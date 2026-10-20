@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../platform/event_log.dart';
 import '../settings/user_settings.dart';
 
 /// Where the user came to baocode.dev from, as the site kept it in their
@@ -355,6 +356,7 @@ class ChannelSetup extends ChangeNotifier {
 
   bool _done;
   bool _opened = false;
+  bool _openFailed = false;
   bool _offline = false;
   int _failures = 0;
   Timer? _poll;
@@ -365,6 +367,11 @@ class ChannelSetup extends ChangeNotifier {
 
   /// Whether the page was opened: the app waits for it.
   bool get waiting => _opened && !_done;
+
+  /// Whether the browser did not open the page, the last time it was
+  /// asked to: the welcome shows the page's address to copy instead. The
+  /// app waits all the same ([waiting]), for the page opened by hand.
+  bool get openFailed => _openFailed && !_done;
 
   /// Whether the stats server could not be reached, lately: the network.
   bool get offline => _offline && !_done;
@@ -405,8 +412,19 @@ class ChannelSetup extends ChangeNotifier {
     _offline = false;
     _notify();
     _poll ??= Timer.periodic(pollInterval, (_) => unawaited(_ask()));
-    final opened = await open(page(zh: zh));
-    if (!opened) debugPrint('channel setup: the page did not open');
+    bool opened;
+    try {
+      opened = await open(page(zh: zh));
+    } on Object catch (error) {
+      debugPrint('channel setup: the page did not open: $error');
+      opened = false;
+    }
+    // For the diagnostics a user uploads; not the address, whose install
+    // id they are not to be linked to.
+    if (!opened) appEvent('channel', 'setup page did not open in the browser');
+    if (_openFailed == !opened) return;
+    _openFailed = !opened;
+    _notify();
   }
 
   Future<void> _ask() async {

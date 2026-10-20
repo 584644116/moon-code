@@ -9669,6 +9669,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get channelSetupWaiting => '网页显示完成后，这里会自动继续。不小心关掉了网页，可以重新打开。';
 
   @override
+  String get channelSetupOpenFailedTitle => '浏览器没有打开';
+
+  @override
+  String get channelSetupOpenFailed => '复制下面的网址，粘贴到浏览器里打开。网页显示完成后，这里会自动继续。';
+
+  @override
+  String get channelSetupAddressCopied => '已复制';
+
+  @override
   String get channelSetupOffline => '连不上 baocode.dev，需要联网才能完成设置。';
 
   @override

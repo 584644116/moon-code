@@ -63,6 +63,8 @@ void main() {
   late FakeServer server;
   late MemoryChannelSetupStore store;
   late List<Uri> opened;
+  // Whether the browser opens the page.
+  late bool opens;
 
   ChannelSetup setupOf({
     Duration poll = const Duration(milliseconds: 5),
@@ -74,7 +76,7 @@ void main() {
     lookUp: server.lookUp,
     open: (url) async {
       opened.add(url);
-      return true;
+      return opens;
     },
     pollInterval: poll,
   );
@@ -83,6 +85,7 @@ void main() {
     server = FakeServer();
     store = MemoryChannelSetupStore();
     opened = [];
+    opens = true;
   });
 
   Future<void> until(bool Function() condition) async {
@@ -271,6 +274,31 @@ void main() {
         Uri.parse('https://baocode.dev/zh/activate#i=$_id'),
       ]);
       expect(setup.waiting, isTrue);
+    });
+
+    test('says the browser did not open the page, and still waits for '
+        'it', () async {
+      final setup = setupOf();
+      addTearDown(setup.dispose);
+      opens = false;
+      await setup.openPage(zh: true);
+      expect(setup.openFailed, isTrue);
+      expect(setup.waiting, isTrue);
+      // The page opened by hand: it asks all the same.
+      server.kept = const ChannelAttribution('direct', null);
+      await until(() => setup.done);
+      expect(setup.openFailed, isFalse);
+    });
+
+    test('a page opened at last is no longer said not to have', () async {
+      final setup = setupOf(poll: const Duration(hours: 1));
+      addTearDown(setup.dispose);
+      opens = false;
+      await setup.openPage(zh: false);
+      expect(setup.openFailed, isTrue);
+      opens = true;
+      await setup.openPage(zh: false);
+      expect(setup.openFailed, isFalse);
     });
 
     test('asks the stats server while the page is open, and is done once '
@@ -675,6 +703,51 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 1600));
       expect(find.text('欢迎使用 YouTube'), findsOneWidget);
+    });
+
+    testWidgets('the browser not opening, shows the page’s address to copy', (
+      tester,
+    ) async {
+      final copied = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied.add((call.arguments as Map)['text'] as String);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      opens = false;
+      final setup = setupOf(poll: const Duration(hours: 1));
+      await open(tester, setup);
+      await tester.tap(find.text('在浏览器中完成设置').last);
+      await tester.pump();
+      expect(find.text('浏览器没有打开'), findsOneWidget);
+      expect(find.text('正在等待浏览器完成…'), findsNothing);
+      final address = 'https://baocode.dev/zh/activate#i=$_id';
+      expect(find.text(address), findsOneWidget);
+      await tester.tap(find.text('复制'));
+      await tester.pump();
+      expect(copied, [address]);
+      expect(find.text('已复制'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('复制'), findsOneWidget);
+
+      // Opened at last: waiting for it, as ever.
+      opens = true;
+      await tester.tap(find.text('重新打开网页'));
+      await tester.pump();
+      expect(find.text('正在等待浏览器完成…'), findsOneWidget);
+      expect(find.text(address), findsNothing);
+      // Its questions stop with it, before the test's end checks the timers.
+      setup.dispose();
     });
 
     testWidgets('says it needs the network, Retry opening the page again', (

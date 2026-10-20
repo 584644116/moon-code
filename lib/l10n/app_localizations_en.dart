@@ -10230,6 +10230,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Once the page says it\'s done, BaoCode continues on its own. Closed the page by mistake? Open it again.';
 
   @override
+  String get channelSetupOpenFailedTitle => 'Your browser didn\'t open';
+
+  @override
+  String get channelSetupOpenFailed =>
+      'Copy this address and open it in your browser. Once the page says it\'s done, BaoCode continues on its own.';
+
+  @override
+  String get channelSetupAddressCopied => 'Copied';
+
+  @override
   String get channelSetupOffline =>
       'Can\'t reach baocode.dev. You need to be online to finish setup.';
 

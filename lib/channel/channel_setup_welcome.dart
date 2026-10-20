@@ -121,7 +121,8 @@ class _ChannelSetupWelcomeState extends State<ChannelSetupWelcome>
 
   void _changed() {
     if (!mounted) return;
-    final waiting = _setup?.waiting ?? false;
+    final waiting =
+        (_setup?.waiting ?? false) && !(_setup?.openFailed ?? false);
     if (waiting && !_travel.isAnimating) {
       unawaited(_travel.repeat());
     } else if (!waiting && _travel.isAnimating) {
@@ -268,11 +269,16 @@ class _ChannelSetupWelcomeState extends State<ChannelSetupWelcome>
     final stage = _gate.stage;
     final setup = _setup;
     final done = stage != ChannelStage.setup;
-    final waiting = !done && (setup?.waiting ?? false);
+    // The browser did not open the page: its address, to open by hand.
+    final failed = !done && (setup?.openFailed ?? false);
+    final waiting = !done && !failed && (setup?.waiting ?? false);
     final finding = stage == ChannelStage.finding;
     final String title;
     final String text;
     switch (stage) {
+      case ChannelStage.setup when failed:
+        title = l10n.channelSetupOpenFailedTitle;
+        text = l10n.channelSetupOpenFailed;
       case ChannelStage.setup when waiting:
         title = l10n.channelSetupWaitingTitle;
         text = l10n.channelSetupWaiting;
@@ -334,7 +340,7 @@ class _ChannelSetupWelcomeState extends State<ChannelSetupWelcome>
           child: WelcomeStep(
             done: done && !stuck && !finding,
             spinning: waiting || finding,
-            icon: stuck
+            icon: stuck || failed
                 ? Codicons.warning
                 : waiting || finding
                 ? Codicons.loading
@@ -342,6 +348,10 @@ class _ChannelSetupWelcomeState extends State<ChannelSetupWelcome>
             title: title,
             text: text,
             below: [
+              if (setup != null && failed) ...[
+                const SizedBox(height: 8),
+                _PageAddress('${setup.page(zh: _language == 'zh')}'),
+              ],
               if (setup != null && setup.offline && !done) ...[
                 const SizedBox(height: 6),
                 Text(
@@ -389,11 +399,11 @@ class _ChannelSetupWelcomeState extends State<ChannelSetupWelcome>
             const SizedBox(width: 12),
             if (!done)
               IdeButton(
-                label: waiting
+                label: waiting || failed
                     ? l10n.channelSetupOpenAgain
                     : l10n.channelSetupOpen,
-                icon: waiting ? null : Codicons.linkExternal,
-                secondary: waiting,
+                icon: waiting || failed ? null : Codicons.linkExternal,
+                secondary: waiting || failed,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 6,
@@ -433,6 +443,73 @@ class _ChannelSetupWelcomeState extends State<ChannelSetupWelcome>
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The page's address, when the browser did not open it: copied, to open
+/// by hand.
+class _PageAddress extends StatefulWidget {
+  const _PageAddress(this.url);
+
+  final String url;
+
+  @override
+  State<_PageAddress> createState() => _PageAddressState();
+}
+
+class _PageAddressState extends State<_PageAddress> {
+  bool _copied = false;
+  Timer? _copiedTimer;
+
+  @override
+  void dispose() {
+    _copiedTimer?.cancel();
+    super.dispose();
+  }
+
+  void _copy() {
+    unawaited(Clipboard.setData(ClipboardData(text: widget.url)));
+    _copiedTimer?.cancel();
+    setState(() => _copied = true);
+    _copiedTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _copied = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              border: Border.all(color: AppColors.borderStrong),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              widget.url,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.text,
+                fontSize: 12,
+                fontFamily: AppFonts.mono,
+                fontFamilyFallback: AppFonts.monoFallbacks,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        IdeButton(
+          label: _copied ? l10n.channelSetupAddressCopied : l10n.commonCopy,
+          icon: _copied ? Codicons.check : Codicons.copy,
+          onPressed: _copy,
+        ),
+      ],
     );
   }
 }

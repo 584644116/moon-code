@@ -16731,6 +16731,24 @@ abstract class AppLocalizations {
   /// **'Once the page says it\'s done, BaoCode continues on its own. Closed the page by mistake? Open it again.'**
   String get channelSetupWaiting;
 
+  /// No description provided for @channelSetupOpenFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your browser didn\'t open'**
+  String get channelSetupOpenFailedTitle;
+
+  /// No description provided for @channelSetupOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy this address and open it in your browser. Once the page says it\'s done, BaoCode continues on its own.'**
+  String get channelSetupOpenFailed;
+
+  /// No description provided for @channelSetupAddressCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get channelSetupAddressCopied;
+
   /// No description provided for @channelSetupOffline.
   ///
   /// In en, this message translates to:
