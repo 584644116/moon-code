@@ -77,6 +77,11 @@ class GitSnapshot {
 
 /// What the model is told of where it works: its system prompt, and the
 /// context sent with the conversation's first message.
+///
+/// One per session, shared by every run: what it reads (the plugins, the
+/// memory files, the repository) is the session's. What a run is told of
+/// it is made for that run ([agentSystem], [userContext]), so a
+/// subagent's prompt is its own.
 class SessionContext {
   SessionContext(this.session);
 

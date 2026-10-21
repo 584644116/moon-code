@@ -257,4 +257,6 @@ Future<void> startNetworkProxy(
 
 Future<ProxyRoute> currentProxyRoute() => NetworkProxy.instance.resolve();
 
+ProxyRoute get proxyRouteNow => NetworkProxy.instance.current;
+
 Future<Duration> probeConnection(Uri url) => NetworkProxy.instance.probe(url);

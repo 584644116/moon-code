@@ -9,5 +9,7 @@ Future<void> startNetworkProxy(
 
 Future<ProxyRoute> currentProxyRoute() async => const ProxyRoute.direct();
 
+ProxyRoute get proxyRouteNow => const ProxyRoute.direct();
+
 Future<Duration> probeConnection(Uri url) =>
     throw UnsupportedError('No proxy on the web');

@@ -334,6 +334,423 @@ void main() {
       expect(h.of('system', 'compact_boundary'), isEmpty);
     });
 
+    test(
+      'two subagents compacting at once keep their contexts apart',
+      () async {
+        h = await Harness.start();
+        bool isSummary(ModelRequest request) =>
+            jsonEncode(request.body['system'])
+                .contains('summary of a conversation');
+        String? tagOf(ModelRequest request) {
+          final first = jsonEncode((request.body['messages'] as List).first);
+          if (first.contains('SUB1')) return 'SUB1';
+          if (first.contains('SUB2')) return 'SUB2';
+          return null;
+        }
+
+        final steps = <String, int>{'SUB1': 0, 'SUB2': 0};
+        h.model.route = (request) {
+          final tag = tagOf(request);
+          if (tag == null) return null;
+          if (isSummary(request)) {
+            return Reply.text('<summary>$tag COMPACTED</summary>');
+          }
+          final step = steps[tag]!;
+          steps[tag] = step + 1;
+          return switch (step) {
+            0 => Reply.tool('TodoWrite', {
+              'todos': [
+                {
+                  'content': '$tag-TODO',
+                  'status': 'pending',
+                  'activeForm': tag,
+                },
+              ],
+            }),
+            1 => Reply.failing(
+              const ApiError(
+                'prompt is too long: 210000 tokens > 200000 maximum',
+                status: 400,
+              ),
+            ),
+            _ => Reply.text('$tag report'),
+          };
+        };
+        h.model.script.addAll([
+          Reply.tools([
+            (
+              'TodoWrite',
+              {
+                'todos': [
+                  {
+                    'content': 'MAIN-TODO',
+                    'status': 'pending',
+                    'activeForm': 'Main',
+                  },
+                ],
+              },
+            ),
+            ('Agent', {'description': 'One', 'prompt': 'SUB1: look'}),
+            ('Agent', {'description': 'Two', 'prompt': 'SUB2: look'}),
+          ]),
+          Reply.text('both done'),
+        ]);
+        await h.turn('go');
+
+        List<ModelRequest> childRequests(String tag) => [
+          for (final request in h.model.requests)
+            if (request.body['tools'] != null &&
+                jsonEncode(request.body['system']).contains('As an agent:') &&
+                tagOf(request) == tag)
+              request,
+        ];
+        // Both were at work at once: the second asked before the first
+        // finished.
+        int at(ModelRequest request) => h.model.requests.indexOf(request);
+        expect(
+          at(childRequests('SUB2').first),
+          lessThan(at(childRequests('SUB1').last)),
+        );
+        // Each went on from its own summary, its own todos carried over,
+        // and none of the other's.
+        for (final tag in const ['SUB1', 'SUB2']) {
+          final other = tag == 'SUB1' ? 'SUB2' : 'SUB1';
+          final after = sentIn(childRequests(tag).last);
+          expect(after, contains('$tag COMPACTED'));
+          expect(after, contains('$tag-TODO'));
+          expect(after, isNot(contains('$other COMPACTED')));
+          expect(after, isNot(contains('$other-TODO')));
+          expect(after, isNot(contains('MAIN-TODO')));
+        }
+        // The main agent's conversation has the reports, not the summaries.
+        final main = h.model.requests.lastWhere(
+          (request) =>
+              request.body['tools'] != null &&
+              !jsonEncode(request.body['system']).contains('As an agent:') &&
+              !isSummary(request),
+        );
+        expect(sentIn(main), contains('SUB1 report'));
+        expect(sentIn(main), contains('SUB2 report'));
+        expect(sentIn(main), contains('MAIN-TODO'));
+        expect(sentIn(main), isNot(contains('COMPACTED')));
+        // Neither subagent's compaction is the conversation's to show.
+        expect(h.of('system', 'compact_boundary'), isEmpty);
+
+        final dir = p.join(p.withoutExtension(h.sessionFile), 'subagents');
+        final files = Directory(dir)
+            .listSync()
+            .whereType<File>()
+            .where((file) => file.path.endsWith('.jsonl'))
+            .toList();
+        expect(files, hasLength(2));
+        for (final file in files) {
+          final agentId = p
+              .basenameWithoutExtension(file.path)
+              .replaceFirst('agent-', '');
+          final lines = [
+            for (final line in file.readAsLinesSync())
+              (jsonDecode(line) as Map).cast<String, Object?>(),
+          ];
+          // Every line is of the side chain, and names that agent: the
+          // boundaries and summaries a compaction writes too.
+          expect(
+            lines.every((line) => line['isSidechain'] == true),
+            isTrue,
+            reason: '${file.path} has a line of the parent',
+          );
+          expect(
+            lines.every((line) => line['agentId'] == agentId),
+            isTrue,
+            reason: '${file.path} names another agent',
+          );
+          expect(
+            lines.where((line) => line['subtype'] == 'compact_boundary'),
+            hasLength(1),
+          );
+          final summary = lines.firstWhere(
+            (line) => line['isCompactSummary'] == true,
+          );
+          final tag = jsonEncode(summary['message']).contains('SUB1')
+              ? 'SUB1'
+              : 'SUB2';
+          expect(jsonEncode(summary), contains('$tag COMPACTED'));
+          expect(jsonEncode(summary), contains('$tag-TODO'));
+          expect(jsonEncode(summary), isNot(contains('MAIN-TODO')));
+        }
+      },
+    );
+
+    test('the main agent and a subagent compact at once, apart', () async {
+      h = await Harness.start();
+      bool isSummary(ModelRequest request) =>
+          jsonEncode(request.body['system'])
+              .contains('summary of a conversation');
+      bool childThread(ModelRequest request) =>
+          jsonEncode((request.body['messages'] as List).first).contains('SUB');
+
+      var subSteps = 0;
+      h.model.route = (request) {
+        if (isSummary(request)) {
+          return Reply.text(
+            childThread(request)
+                ? '<summary>SUB COMPACTED</summary>'
+                : '<summary>MAIN COMPACTED</summary>',
+          );
+        }
+        if (childThread(request)) {
+          subSteps++;
+          return subSteps == 1
+              ? Reply.failing(
+                  const ApiError(
+                    'prompt is too long: 210000 tokens > 200000 maximum',
+                    status: 400,
+                  ),
+                )
+              : Reply.text('sub report');
+        }
+        if (jsonEncode(request.body['messages'])
+            .contains('<task-notification>')) {
+          return Reply.text('noted');
+        }
+        return null;
+      };
+      h.model.script.addAll([
+        Reply.tool('Agent', {
+          'description': 'Background',
+          'prompt': 'SUB: look',
+          'run_in_background': true,
+        }),
+        Reply.failing(
+          const ApiError(
+            'prompt is too long: 210000 tokens > 200000 maximum',
+            status: 400,
+          ),
+        ),
+        Reply.text('main done'),
+      ]);
+      await h.turn('go');
+      if (h.of('system', 'task_notification').isEmpty) {
+        await h.nextIdle().timeout(const Duration(seconds: 10));
+      }
+
+      // The main agent went on from its own summary ...
+      final mainAfter = sentIn(
+        h.model.requests.lastWhere(
+          (request) =>
+              request.body['tools'] != null &&
+              !childThread(request) &&
+              !isSummary(request) &&
+              sentIn(request).contains('MAIN COMPACTED'),
+        ),
+      );
+      expect(mainAfter, contains('MAIN COMPACTED'));
+      expect(mainAfter, isNot(contains('SUB COMPACTED')));
+      // ... the subagent from its own.
+      final childAfter = sentIn(
+        h.model.requests.lastWhere(
+          (request) =>
+              childThread(request) && sentIn(request).contains('SUB COMPACTED'),
+        ),
+      );
+      expect(childAfter, contains('SUB COMPACTED'));
+      expect(childAfter, isNot(contains('MAIN COMPACTED')));
+      // Each was compacting while the other was still at work: the child's
+      // summary was asked before the main agent came back, and the main
+      // agent's before the child answered.
+      final parentSummary = h.model.requests.indexWhere(
+        (request) => isSummary(request) && !childThread(request),
+      );
+      final childSummary = h.model.requests.indexWhere(
+        (request) => isSummary(request) && childThread(request),
+      );
+      final parentLast = h.model.requests.lastIndexWhere(
+        (request) =>
+            request.body['tools'] != null &&
+            !childThread(request) &&
+            !isSummary(request),
+      );
+      final childLast = h.model.requests.lastIndexWhere(
+        (request) => childThread(request) && !isSummary(request),
+      );
+      expect(childSummary, lessThan(parentLast));
+      expect(parentSummary, lessThan(childLast));
+      // Only the conversation's own compaction is the host's to show.
+      expect(h.of('system', 'compact_boundary'), hasLength(1));
+
+      final dir = p.join(p.withoutExtension(h.sessionFile), 'subagents');
+      final file = Directory(dir)
+          .listSync()
+          .whereType<File>()
+          .singleWhere((file) => file.path.endsWith('.jsonl'));
+      final lines = [
+        for (final line in file.readAsLinesSync())
+          (jsonDecode(line) as Map).cast<String, Object?>(),
+      ];
+      expect(lines.every((line) => line['isSidechain'] == true), isTrue);
+      expect(
+        lines.where((line) => line['subtype'] == 'compact_boundary'),
+        hasLength(1),
+      );
+      final summary = lines.firstWhere(
+        (line) => line['isCompactSummary'] == true,
+      );
+      expect(jsonEncode(summary), contains('SUB COMPACTED'));
+      expect(jsonEncode(summary), isNot(contains('MAIN COMPACTED')));
+    });
+
+    test('old tool results are cleared before a summary is asked', () async {
+      final big1 = [for (var i = 0; i < 300; i++) 'BIG1-$i ${'x' * 90}']
+          .join('\n');
+      final big2 = [for (var i = 0; i < 300; i++) 'BIG2-$i ${'y' * 90}']
+          .join('\n');
+      h = await Harness.start(files: {'big1.txt': big1, 'big2.txt': big2});
+      final cwd = h.cwd;
+      var calls = 0;
+      Map<String, Object?> usage(int input) => {
+        'input_tokens': input,
+        'cache_read_input_tokens': 0,
+        'cache_creation_input_tokens': 0,
+        'output_tokens': 10,
+      };
+      Reply call(String name, Map<String, Object?> input, int inputTokens) =>
+          Reply(
+            [
+              {
+                'type': 'tool_use',
+                'id': 'toolu_${calls++}',
+                'name': name,
+                'input': input,
+              },
+            ],
+            stopReason: 'tool_use',
+            usage: usage(inputTokens),
+          );
+      h.model.script.addAll([
+        call('Read', {'file_path': p.join(cwd, 'big1.txt')}, 100000),
+        call('Read', {'file_path': p.join(cwd, 'big2.txt')}, 120000),
+        call('Grep', {'pattern': 'needle', 'path': cwd}, 130000),
+        call('Grep', {'pattern': 'needle', 'path': cwd}, 140000),
+        call('Glob', {'pattern': '*.txt', 'path': cwd}, 175000),
+        Reply.text('done'),
+      ]);
+      await h.turn('go');
+
+      // The old output made room: no summary was asked for.
+      expect(
+        h.model.requests.where(
+          (request) =>
+              jsonEncode(request.body['system'])
+                  .contains('summary of a conversation'),
+        ),
+        isEmpty,
+      );
+      // What is sent has the placeholder, not what the files held.
+      final sent = sentIn(h.model.turns.last);
+      expect(sent, contains('Old tool result content cleared'));
+      expect(sent, isNot(contains('BIG1-')));
+      expect(sent, isNot(contains('BIG2-')));
+      // The file keeps what was said; only the request left it out.
+      final kept = File(h.sessionFile).readAsStringSync();
+      expect(kept, contains('BIG1-'));
+      expect(kept, contains('BIG2-'));
+      expect(
+        kept
+            .split('\n')
+            .where((line) => line.contains('"microcompact_boundary"')),
+        hasLength(1),
+      );
+      expect(h.of('system', 'compact_boundary'), isEmpty);
+    });
+
+    test('a file read before the summary is given back after it', () async {
+      final content = [for (var i = 0; i < 50; i++) 'RESTORE-$i ${'z' * 80}']
+          .join('\n');
+      h = await Harness.start(files: {'restore.txt': content});
+      final cwd = h.cwd;
+      h.model.route = (request) {
+        if (jsonEncode(request.body['system'])
+            .contains('summary of a conversation')) {
+          return Reply.text('<summary>RESTORE talk.</summary>');
+        }
+        return null;
+      };
+      h.model.script.addAll([
+        Reply(
+          [
+            {
+              'type': 'tool_use',
+              'id': 'toolu_restore',
+              'name': 'Read',
+              'input': {'file_path': p.join(cwd, 'restore.txt')},
+            },
+          ],
+          stopReason: 'tool_use',
+          usage: {
+            'input_tokens': 100000,
+            'cache_read_input_tokens': 0,
+            'cache_creation_input_tokens': 0,
+            'output_tokens': 10,
+          },
+        ),
+        Reply.failing(
+          const ApiError(
+            'prompt is too long: 210000 tokens > 200000 maximum',
+            status: 400,
+          ),
+        ),
+        Reply.text('done'),
+      ]);
+      await h.turn('go');
+
+      final sent = sentIn(h.model.turns.last);
+      expect(
+        sent,
+        contains('The files read before the conversation was compacted'),
+      );
+      expect(sent, contains('RESTORE-'));
+      expect(sent, contains('restore.txt'));
+    });
+
+    test('a summary is asked without the images in the conversation', () async {
+      h = await Harness.start();
+      final summaries = <ModelRequest>[];
+      h.model.route = (request) {
+        if (jsonEncode(request.body['system'])
+            .contains('summary of a conversation')) {
+          summaries.add(request);
+          return Reply.text('<summary>seen.</summary>');
+        }
+        return null;
+      };
+      h.model.script.addAll([
+        Reply.failing(
+          const ApiError(
+            'prompt is too long: 210000 tokens > 200000 maximum',
+            status: 400,
+          ),
+        ),
+        Reply.text('done'),
+      ]);
+      await h.turn(
+        'look',
+        blocks: [
+          {
+            'type': 'image',
+            'source': {
+              'type': 'base64',
+              'media_type': 'image/png',
+              'data': 'aGVsbG8=',
+            },
+          },
+        ],
+      );
+
+      expect(summaries, hasLength(1));
+      final sent = jsonEncode(summaries.single.body['messages']);
+      expect(sent, contains('[image]'));
+      expect(sent, isNot(contains('"type":"image"')));
+    });
+
     test("a subagent's model the provider lacks: the session's own", () async {
       h = await Harness.start();
       final models = <String>[];
@@ -549,9 +966,8 @@ void main() {
               'INFO step $i',
         '2026-10-21T09:01:00 ERROR the thing that matters',
       ].join('\n');
-      final table = [
-        for (var i = 0; i < 40; i++) 'row$i\tvalue$i\t${i * 2}',
-      ].join('\n');
+      final table = [for (var i = 0; i < 40; i++) 'row$i\tvalue$i\t${i * 2}']
+          .join('\n');
       h.onRequest = (request) async {
         final message = request['message'] as Map;
         final id = message['id'];

@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import '../platform/app_paths.dart';
 import 'claude_environment.dart';
 import 'claude_history_page.dart';
+import 'claude_session_bytes.dart';
 
 /// A session Claude Code kept: its title, the folder it ran in, and when
 /// it was last talked in.
@@ -66,14 +67,13 @@ class ClaudeSessionSummary {
 /// for one saying nothing readable, so that a session listed is still
 /// listed — at its worst place in the order, which is where one of
 /// unknown time belongs.
-DateTime _time(Object? value) => DateTime.fromMicrosecondsSinceEpoch(
-  switch (value) {
-    final int at => at,
-    final num at => at.toInt(),
-    final String at => int.tryParse(at.trim()) ?? 0,
-    _ => 0,
-  },
-);
+DateTime _time(Object? value) =>
+    DateTime.fromMicrosecondsSinceEpoch(switch (value) {
+      final int at => at,
+      final num at => at.toInt(),
+      final String at => int.tryParse(at.trim()) ?? 0,
+      _ => 0,
+    });
 
 /// A project directory and its sessions, newest first.
 class ClaudeProjectSummary {
@@ -481,39 +481,97 @@ class _SummaryCache {
   }
 }
 
+/// How much of a session file is read from each end to summarize it: the
+/// place it ran in and its first prompt are at its head, its title and
+/// last message at its tail.
+const _summaryWindow = 64 * 1024;
+
 /// Title, place and time of a session file; null for one with no
 /// conversation (e.g. only a failed start). Raise [_SummaryCache._version]
 /// when changing what it makes of a file.
 ClaudeSessionSummary? _summarize(File file) {
   final String text;
   try {
+    // Read at its two ends: a session talked in for hours is hundreds of
+    // megabytes of lines, almost none of which say what a listing asks.
+    if (file.lengthSync() > _summaryWindow * 2) {
+      final head = readHead(file, _summaryWindow);
+      final tail = readTail(file, _summaryWindow);
+      if (_summarizeParts(file, head, tail) case final summary?) {
+        return summary;
+      }
+    }
     text = file.readAsStringSync();
   } on Object {
     return null;
   }
-  String? cwd;
-  String? firstPrompt;
-  // The last title wins; scan for the marker rather than decoding every
-  // line of a long session.
-  String? lastTitle(String type, String key) {
-    final at = text.lastIndexOf('"type":"$type"');
-    if (at < 0) return null;
-    final start = text.lastIndexOf('\n', at) + 1;
-    final end = text.indexOf('\n', at);
-    final line = text.substring(start, end < 0 ? text.length : end);
-    try {
-      final title = ((jsonDecode(line) as Map)[key] as String?)?.trim();
-      return title?.isEmpty ?? true ? null : title;
-    } on Object {
-      return null;
-    }
-  }
+  return _summarizeFull(file, text);
+}
 
-  // The user's (`/rename`) before the one Claude Code generated.
+/// The summary of [file] from [head] and [tail] alone; null when either
+/// says nothing of what is asked (an old title or first prompt is one the
+/// windows do not hold), let the whole file be read.
+ClaudeSessionSummary? _summarizeParts(File file, String head, String tail) {
+  // The user's (`/rename`) before the one Claude Code generated; the last
+  // of them, the tail's before the head's.
   final title =
-      lastTitle('custom-title', 'customTitle') ??
-      lastTitle('ai-title', 'aiTitle');
-  final lines = const LineSplitter().convert(text);
+      _lastTitle(tail, 'custom-title', 'customTitle') ??
+      _lastTitle(head, 'custom-title', 'customTitle') ??
+      _lastTitle(tail, 'ai-title', 'aiTitle') ??
+      _lastTitle(head, 'ai-title', 'aiTitle');
+  if (title == null) return null;
+  final (cwd, firstPrompt) = _firstOf(const LineSplitter().convert(head));
+  if (cwd == null || firstPrompt == null) return null;
+  return _summary(
+    file,
+    cwd: cwd,
+    firstPrompt: firstPrompt,
+    title: title,
+    // When it was last talked in: the file is written to besides (titles,
+    // the last prompt), by the CLI resuming it too.
+    updatedAt:
+        _lastMessageTime(const LineSplitter().convert(tail)) ??
+        file.lastModifiedSync(),
+  );
+}
+
+ClaudeSessionSummary? _summarizeFull(File file, String text) {
+  final (cwd, firstPrompt) = _firstOf(const LineSplitter().convert(text));
+  if (cwd == null || firstPrompt == null) return null;
+  return _summary(
+    file,
+    cwd: cwd,
+    firstPrompt: firstPrompt,
+    title:
+        _lastTitle(text, 'custom-title', 'customTitle') ??
+        _lastTitle(text, 'ai-title', 'aiTitle'),
+    updatedAt:
+        _lastMessageTime(const LineSplitter().convert(text)) ??
+        file.lastModifiedSync(),
+  );
+}
+
+/// The title the last `type` line in [text] names; null when there is none.
+/// Scanned for rather than decoded line by line: most lines of a long
+/// session are messages.
+String? _lastTitle(String text, String type, String key) {
+  final at = text.lastIndexOf('"type":"$type"');
+  if (at < 0) return null;
+  final start = text.lastIndexOf('\n', at) + 1;
+  final end = text.indexOf('\n', at);
+  final line = text.substring(start, end < 0 ? text.length : end);
+  try {
+    final title = ((jsonDecode(line) as Map)[key] as String?)?.trim();
+    return title?.isEmpty ?? true ? null : title;
+  } on Object {
+    return null;
+  }
+}
+
+/// The place [lines] say the session ran in, and the first prompt of the
+/// user's; either null when they hold none.
+(String?, String?) _firstOf(Iterable<String> lines) {
+  String? cwd;
   for (final line in lines) {
     if (!line.contains('"type":"user"')) continue;
     final Map<String, Object?> entry;
@@ -525,12 +583,18 @@ ClaudeSessionSummary? _summarize(File file) {
     cwd ??= entry['cwd'] as String?;
     if (entry['isSidechain'] == true || entry['isMeta'] == true) continue;
     final prompt = _promptText(entry);
-    if (prompt != null) {
-      firstPrompt = prompt;
-      break;
-    }
+    if (prompt != null) return (cwd, prompt);
   }
-  if (cwd == null || firstPrompt == null) return null;
+  return (cwd, null);
+}
+
+ClaudeSessionSummary _summary(
+  File file, {
+  required String cwd,
+  required String firstPrompt,
+  required String? title,
+  required DateTime updatedAt,
+}) {
   final name = file.uri.pathSegments.last;
   final firstLine = firstPrompt.trim().split('\n').first;
   return ClaudeSessionSummary(
@@ -540,9 +604,7 @@ ClaudeSessionSummary? _summarize(File file) {
         (firstLine.length > 120
             ? '${firstLine.substring(0, 120)}…'
             : firstLine),
-    // When it was last talked in: the file is written to besides (titles,
-    // the last prompt), by the CLI resuming it too.
-    updatedAt: _lastMessageTime(lines) ?? file.lastModifiedSync(),
+    updatedAt: updatedAt,
     cwd: cwd,
     path: file.path,
   );

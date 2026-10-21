@@ -22,5 +22,10 @@ Future<void> startNetworkProxy(
 /// The proxy now, the system's read again.
 Future<ProxyRoute> currentProxyRoute() => platform.currentProxyRoute();
 
+/// The proxy as last read, without reading the system again: what a
+/// running agent is told when it changes (see the kernel's environment
+/// update).
+ProxyRoute get proxyRouteNow => platform.proxyRouteNow;
+
 /// How long [url] took to answer through it; throws a [ProbeFailure].
 Future<Duration> probeConnection(Uri url) => platform.probeConnection(url);

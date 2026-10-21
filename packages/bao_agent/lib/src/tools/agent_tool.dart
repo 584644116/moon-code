@@ -363,6 +363,7 @@ class _Job {
         file: file,
         gitBranch: session.store.gitBranch,
         sidechain: true,
+        agentId: agentId,
       );
     }
     if (file != null && !resumed) {
@@ -381,6 +382,8 @@ class _Job {
       cwd: session.cwd,
       file: file,
       gitBranch: session.store.gitBranch,
+      sidechain: true,
+      agentId: agentId,
     );
   }
 
@@ -390,6 +393,7 @@ class _Job {
     final store = _store();
     final run = this.run = AgentRun(
       session: session,
+      store: store,
       agentId: agentId,
       parentToolUseId: toolUseId,
       agentType: agent.name,
@@ -431,9 +435,7 @@ class _Job {
         'uuid': entry['uuid'],
       });
       final loop = AgentLoop(
-        session: session,
         run: run,
-        store: store,
         tools: session.toolbox.forAgent(agent),
         system: session.context.agentSystem(agent, model),
         model: model,

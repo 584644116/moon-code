@@ -126,11 +126,27 @@ claude -p --input-format stream-json --output-format stream-json
 | `get_hooks_listing` | 反推 `/goal` 状态 | `claude_code_kernel.dart:1947` |
 | `get_usage` | 账号用量 | `claude_code_kernel.dart:2093` |
 | `get_context_usage` | 上下文窗口占用 | `claude_code_kernel.dart:2247` |
-| `get_settings` | 读回生效设置 | `claude_code_kernel.dart:2601` |
+| `get_settings` | 读回生效设置；`effective` 里的 allow 规则用来警告 Auto 下会被绕过的规则 | `claude_code_kernel.dart:2786` |
 
 `set_permission_mode` 送的是 `_mode`：Plan 时是 `plan`，否则是 `_cliApproval`。`_cliApproval` 对两种模式做了映射：Full access 以 `acceptEdits` 送（CLI 在 root 下不接受 `bypassPermissions`）；Auto 在 Claude Code 自己的分类器跑不了的模型上（另一家 provider 的、或它标注不支持 Auto 的）以 `default` 送，由 `_permission` 本地分类后直接应答。换模型时 `_selectModel` 会重发；`--resume` 的 init 回填只作为起点，随后按当前选择重发（见 `_reported` 对映射值的处理）。
 
-### 4.2 BaoCode 应答的 subtype（CLI 发来的）
+**`get_settings` 的 `effective` 不只是回填模型与 effort**：`effective.permissions.allow` 会交给 `dangerousAutoAllowRules`（`lib/kernel/claude_code/claude_auto_rules.dart`）检查。Auto 由 BaoCode 本地分类时（`_classifies` 为 false），CLI 仍在 `default` 模式下先套用自己的权限规则：`Bash(python:*)`、`PowerShell(iex:*)` 这类解释器规则，以及任何 `Agent` / `Task` 规则，会把调用直接放行，永远到不了分类器。BaoCode 无法代 CLI 撤销这些规则，只能在界面上出一条 warning，列出命中的规则；规则集合不变就不重复警告（`_checkAutoAllowRules`，`claude_code_kernel.dart:3348`）。CLI 自己的 Auto 模式会剥离这些规则，所以这条警告只对本地分类的会话有意义。
+
+分类器读到的转录也收紧了（`_askedText`，`claude_code_kernel.dart:1539`）：用户消息加 agent 已经发出的工具调用（名称与输入，跳过子代理的），**不含** agent 自己的正文。模型写在正文里的话不能成为给自己放行的证据。转录最多 24 条、8000 字符。
+
+### 4.2 走 stdin 的普通消息
+
+不是所有要 CLI 做事的东西都包在 `control_request` 里。下面这条是顶层 stdin 消息：
+
+| 消息 | 用途 | 位置 |
+|---|---|---|
+| `update_environment_variables` | 代理开关变化时，把新的 `HTTPS_PROXY` 等变量告诉正在跑的 CLI | `claude_code_kernel.dart:1004`（`_syncEnvironment`） |
+
+`initialize` 时 CLI 只拿到一次环境变量，会话中途打开或关闭代理，原本要重启会话才生效。现在每次写 stdin 前比较当前 `ProxyRoute.environment` 与启动时发送的：有差异就发一条 `update_environment_variables`，只带变化项；原来设了、现在没设的变量送空字符串（CLI 逐个应用）。这是 CLI 在 stream-json 输入里支持的普通消息，不是 control subtype，所以不进 4.1 的表。
+
+测试：`test/kernel_test.dart` → `a proxy turned on or off is told to the running CLI`。
+
+### 4.3 BaoCode 应答的 subtype（CLI 发来的）
 
 | subtype | 用途 | 位置 |
 |---|---|---|
@@ -138,13 +154,13 @@ claude -p --input-format stream-json --output-format stream-json
 | `elicitation` | MCP 服务器要用户填表 / 开链接 | `claude_code_kernel.dart:1742` |
 | `mcp_message` | SDK MCP server 的工具调用 | `claude_code_kernel.dart:1744` |
 
-### 4.3 `control_response` 的配对
+### 4.4 `control_response` 的配对
 
 请求带 `request_id`（形如 `baocode-N`），应答按 `request_id` 配回去，默认超时 60 秒（`lib/kernel/claude_code/control_channel.dart`）。
 
 **改 subtype 名称、改字段名，都要同步改本文档和对应测试。** 不要让第三层的知识只活在代码里。
 
-### 4.4 最特殊的一个：`/goal`
+### 4.5 最特殊的一个：`/goal`
 
 `/goal` 的状态是**反推**的，不是直接读的（`lib/kernel/claude_code/claude_goal.dart`）：
 
@@ -262,3 +278,11 @@ case 'tool_use':
 - `test/remote/claude_wire_contract_test.dart`：新建，12 个契约测试。
 
 **关于"落盘优先"这件事的实测结论**：BaoCode 的历史读取**本来就是落盘优先的**——`_replay`（`claude_code_kernel.dart:2392`）从会话文件读，`_decode` / `_branch` / `_summarize` / `_fork` 每一处都已有 `try/catch` 或前置类型检查。所以这一层不需要"改成落盘优先"，需要的是把剩下几个**跨机器边界**的解析器补齐，以及给 `/goal` 那个没人接的 future 补护栏。这两件事这一批都做了。
+
+### 第三批（Auto 绕过警告 + 环境变量同步）
+
+- `lib/kernel/claude_code/claude_auto_rules.dart`：新建。`parsePermissionRule` 解析 `Tool` / `Tool(content)`；`isDangerousAutoAllowRule` 判定 Auto 下会被 CLI 先放行的规则（`Agent` / `Task` 全部；Bash 的解释器形态 `python`、`node`、`bash`、`sh`、`iex` 等；PowerShell 的 `iex` / `start-process` 等）；`dangerousAutoAllowRules` 从 `get_settings.effective` 的 `permissions.allow` 里挑出来。
+- `claude_code_kernel.dart`：`_refreshApplied` 存下 `effective`；`_applyMode` / `_reported` 在模式或模型变化时调用 `_checkAutoAllowRules`，命中的规则集合发一条 warning 通知（同一集合只发一次）。
+- `claude_code_kernel.dart`：`_syncEnvironment` + `_sentEnvironment`，代理开关变化时发 `update_environment_variables`（见 4.2）。
+- `packages/bao_agent/lib/src/prompts/task_prompts.dart`：分类器的 system prompt 改为分级阻止/允许类别，明确只看用户消息与工具调用；prompt 标签改为 "What the user asked, and the tool calls the agent made"。
+- 测试：`test/kernel/claude_auto_rules_test.dart` 6 个；`test/kernel_test.dart` 新增/扩展 3 个（分类器转录不含 agent 正文、Auto 绕过警告、代理开关同步）。`test/kernel_test.dart` 的定向测试与 `test/kernel/claude_auto_rules_test.dart` 全部通过；`packages/bao_agent` 三个引擎测试文件仍只有基线里的 8 个 Windows 失败。

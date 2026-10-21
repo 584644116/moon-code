@@ -229,8 +229,15 @@ class AgentSession {
   late final TaskManager tasks;
   late final HookRunner hooks;
   late final McpManager mcp = McpManager(this);
+
+  /// The main agent's run: its conversation, its context's fill, its todos.
+  /// A subagent gets a run of its own ([AgentRun]), and shares of this
+  /// session only what the others do (see [AgentRun]).
   late final AgentRun mainRun;
-  late SessionStore store;
+
+  /// The main agent's conversation, a view of [mainRun]'s.
+  SessionStore get store => mainRun.store;
+  set store(SessionStore store) => mainRun.store = store;
   late final FileIndex fileIndex = FileIndex(environment);
   late final Toolbox toolbox = Toolbox(this);
   late final SessionContext context = SessionContext(this);
@@ -272,11 +279,15 @@ class AgentSession {
   double totalCost = 0;
   final Map<String, Map<String, num>> modelUsage = {};
 
-  /// The main agent's last request's usage: how full its context is.
-  Map<String, Object?>? lastUsage;
+  /// The main agent's last request's usage: how full its context is. A
+  /// subagent's is its own run's ([AgentRun.lastUsage]).
+  Map<String, Object?>? get lastUsage => mainRun.lastUsage;
+  set lastUsage(Map<String, Object?>? usage) => mainRun.lastUsage = usage;
 
-  /// Whether the model ever answered a request: the session is real.
-  bool requested = false;
+  /// Whether the main agent's model ever answered a request: the session
+  /// is real. A subagent's answers say nothing of the session's start.
+  bool get requested => mainRun.requested;
+  set requested(bool requested) => mainRun.requested = requested;
 
   /// Told when a background task ends, with what to tell the model.
   void Function(BackgroundTask task, String notification)? onTaskEnded;
@@ -779,5 +790,5 @@ class AgentSession {
 
   // --- Todos and goal ----------------------------------------------------------
 
-  List<Map<String, Object?>> get mainTodos => todos[sessionId] ?? const [];
+  List<Map<String, Object?>> get mainTodos => mainRun.todos;
 }

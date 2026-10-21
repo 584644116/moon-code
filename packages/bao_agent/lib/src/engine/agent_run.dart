@@ -1,9 +1,15 @@
 import '../tools/file_state.dart';
 import 'session.dart';
+import 'session_store.dart';
 
 /// One agent at work in a session: the main one, or a subagent a call of
 /// the Agent tool started. What it read, where its shell is, the mode it
-/// works in.
+/// works in, and the conversation and context it keeps: its own, apart
+/// from the main agent's and from the other subagents' running beside it.
+///
+/// What a run shares is [session] and its services: the settings, the
+/// tools, the hooks, the permission rules, the task list and how the host
+/// is told. The context that fills and is compacted is this run's.
 class AgentRun {
   AgentRun({
     required this.session,
@@ -13,8 +19,11 @@ class AgentRun {
     String? cwd,
     this.modeOverride,
     ReadFileState? readFiles,
+    SessionStore? store,
   }) : cwd = cwd ?? session.cwd,
-       readFiles = readFiles ?? ReadFileState();
+       readFiles = readFiles ?? ReadFileState() {
+    if (store != null) this.store = store;
+  }
 
   final AgentSession session;
 
@@ -39,7 +48,33 @@ class AgentRun {
   /// rule), so each is given once.
   final Set<String> givenMemory = {};
 
+  /// The conversation this run is on: the session's for the main agent,
+  /// a file of its own for a subagent (see [sidechainFile]). Set when the
+  /// session's is (the main) or as it starts (a subagent).
+  late SessionStore store;
+
+  /// The last request's usage of this run's conversation: what its context
+  /// held, as the API counted it. Its own, for a subagent; the session's
+  /// report reads the main run's (see [AgentSession.lastUsage]).
+  Map<String, Object?>? lastUsage;
+
+  /// Whether this run's model ever answered a request.
+  bool requested = false;
+
+  /// Auto compactions in a row that made no summary: after a few, the
+  /// conversation is not to be put to the model for one again (see
+  /// compaction.dart). This run's own count.
+  int compactFailures = 0;
+
   bool get isMain => agentId == null;
+
+  /// What this run's context is kept under: its own, apart from the other
+  /// agents' (see [AgentSession.todos]).
+  String get contextKey => agentId ?? session.sessionId;
+
+  /// The todos of this run: its own list, not the main agent's or another
+  /// subagent's.
+  List<Map<String, Object?>> get todos => session.todos[contextKey] ?? const [];
 
   /// The mode its calls are weighed in.
   String get permissionMode {

@@ -22,6 +22,8 @@ class SessionStore {
     required this.cwd,
     this.file,
     this.gitBranch,
+    this.sidechain = false,
+    this.agentId,
   });
 
   /// Continues the session kept in [file], on the branch it ended on.
@@ -32,12 +34,15 @@ class SessionStore {
     String? gitBranch,
     bool persist = true,
     bool sidechain = false,
+    String? agentId,
   }) {
     final store = SessionStore(
       sessionId: sessionId,
       cwd: cwd,
       file: persist ? file : null,
       gitBranch: gitBranch,
+      sidechain: sidechain,
+      agentId: agentId,
     );
     store._load(file, sidechain: sidechain);
     return store;
@@ -50,7 +55,17 @@ class SessionStore {
   final String? file;
   String? gitBranch;
 
+  /// Whether it is a subagent's conversation, kept beside the session's:
+  /// every line written is of its side chain, and names [agentId].
+  final bool sidechain;
+  final String? agentId;
+
   final Map<String, Map<String, Object?>> _byUuid = {};
+
+  /// The calls whose results were cleared from the context by an auto
+  /// microcompaction: their content stays in the file, but is not sent to
+  /// the API. This conversation's own, restored with it.
+  final Set<String> clearedToolResults = {};
 
   /// The branch the session is on, oldest first: messages, compaction
   /// boundaries and how the goal stood.
@@ -108,6 +123,26 @@ class SessionStore {
       entry = parent == null ? null : _byUuid[parent];
     }
     chain.addAll(branch.reversed.where(_kept));
+    _rebuildCleared();
+  }
+
+  /// Reads [clearedToolResults] off [chain]: what the last full compaction
+  /// left, and the microcompactions since.
+  void _rebuildCleared() {
+    clearedToolResults.clear();
+    for (final entry in chain) {
+      if (entry['type'] != 'system') continue;
+      switch (entry['subtype']) {
+        case 'compact_boundary':
+          clearedToolResults.clear();
+        case 'microcompact_boundary':
+          for (final id in asList(
+            asMap(entry['microcompactMetadata'])['compactedToolIds'],
+          )) {
+            if (id is String) clearedToolResults.add(id);
+          }
+      }
+    }
   }
 
   /// Whether [entry] is part of the conversation (read back), not a line
@@ -125,7 +160,10 @@ class SessionStore {
       'parentUuid': entry.containsKey('parentUuid')
           ? entry['parentUuid']
           : leaf,
-      'isSidechain': false,
+      // Every line of a subagent's file is of its side chain: a boundary
+      // or a summary is as much its own as a message is.
+      'isSidechain': sidechain,
+      if (sidechain && agentId != null) 'agentId': agentId,
       'userType': 'external',
       'cwd': cwd,
       'sessionId': sessionId,
@@ -137,6 +175,18 @@ class SessionStore {
     };
     _byUuid[full['uuid'] as String] = full;
     chain.add(full);
+    if (full['type'] == 'system') {
+      switch (full['subtype']) {
+        case 'compact_boundary':
+          clearedToolResults.clear();
+        case 'microcompact_boundary':
+          for (final id in asList(
+            asMap(full['microcompactMetadata'])['compactedToolIds'],
+          )) {
+            if (id is String) clearedToolResults.add(id);
+          }
+      }
+    }
     _write(full);
     return full;
   }
@@ -169,6 +219,7 @@ class SessionStore {
     final at = chain.indexWhere((entry) => entry['uuid'] == uuid);
     if (at < 0) return false;
     chain.removeRange(at, chain.length);
+    _rebuildCleared();
     return true;
   }
 
@@ -207,7 +258,8 @@ class SessionStore {
 
   /// What the model is sent: the branch since its last compaction, as
   /// messages the API takes (see [toApiMessages]).
-  List<Map<String, Object?>> apiMessages() => toApiMessages(chain);
+  List<Map<String, Object?>> apiMessages() =>
+      toApiMessages(chain, cleared: clearedToolResults);
 }
 
 /// [chain] as the Messages API takes it: from the last compaction on; the
@@ -215,7 +267,10 @@ class SessionStore {
 /// messages of one role as one; a call's result first in the message after
 /// it, and a result made up for a call left unanswered (an interrupted
 /// turn, a crash); empty text left out.
-List<Map<String, Object?>> toApiMessages(List<Map<String, Object?>> chain) {
+List<Map<String, Object?>> toApiMessages(
+  List<Map<String, Object?>> chain, {
+  Set<String> cleared = const {},
+}) {
   var start = 0;
   for (var i = chain.length - 1; i >= 0; i--) {
     final entry = chain[i];
@@ -305,6 +360,22 @@ List<Map<String, Object?>> toApiMessages(List<Map<String, Object?>> chain) {
     );
   }
   messages.removeWhere((m) => (m['content'] as List).isEmpty);
+  // What a microcompaction cleared: the call and its result stay, the
+  // result's content does not. A copy, as the file keeps it as it was.
+  if (cleared.isNotEmpty) {
+    for (final message in messages) {
+      if (message['role'] != 'user') continue;
+      final blocks = message['content'] as List<Map<String, Object?>>;
+      for (var i = 0; i < blocks.length; i++) {
+        final block = blocks[i];
+        if (block['type'] != 'tool_result' ||
+            !cleared.contains(block['tool_use_id'])) {
+          continue;
+        }
+        blocks[i] = {...block, 'content': '[Old tool result content cleared]'};
+      }
+    }
+  }
   // The conversation starts with the user.
   while (messages.isNotEmpty && messages.first['role'] != 'user') {
     messages.removeAt(0);

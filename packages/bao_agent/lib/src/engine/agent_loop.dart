@@ -85,9 +85,7 @@ class _Answer {
 /// host; a subagent's messages go to the host under its call.
 class AgentLoop {
   AgentLoop({
-    required this.session,
     required this.run,
-    required this.store,
     required this.tools,
     required this.system,
     required this.model,
@@ -96,10 +94,16 @@ class AgentLoop {
     this.takeQueued,
   });
 
-  final AgentSession session;
+  /// The session whose services this run shares: its settings, hooks,
+  /// permissions, tasks and the host it speaks to. Its context is not
+  /// shared: that is [run]'s.
+  AgentSession get session => run.session;
+
   final AgentRun run;
-  final SessionStore store;
   final ToolSet tools;
+
+  /// The conversation this run is on: its own, never another agent's.
+  SessionStore get store => run.store;
 
   /// The system prompt's blocks.
   final List<String> system;
@@ -122,20 +126,13 @@ class AgentLoop {
 
   /// The conversation's compaction, sized by the model it is with: a
   /// subagent's own conversation is its own, and is compacted too.
-  Compaction _compaction() => Compaction(
-    session,
-    model: model,
-    isMain: isMain,
-    agentId: run.agentId,
-    usage: _lastUsage,
-  );
+  Compaction _compaction() => Compaction(session, run, model: model);
 
   /// Goes on from the newest messages, where no summary could be made.
   /// Returns whether there was anything to go on from.
   Future<bool> _fallBack(CancelToken cancel, String reason) async {
     try {
       await _compaction().fallBack(
-        store,
         trigger: 'auto',
         reason: reason,
         cancel: cancel,
@@ -169,10 +166,6 @@ class AgentLoop {
   int _requests = 0;
   Duration _apiTime = Duration.zero;
 
-  /// The last request's usage: what the context held, as the API counted
-  /// it (a subagent's is its own; the session keeps the main agent's).
-  Map<String, Object?>? _lastUsage;
-
   /// The calls refused, as the result reports them.
   final List<Map<String, Object?>> denials = [];
   String _lastText = '';
@@ -188,7 +181,7 @@ class AgentLoop {
       }
       if (!compactedForLength) {
         try {
-          await _compaction().autoCompactIfNeeded(store, cancel);
+          await _compaction().autoCompactIfNeeded(cancel);
         } on Cancelled {
           return _interrupted(during: false);
         }
@@ -202,11 +195,7 @@ class AgentLoop {
         if (error.promptTooLong && !compactedForLength) {
           compactedForLength = true;
           try {
-            if (await _compaction().compact(
-              store,
-              trigger: 'auto',
-              cancel: cancel,
-            )) {
+            if (await _compaction().compact(trigger: 'auto', cancel: cancel)) {
               continue;
             }
           } on Cancelled {
@@ -626,11 +615,10 @@ class AgentLoop {
       rethrow;
     }
     _countUsage(accumulator, started);
-    _lastUsage = {...accumulator.usage};
-    if (isMain) {
-      session.lastUsage = _lastUsage;
-      session.requested = true;
-    }
+    // This run's context is what it says: the main agent's is the
+    // session's (see AgentSession.lastUsage); a subagent's is its own.
+    run.lastUsage = {...accumulator.usage};
+    run.requested = true;
     for (final block in blocks) {
       if (block['type'] == 'text') {
         final text = '${block['text'] ?? ''}'.trim();

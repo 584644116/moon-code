@@ -6,6 +6,7 @@ import '../hooks/hooks.dart';
 import '../prompts/task_prompts.dart';
 import '../util/cancel.dart';
 import '../util/json.dart';
+import 'agent_run.dart';
 import 'session.dart';
 import 'session_store.dart';
 import 'transcript.dart';
@@ -18,15 +19,14 @@ import 'transcript.dart';
 /// cut back to the messages that last passed and goes on from them, with
 /// the boundary saying so. The whole of it stays in the file either way.
 class Compaction {
-  Compaction(
-    this.session, {
-    String? model,
-    this.isMain = true,
-    this.agentId,
-    this.usage,
-  }) : model = model ?? session.resolvedModel;
+  Compaction(this.session, this.run, {String? model})
+    : model = model ?? session.resolvedModel;
 
   final AgentSession session;
+
+  /// The agent whose conversation this is: its own, for a subagent. What
+  /// is counted, cut and carried over is this run's, none other's.
+  final AgentRun run;
 
   /// The model the conversation is with: a subagent's own, else the
   /// session's. Its window is the one the conversation is sized by.
@@ -34,14 +34,10 @@ class Compaction {
 
   /// Whether this is the main agent's conversation: a subagent's is kept
   /// apart, sized by its own model, and says nothing to the host.
-  final bool isMain;
+  bool get isMain => run.isMain;
 
   /// The subagent whose conversation this is, if one.
-  final String? agentId;
-
-  /// The last request's usage, where the caller keeps it (a subagent's is
-  /// its own, the session keeping the main agent's).
-  final Map<String, Object?>? usage;
+  String? get agentId => run.agentId;
 
   static const _system =
       'You write the summary of a conversation between a user and a coding '
@@ -62,13 +58,12 @@ class Compaction {
         !on('DISABLE_COMPACT');
   }
 
-  /// How full the context is: the last request's, and what was added since.
-  int usedTokens(SessionStore store) {
-    final messages = store.apiMessages();
-    // The main agent's is the session's (cleared by a compaction, so that
-    // what the next request reports is the context then); a subagent's is
-    // its own, kept by its loop.
-    final usage = isMain ? session.lastUsage : this.usage;
+  /// How full this run's context is: the last request's, and what was
+  /// added since. None but this run's own: a subagent's is not the main
+  /// agent's, nor another subagent's.
+  int usedTokens() {
+    final messages = run.store.apiMessages();
+    final usage = run.lastUsage;
     if (usage == null) return estimateTokens(messages);
     int count(String key) => asInt(usage[key]) ?? 0;
     final reported =
@@ -88,26 +83,117 @@ class Compaction {
   int get threshold =>
       contextWindow - AgentSession.compactBufferOf(contextWindow);
 
+  /// How many auto compactions in a row may make no summary before the
+  /// conversation is no longer put to the model for one: a provider that
+  /// cannot answer would otherwise be asked again every turn.
+  static const maxConsecutiveFailures = 3;
+
+  /// The newest messages whose tool results are never cleared: what is
+  /// being worked on now.
+  static const _microKeepMessages = 4;
+
+  /// What a microcompaction must save to be worth a boundary in the file.
+  int get _microMinSaved => math.max(2000, contextWindow ~/ 50);
+
+  /// The tools whose old output is cleared: what is read or run, not the
+  /// agent's own reports (a subagent's, a task's).
+  static const _clearableTools = {
+    'Read',
+    'Bash',
+    'Grep',
+    'Glob',
+    'WebSearch',
+    'WebFetch',
+    'Edit',
+    'Write',
+  };
+
+  /// Clears the content of old tool results from what is sent to the API,
+  /// as the CLI's microcompaction does: the calls, their results and the
+  /// file stay as they were, and the model can read a file again for what
+  /// it needs. Returns whether anything was cleared.
+  ///
+  /// A boundary is written so that a resumed conversation clears the same
+  /// results again, and the usage is taken by estimate from here on: the
+  /// last request's count included what is no longer sent.
+  bool microcompact() {
+    final store = run.store;
+    final messages = store.apiMessages();
+    if (messages.length <= _microKeepMessages) return false;
+    final names = <String, String>{};
+    for (final message in messages) {
+      if (message['role'] != 'assistant') continue;
+      for (final block in asList(message['content'])) {
+        final call = asMap(block);
+        if (call['type'] == 'tool_use' && call['id'] is String) {
+          names[call['id'] as String] = '${call['name']}';
+        }
+      }
+    }
+    final cutoff = messages.length - _microKeepMessages;
+    final ids = <String>[];
+    var saved = 0;
+    for (var i = 0; i < cutoff; i++) {
+      final message = messages[i];
+      if (message['role'] != 'user') continue;
+      for (final block in asList(message['content'])) {
+        final result = asMap(block);
+        if (result['type'] != 'tool_result') continue;
+        final id = result['tool_use_id'];
+        if (id is! String || store.clearedToolResults.contains(id)) continue;
+        if (!_clearableTools.contains(names[id])) continue;
+        final tokens = estimateTokens(result['content']);
+        if (tokens < 50) continue;
+        saved += tokens - 16;
+        ids.add(id);
+      }
+    }
+    if (ids.isEmpty || saved < _microMinSaved) return false;
+    final before = usedTokens();
+    store.clearedToolResults.addAll(ids);
+    run.lastUsage = null;
+    store.append({
+      'type': 'system',
+      'subtype': 'microcompact_boundary',
+      'content': 'Context microcompacted',
+      'isMeta': false,
+      'level': 'info',
+      'parentUuid': null,
+      'logicalParentUuid': store.leaf,
+      'microcompactMetadata': {
+        'trigger': 'auto',
+        'preTokens': before,
+        'tokensSaved': saved,
+        'compactedToolIds': ids,
+      },
+    });
+    return true;
+  }
+
   /// Compacts if the conversation has filled the context.
   ///
-  /// A summary that cannot be made leaves the turn to go on: the
-  /// conversation is cut back to its recent messages instead ([fallBack]).
-  Future<void> autoCompactIfNeeded(
-    SessionStore store,
-    CancelToken cancel,
-  ) async {
+  /// A summary that cannot be made is tried again next turn, unless a few
+  /// in a row made none; each such turn goes on from its recent messages
+  /// instead ([fallBack]).
+  Future<void> autoCompactIfNeeded(CancelToken cancel) async {
     if (!autoEnabled) return;
-    if (usedTokens(store) < threshold) return;
+    if (usedTokens() < threshold) return;
+    // Before a summary, what old calls returned is cleared: most of what
+    // fills a context is their output, and the conversation itself can go
+    // on.
+    if (microcompact() && usedTokens() < threshold) return;
+    if (run.compactFailures >= maxConsecutiveFailures) return;
     try {
-      await compact(store, trigger: 'auto', cancel: cancel);
+      final done = await compact(trigger: 'auto', cancel: cancel);
+      if (!done) run.compactFailures++;
     } on Cancelled {
       rethrow;
     } on Object catch (error) {
+      run.compactFailures++;
       // No summary: what was said lately is kept and the rest goes. A turn
       // that ends here is worse than one that goes on without the older
       // part of a conversation too long to send as it is.
       await fallBack(
-        store,
         trigger: 'auto',
         reason: error is ApiError && !error.promptTooLong
             ? 'summary_provider'
@@ -125,16 +211,16 @@ class Compaction {
   /// window kept is the newest messages that fit a third of the context,
   /// cut at a user message so that it starts as the API needs it to, and
   /// cleared of what the API would refuse (see [toApiMessages]).
-  Future<bool> fallBack(
-    SessionStore store, {
+  Future<bool> fallBack({
     required String trigger,
     required String reason,
     required CancelToken cancel,
   }) async {
     if (cancel.isCancelled) throw const Cancelled('interrupted');
+    final store = run.store;
     final messages = store.apiMessages();
     if (messages.isEmpty) return false;
-    final before = usedTokens(store);
+    final before = usedTokens();
     final budget = math.max(2000, (contextWindow * 0.3).round());
     final kept = _recentWindow(messages, budget);
     final text = _retainedTail(kept, reason: reason, file: store.file);
@@ -176,7 +262,9 @@ class Compaction {
         if (!isMain) ...{'agentId': ?agentId, 'isSidechain': true},
       });
     }
-    if (isMain) session.lastUsage = null;
+    // What the next request reports is this run's context now: its own
+    // last usage no longer says how full it is.
+    run.lastUsage = null;
     return true;
   }
 
@@ -196,9 +284,8 @@ class Compaction {
       if (messages[at]['role'] != 'user') return false;
       final content = messages[at]['content'];
       if (content is String) return content.trim().isNotEmpty;
-      return asList(content).any(
-        (block) => asMap(block)['type'] != 'tool_result',
-      );
+      return asList(content)
+          .any((block) => asMap(block)['type'] != 'tool_result');
     }
 
     var from = messages.length - 1;
@@ -288,20 +375,24 @@ class Compaction {
 
   /// Sums up the conversation and goes on from the summary. Returns
   /// whether it did ([instructions] say what to keep).
-  Future<bool> compact(
-    SessionStore store, {
+  Future<bool> compact({
     required String trigger,
     String? instructions,
     required CancelToken cancel,
   }) async {
+    final store = run.store;
     final messages = store.apiMessages();
     if (messages.isEmpty) return false;
-    final before = usedTokens(store);
+    final before = usedTokens();
     var custom = instructions;
     if (session.hooks.has(HookEvent.preCompact)) {
       final hook = await session.hooks.run(
         HookEvent.preCompact,
-        {'trigger': trigger, 'custom_instructions': instructions ?? ''},
+        {
+          'trigger': trigger,
+          'custom_instructions': instructions ?? '',
+          if (!isMain) 'agent_id': agentId,
+        },
         query: trigger,
         cancel: cancel,
       );
@@ -313,11 +404,7 @@ class Compaction {
     _status('compacting');
     final String summary;
     try {
-      summary = await _summarize(
-        messages,
-        custom,
-        cancel,
-      );
+      summary = await _summarize(messages, custom, cancel);
     } on Object {
       _status(null);
       rethrow;
@@ -336,9 +423,14 @@ class Compaction {
       'logicalParentUuid': store.leaf,
       'compactMetadata': {'trigger': trigger, 'preTokens': before},
     });
+    final started = await _sessionStartAfterCompact(cancel);
     final text = [
       compactedSummary(summary, transcriptPath: store.file),
       ..._carriedOver(),
+      ..._restoredFiles(),
+      if (started.isNotEmpty)
+        '<system-reminder>\nA SessionStart hook adds: '
+            '${started.join('\n\n')}\n</system-reminder>',
     ].join('\n\n');
     final after = estimateTokens(text);
     _emitBoundary(boundary, trigger: trigger, before: before, after: after);
@@ -349,8 +441,9 @@ class Compaction {
       'isVisibleInTranscriptOnly': true,
     });
     _emitSummary(entry);
-    // What the next request reports is the context now.
-    if (isMain) session.lastUsage = null;
+    // What the next request reports is this run's context now.
+    run.lastUsage = null;
+    run.compactFailures = 0;
     _status(null);
     return true;
   }
@@ -361,11 +454,12 @@ class Compaction {
     session.emitSystem('status', {'status': status});
   }
 
-  /// What the model is to keep in view after the summary: its todos, the
-  /// plan it was writing.
+  /// What the model is to keep in view after the summary: this run's
+  /// todos, and the plan the main agent was writing. A subagent carries
+  /// its own list only: the main agent's plan and todos are not its task.
   List<String> _carriedOver() {
     final out = <String>[];
-    final todos = session.mainTodos;
+    final todos = run.todos;
     if (todos.isNotEmpty) {
       out.add(
         '<system-reminder>\nYour todo list before the conversation was '
@@ -373,13 +467,92 @@ class Compaction {
         '</system-reminder>',
       );
     }
-    if (session.planSlug != null && session.planExists) {
+    if (run.isMain && session.planSlug != null && session.planExists) {
       out.add(
         '<system-reminder>\nThe plan of this session is in '
         '${session.planFilePath}.\n</system-reminder>',
       );
     }
     return out;
+  }
+
+  /// The most recently read files, given back after the summary: the
+  /// summary keeps what was said of them, not what they held, and a file
+  /// read again costs a call. The newest are kept, five at most, each cut
+  /// to a few thousand tokens, and all within a share of the window.
+  static const _maxRestoredFiles = 5;
+  static const _maxTokensPerFile = 5000;
+  static const _maxRestoreTokens = 50000;
+
+  int get _restoreBudget =>
+      math.min(_maxRestoreTokens, math.max(1000, contextWindow ~/ 4));
+
+  List<String> _restoredFiles() {
+    final paths = run.readFiles.recentPaths;
+    if (paths.isEmpty) return const [];
+    var budget = _restoreBudget;
+    final restored = <String>[];
+    for (final path in paths.reversed) {
+      if (restored.length >= _maxRestoredFiles || budget <= 0) break;
+      final record = run.readFiles[path];
+      if (record == null || record.content.trim().isEmpty) continue;
+      final text = _cutToTokens(
+        record.content,
+        math.min(_maxTokensPerFile, budget),
+      );
+      final tokens = estimateTokens(text);
+      if (tokens > budget) continue;
+      budget -= tokens;
+      restored.add(
+        '## $path${record.partial ? ' (the part read)' : ''}\n\n$text',
+      );
+    }
+    if (restored.isEmpty) return const [];
+    return [
+      '<system-reminder>\n'
+          'The files read before the conversation was compacted, as they '
+          'were (newest first). The summary does not hold their contents: '
+          'read one again for more than is here.\n\n'
+          '${restored.join('\n\n')}\n'
+          '</system-reminder>',
+    ];
+  }
+
+  /// [content], cut to about [tokens], saying so where it is cut.
+  static String _cutToTokens(String content, int tokens) {
+    if (estimateTokens(content) <= tokens) return content;
+    var end = content.length;
+    while (end > 0) {
+      final text = content.substring(0, end);
+      if (estimateTokens(text) <= tokens) {
+        return '$text\n… (cut here: read the file for the rest)';
+      }
+      end = (end * 4) ~/ 5;
+    }
+    return '';
+  }
+
+  /// What a SessionStart hook adds once the conversation is compacted, as
+  /// the CLI runs it with the source `compact`. The main agent's own
+  /// session: a subagent's summary is its own.
+  Future<List<String>> _sessionStartAfterCompact(CancelToken cancel) async {
+    if (!isMain || !session.hooks.has(HookEvent.sessionStart)) {
+      return const [];
+    }
+    try {
+      final hook = await session.hooks.run(
+        HookEvent.sessionStart,
+        {'source': 'compact'},
+        query: 'compact',
+        cancel: cancel,
+      );
+      return [...hook.additionalContext, ...hook.outputs];
+    } on Cancelled {
+      rethrow;
+    } on Object {
+      // The summary stands without it.
+      return const [];
+    }
   }
 
   /// What the summary must hold, whatever else it leaves out: what the
@@ -476,6 +649,28 @@ class Compaction {
     }
   }
 
+  /// [messages] with images and documents replaced by a short marker: the
+  /// summary needs what was said, not what was shown.
+  static List<Map<String, Object?>> _withoutImages(
+    List<Map<String, Object?>> messages,
+  ) => [
+    for (final message in messages)
+      if (message['content'] case final List<Object?> blocks)
+        {
+          ...message,
+          'content': [
+            for (final block in blocks)
+              if (block is Map &&
+                  (block['type'] == 'image' || block['type'] == 'document'))
+                {'type': 'text', 'text': '[${block['type']}]'}
+              else
+                block,
+          ],
+        }
+      else
+        message,
+  ];
+
   Future<String> _ask(
     List<Map<String, Object?>> messages,
     String? instructions,
@@ -483,11 +678,10 @@ class Compaction {
     List<String> keep = const [],
   }) async {
     final info = session.catalog.info(model);
-    final conversation = [...messages];
-    final ask = {
-      'type': 'text',
-      'text': compactPrompt(instructions, keep),
-    };
+    // Images and documents are not summed up: they are replaced by a
+    // marker, so the summary request itself does not grow too long to send.
+    final conversation = _withoutImages(messages);
+    final ask = {'type': 'text', 'text': compactPrompt(instructions, keep)};
     if (conversation.isNotEmpty && conversation.last['role'] == 'user') {
       final last = conversation.removeLast();
       conversation.add({

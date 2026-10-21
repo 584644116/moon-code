@@ -439,15 +439,48 @@ class ClaudeTranslator {
       final agent = _agents[parent];
       if (agent == null) return; // A subagent's message we cannot place.
       agent.children[id] = item;
+      _trimAgent(agent);
       _putAgent(parent);
       return;
     }
     emit(ItemUpserted(nextSeq(), id, item, streaming: streaming));
   }
 
+  /// The most steps a subagent's card keeps in view: a long run's older
+  /// ones are left out as it goes, so that a card stays quick to draw and
+  /// what is copied for it at each step stays bounded. Its own file keeps
+  /// them all.
+  static const _maxAgentChildren = 200;
+
+  /// Leaves out the oldest steps of [agent] past [_maxAgentChildren]. A
+  /// subagent still at work is one to open: it stays, even past the cap.
+  void _trimAgent(_Agent agent) {
+    var excess = agent.children.length - _maxAgentChildren;
+    if (excess <= 0) return;
+    for (final key in [...agent.children.keys]) {
+      if (excess <= 0) break;
+      final child = agent.children[key];
+      if (child is AgentItem && child.status == CommandStatus.running) {
+        continue;
+      }
+      agent.children.remove(key);
+      agent.dropped++;
+      excess--;
+    }
+  }
+
   void _putAgent(String id) {
     final agent = _agents[id]!;
-    agent.item = agent.item.copyWith(children: [...agent.children.values]);
+    agent.item = agent.item.copyWith(
+      children: [
+        if (agent.dropped > 0)
+          NoticeItem(
+            NoticeKind.info,
+            'Earlier steps are not shown (${agent.dropped} left out).',
+          ),
+        ...agent.children.values,
+      ],
+    );
     _put(id, agent.item, parent: _tools[id]?.parent);
   }
 
@@ -1986,4 +2019,7 @@ class _Agent {
 
   AgentItem item;
   final Map<String, ChatItem> children = {};
+
+  /// Steps left out of [children] past the cap (see _maxAgentChildren).
+  int dropped = 0;
 }

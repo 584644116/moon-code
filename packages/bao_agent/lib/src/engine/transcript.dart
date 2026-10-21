@@ -92,7 +92,8 @@ int _cjkExtra(String text) {
     if ((rune >= 0x3400 && rune <= 0x9fff) || // unified ideographs, ext. A
         (rune >= 0x20000 && rune <= 0x2ebef) || // extensions B to F
         (rune >= 0x3000 && rune <= 0x303f) || // CJK punctuation
-        (rune >= 0xff00 && rune <= 0xffef)) { // fullwidth forms
+        (rune >= 0xff00 && rune <= 0xffef)) {
+      // fullwidth forms
       cjk++;
     }
   }

@@ -26,19 +26,43 @@ class FileRecord {
 class ReadFileState {
   final Map<String, FileRecord> _records = {};
 
+  /// When each was last read, by [path]: a file read again moves to the
+  /// newest (see [recentPaths]).
+  final Map<String, int> _used = {};
+  int _tick = 0;
+
   FileRecord? operator [](String path) => _records[path];
 
-  void operator []=(String path, FileRecord record) => _records[path] = record;
+  void operator []=(String path, FileRecord record) {
+    _records[path] = record;
+    _used[path] = ++_tick;
+  }
 
-  void remove(String path) => _records.remove(path);
+  void remove(String path) {
+    _records.remove(path);
+    _used.remove(path);
+  }
 
   Iterable<String> get paths => _records.keys;
 
-  void clear() => _records.clear();
+  /// The paths read, the most recently read last.
+  List<String> get recentPaths {
+    final paths = [..._records.keys];
+    paths.sort((a, b) => (_used[a] ?? 0).compareTo(_used[b] ?? 0));
+    return paths;
+  }
+
+  void clear() {
+    _records.clear();
+    _used.clear();
+  }
 
   /// A state of its own that starts with what this one has read (a
   /// subagent's, which may change what its caller read).
-  ReadFileState copy() => ReadFileState().._records.addAll(_records);
+  ReadFileState copy() => ReadFileState()
+    .._records.addAll(_records)
+    .._used.addAll(_used)
+    .._tick = _tick;
 
   /// What is wrong with changing [path] now: not read, or changed since.
   /// Null when it may be changed.

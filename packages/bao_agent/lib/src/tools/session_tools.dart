@@ -63,7 +63,7 @@ As you go:
     Map<String, Object?> input,
     ToolContext context,
   ) async {
-    final key = context.run.agentId ?? context.session.sessionId;
+    final key = context.run.contextKey;
     final old = context.session.todos[key] ?? const [];
     final todos = [
       for (final raw in asList(input['todos']))

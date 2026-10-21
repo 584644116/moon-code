@@ -14,6 +14,7 @@ import '../../models/model_icons.dart';
 import '../../models/model_provider.dart';
 import '../../models/model_providers.dart';
 import '../../models/model_runtime.dart';
+import '../../network/network_proxy.dart';
 import '../../remote/remote_location.dart';
 import '../../settings/user_settings.dart';
 import '../../workspace/editor_launcher.dart' show openExternal;
@@ -24,6 +25,7 @@ import '../kernel_types.dart';
 import '../prompt_suggestions.dart';
 import '../transcript.dart';
 import '../queued_messages.dart';
+import 'claude_auto_rules.dart';
 import 'claude_classifier.dart';
 import 'claude_code_transport.dart';
 import 'claude_code_translator.dart';
@@ -124,11 +126,13 @@ class ClaudeCodeKernel
     ProviderEnvironment? providerEnvironment,
     ClaudeClassifier? classify,
     Future<bool> Function(String url)? openLink,
+    ProxyRoute Function()? proxyRoute,
   }) : _openLink = openLink ?? openExternal,
        _classifier = classify,
        _usageOffBy = usageOffBy ?? _usageOn,
        _providers = providers ?? ModelProviders.current,
-       _providerEnvironment = providerEnvironment ?? providerLaunchEnvironment {
+       _providerEnvironment = providerEnvironment ?? providerLaunchEnvironment,
+       _proxyRoute = proxyRoute ?? _proxyRouteNow {
     _translator = ClaudeTranslator(
       emit: emit,
       nextSeq: () => nextSeq,
@@ -208,6 +212,15 @@ class ClaudeCodeKernel
   final ModelProviders _providers;
   final ProviderEnvironment _providerEnvironment;
 
+  /// The proxy in effect now: what a running CLI is told when it changes.
+  final ProxyRoute Function() _proxyRoute;
+
+  static ProxyRoute _proxyRouteNow() => proxyRouteNow;
+
+  /// The proxy variables the CLI was started with, as last told to it.
+  /// Null until it starts.
+  Map<String, String>? _sentEnvironment;
+
   /// Auto mode's classifier where the CLI's own does not run on the model
   /// (see [_classifies]). Null: the provider's model is asked (see
   /// [_askClassifier]).
@@ -277,10 +290,19 @@ class ClaudeCodeKernel
   final Map<String, KernelTurn> _sent = {};
   final Set<String> _queued = {};
 
-  /// The user messages written to the CLI, in order: what auto mode's
-  /// classifier reads of what was asked (see [_permission]). A few, and
-  /// only as much of them as is of use to judge one action.
-  final Map<String, String> _asked = {};
+  /// What auto mode's classifier reads of the conversation: what the user
+  /// asked and the tool calls the agent made, in order, and not the
+  /// agent's own text (which an action could use to talk it round). A few,
+  /// and only as much as is of use to judge one action.
+  final List<String> _trace = [];
+
+  /// The settings the CLI last said are in effect, as `get_settings`
+  /// answered: what the allow rules that bypass auto mode are read from.
+  Object? _effectiveSettings;
+
+  /// The dangerous allow rules already told about, joined (see
+  /// [_checkAutoAllowRules]).
+  String? _warnedAutoRules;
 
   /// Turns stopped here: the CLI's word that it took one up (sent just
   /// before, it may not have yet) does not start it again.
@@ -548,6 +570,9 @@ class ClaudeCodeKernel
       _launchedWindow = _autocompact;
       _launchedSuggestions = PromptSuggestions.current();
       final sdkServers = ClaudeSdkTools.servers;
+      // What it starts with, as the transport gives it: a change is told
+      // to it later (see _syncEnvironment).
+      final launchedEnvironment = _proxyRoute().environment;
       final transport = await _start(
         ClaudeLaunch(
           cwd: _cwd,
@@ -583,6 +608,7 @@ class ClaudeCodeKernel
         return;
       }
       _transport = transport;
+      _sentEnvironment = launchedEnvironment;
       final control = _control = ControlChannel(transport.write);
       _subscription = transport.messages.listen(_receive);
       _applyInitialize(
@@ -926,6 +952,7 @@ class ClaudeCodeKernel
     _inAsk = ask;
     _whenReady((transport) {
       _noteAsked(turn);
+      _syncEnvironment(transport);
       transport.write({
         'type': 'user',
         'uuid': turn.id,
@@ -967,6 +994,28 @@ class ClaudeCodeKernel
       // Queued behind the turn running: stopped once it is sent, so it is
       // taken up next, as when the user stops the turn.
       if (turn.now && _queued.contains(turn.id)) cancel();
+    });
+  }
+
+  /// Tells the CLI the proxy variables in effect now, where they differ
+  /// from those it started with: a proxy turned on or off is followed
+  /// without starting the session again. One that was set and is now unset
+  /// is sent empty, as the CLI applies them one by one.
+  void _syncEnvironment(ClaudeCodeTransport transport) {
+    final sent = _sentEnvironment;
+    if (sent == null) return;
+    final now = _proxyRoute().environment;
+    if (mapEquals(sent, now)) return;
+    _sentEnvironment = now;
+    final changes = <String, String>{
+      for (final name in sent.keys)
+        if (!now.containsKey(name)) name: '',
+      ...now,
+    };
+    if (changes.isEmpty) return;
+    transport.write({
+      'type': 'update_environment_variables',
+      'variables': changes,
     });
   }
 
@@ -1445,15 +1494,50 @@ class ClaudeCodeKernel
   /// [turn] as one of the messages auto mode's classifier reads.
   void _noteAsked(KernelTurn turn) {
     if (turn.text.isEmpty) return;
-    _asked.remove(turn.id);
-    _asked[turn.id] = turn.text;
-    if (_asked.length > 6) _asked.remove(_asked.keys.first);
+    _addToTrace('The user asked: ${turn.text}');
   }
 
-  /// What was asked, most recent last, as far as is of use to judge an
-  /// action.
+  /// The calls the agent made in [message], as auto mode's classifier reads
+  /// them: the tool and its input, never the agent's words. A subagent's
+  /// calls are its own work, not the conversation's.
+  void _noteToolUses(Map<String, Object?> message) {
+    if (message['parent_tool_use_id'] != null ||
+        message['isSidechain'] == true) {
+      return;
+    }
+    final body = message['message'];
+    if (body is! Map) return;
+    final content = body['content'];
+    if (content is! List) return;
+    for (final block in content) {
+      if (block is! Map || block['type'] != 'tool_use') continue;
+      final name = block['name'];
+      if (name is! String) continue;
+      final input = block['input'];
+      final text = input is Map
+          ? input.entries
+                .where((e) => e.key != 'content' || '${e.value}'.length < 2000)
+                .map((e) => '${e.key}: ${e.value}')
+                .join(', ')
+          : '$input';
+      _addToTrace(
+        'The agent used $name: '
+        '${text.length > 500 ? '${text.substring(0, 500)}…' : text}',
+      );
+    }
+  }
+
+  void _addToTrace(String entry) {
+    _trace.add(entry);
+    while (_trace.length > 24) {
+      _trace.removeAt(0);
+    }
+  }
+
+  /// What was asked and done, most recent last, as far as is of use to
+  /// judge an action.
   String get _askedText {
-    final text = _asked.values.join('\n\n');
+    final text = _trace.join('\n\n');
     return text.length > 8000 ? text.substring(text.length - 8000) : text;
   }
 
@@ -1765,6 +1849,7 @@ class ClaudeCodeKernel
         );
         emitInfoChanged();
       case 'assistant':
+        _noteToolUses(message);
         if (_countRequest(message)) _reportStats();
         _translator.translate(message);
       case 'result':
@@ -2700,6 +2785,9 @@ class ClaudeCodeKernel
       _control!
           .request('get_settings')
           .then((response) {
+            if (response['effective'] case final Object effective) {
+              _effectiveSettings = effective;
+            }
             if (response['applied'] case final Map<Object?, Object?> applied) {
               if (applied['model'] case final String model) {
                 _reportedModel = model;
@@ -2707,6 +2795,7 @@ class ClaudeCodeKernel
               _appliedEffort = applied['effort'] as String?;
               emitInfoChanged();
             }
+            _checkAutoAllowRules();
           })
           .catchError((_) {}),
     );
@@ -3217,6 +3306,7 @@ class ClaudeCodeKernel
   /// Tells a running CLI what is picked now.
   void _applyMode() {
     _applyPlanReview();
+    _checkAutoAllowRules();
     emitInfoChanged();
     final mode = _mode;
     if (!_running || mode == _cliMode) return;
@@ -3248,7 +3338,32 @@ class ClaudeCodeKernel
         _applyPlanReview();
       }
     }
+    _checkAutoAllowRules();
     emitInfoChanged();
+  }
+
+  /// In auto mode on a model the CLI's classifier does not run on, a user's
+  /// allow rule can let an action through before the CLI asks: it is then
+  /// never judged. Said once for each set of rules, when it may matter.
+  void _checkAutoAllowRules() {
+    if (_approval != 'auto' || _classifies) return;
+    final rules = dangerousAutoAllowRules(_effectiveSettings);
+    if (rules.isEmpty) return;
+    final key = rules.join(' | ');
+    if (key == _warnedAutoRules) return;
+    _warnedAutoRules = key;
+    emit(
+      ItemUpserted(
+        nextSeq,
+        'auto-allow-rules',
+        NoticeItem(
+          NoticeKind.warning,
+          'Approve for me can be bypassed by your permission rules: '
+          '${rules.join(', ')}. What they allow runs without being judged; '
+          'remove them, or use Ask for approval.',
+        ),
+      ),
+    );
   }
 
   void _applyPlanReview() {

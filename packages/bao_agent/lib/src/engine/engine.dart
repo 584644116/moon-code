@@ -563,10 +563,10 @@ class AgentEngine {
     ]);
     final memory = estimateTokens(session.context.userContext());
     final fixed = systemTokens + builtIn + mcp + memory;
-    final compaction = Compaction(session);
+    final compaction = Compaction(session, session.mainRun);
     final used = session.lastUsage == null
         ? fixed + estimateTokens(session.store.apiMessages())
-        : compaction.usedTokens(session.store);
+        : compaction.usedTokens();
     final messages = (used - fixed).clamp(0, 1 << 40);
     final window = session.contextWindow;
     final buffer = compaction.autoEnabled ? session.compactBuffer : 0;
@@ -784,9 +784,7 @@ class AgentEngine {
       if (session.goal case final goal?) goalInstruction(goal),
     ].join('\n');
     final loop = AgentLoop(
-      session: session,
       run: session.mainRun,
-      store: session.store,
       tools: session.toolbox.main(),
       system: [
         ...switch (options.systemPrompt) {
@@ -1055,8 +1053,7 @@ class AgentEngine {
         }
         typed();
         try {
-          final done = await Compaction(session).compact(
-            store,
+          final done = await Compaction(session, session.mainRun).compact(
             trigger: 'manual',
             instructions: args.isEmpty ? null : args,
             cancel: turn.cancel,
