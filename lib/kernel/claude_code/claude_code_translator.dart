@@ -1206,6 +1206,29 @@ class ClaudeTranslator {
     final tool = id == null ? null : _tools[id];
     if (id == null || tool == null) return;
     _unanswered.remove(id);
+    try {
+      _toolResultOf(id, tool, block, result);
+    } finally {
+      // What the call was given is not needed once its result is shown. A
+      // background command's, a subagent's, or a plan's is: its row is
+      // updated later, or another step is read off it.
+      if (!_keepsTool(tool)) _tools.remove(id);
+    }
+  }
+
+  /// Whether [tool] is one whose call is read again after its result.
+  bool _keepsTool(_Tool tool) =>
+      tool.name == 'Agent' ||
+      tool.name == 'Task' ||
+      tool.name == 'Bash' ||
+      _planCalls.containsKey(tool.id);
+
+  void _toolResultOf(
+    String id,
+    _Tool tool,
+    Map<String, Object?> block,
+    Object? result,
+  ) {
     final error = block['is_error'] == true;
     final text = _resultText(block['content']);
     final structured = result is Map ? result.cast<String, Object?>() : null;
