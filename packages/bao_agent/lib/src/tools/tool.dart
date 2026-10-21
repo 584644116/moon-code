@@ -51,6 +51,29 @@ class ToolFailure implements Exception {
   String toString() => message;
 }
 
+/// Runs [call], giving up after [timeout] when there is one. The call's own
+/// token is cancelled so the tool can stop what it was doing; the turn's
+/// cancellation is separate.
+Future<ToolOutput> callWithTimeout(
+  Future<ToolOutput> Function() call, {
+  Duration? timeout,
+  CancelToken? cancel,
+}) async {
+  final future = call();
+  // The deadline may win; a failure from the call afterwards is nobody's.
+  unawaited(future.then((_) {}, onError: (Object _) {}));
+  if (timeout == null) return future;
+  return future.timeout(
+    timeout,
+    onTimeout: () {
+      cancel?.cancel('timeout');
+      return ToolOutput.error(
+        'Error: tool call timed out after ${timeout.inMilliseconds}ms',
+      );
+    },
+  );
+}
+
 /// What a tool works with: the session, the agent calling it, the call.
 class ToolContext {
   ToolContext({
@@ -109,6 +132,10 @@ abstract class Tool {
 
   /// Whether calls of it may run at once with other such calls.
   bool isConcurrencySafe(Map<String, Object?> input) => isReadOnly(input);
+
+  /// The longest a call of it may take, when it has a limit; null to leave
+  /// it to the turn's cancellation.
+  Duration? get timeout => null;
 
   /// Whether the model is offered it at all.
   bool isEnabled(AgentSession session) => true;

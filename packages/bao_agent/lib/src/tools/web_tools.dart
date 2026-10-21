@@ -18,6 +18,10 @@ class WebFetchTool extends Tool {
   static const maxText = 100000;
   static const cacheFor = Duration(minutes: 15);
 
+  /// A page, its body included, has this long before the call is given up.
+  @override
+  Duration? get timeout => const Duration(seconds: 90);
+
   /// Hosts of documentation fetched without asking.
   static const preapproved = {
     'docs.anthropic.com',

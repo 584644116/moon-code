@@ -142,7 +142,7 @@ void main() {
     'a large result is offloaded, and retrieve_tool_result reads it',
     () async {
       final h = await Harness.start(
-        files: {'big.txt': 'x' * 400},
+        files: {'big.txt': 'START${'x' * 400}END'},
         settings: {
           'contextManagement': {
             'ccrMinTokens': 10,
@@ -160,6 +160,9 @@ void main() {
       await h.turn('read it');
       final afterRead = '${h.model.turns[1].body['messages']}';
       expect(afterRead, contains('Large tool result stored out of context'));
+      // The placeholder shows both ends: a failure is often at the end.
+      expect(afterRead, contains('START'));
+      expect(afterRead, contains('END'));
       expect(h.engine.session.store.offloadedToolResults['tr1'], isNotNull);
       // The user still saw what the tool returned.
       final shown = h.sent.where(

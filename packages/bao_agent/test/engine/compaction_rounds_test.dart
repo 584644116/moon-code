@@ -24,6 +24,16 @@ void main() {
     expect(Compaction.thresholdOf(32000, maxOutput: 8000), 16000);
   });
 
+  test('the reserve shown is what the threshold leaves', () {
+    // The context panel and the compactor must read the same number.
+    expect(Compaction.reserveOf(128000, maxOutput: 32000), 34000);
+    expect(Compaction.reserveOf(200000, maxOutput: 64000), 34000);
+    expect(Compaction.reserveOf(1000000, maxOutput: 128000), 34000);
+    expect(Compaction.reserveOf(128000), 33000);
+    expect(Compaction.reserveOf(32000), 6400);
+    expect(Compaction.reserveOf(32000, maxOutput: 8000), 16000);
+  });
+
   test(
     'a summary keeps the exchange it goes on from, as it was said',
     () async {

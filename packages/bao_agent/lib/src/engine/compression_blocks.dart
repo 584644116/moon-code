@@ -92,6 +92,7 @@ class OffloadedResult {
     required this.toolUseId,
     required this.tokens,
     this.preview = '',
+    this.tail = '',
   });
 
   final String toolUseId;
@@ -100,12 +101,16 @@ class OffloadedResult {
   /// The start of what it held, enough to tell whether it is the one.
   final String preview;
 
+  /// The end of it: the line a build failed on often comes last.
+  final String tail;
+
   /// What the model is sent in its place.
   String get placeholder => [
     '[Large tool result stored out of context: id=$toolUseId, '
         '~$tokens tokens.',
     if (preview.isNotEmpty)
       'Preview: ${preview.replaceAll(RegExp(r'\s+'), ' ').trim()}',
+    if (tail.isNotEmpty) 'End: ${tail.replaceAll(RegExp(r'\s+'), ' ').trim()}',
     'Use retrieve_tool_result with this id, or search_context to find part '
         'of it.]',
   ].join('\n');
@@ -121,6 +126,7 @@ class OffloadedResult {
     'tool_use_id': toolUseId,
     'tokens': tokens,
     'preview': preview,
+    if (tail.isNotEmpty) 'tail': tail,
   };
 
   static OffloadedResult? fromEntry(Map<String, Object?> entry) {
@@ -130,6 +136,7 @@ class OffloadedResult {
       toolUseId: id,
       tokens: asInt(entry['tokens']) ?? 0,
       preview: asText(entry['preview']) ?? '',
+      tail: asText(entry['tail']) ?? '',
     );
   }
 }

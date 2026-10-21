@@ -20,6 +20,11 @@ class BashTool extends Tool {
   static const maxTimeout = Duration(minutes: 10);
   static const defaultMaxOutput = 30000;
 
+  /// With the context machinery on, a result too large to keep is offloaded
+  /// whole; cutting it here first would lose the middle for good. This is
+  /// the hard cap beyond which even the offload would be too large a line.
+  static const spillMaxOutput = 1000000;
+
   @override
   String get name => 'Bash';
 
@@ -281,9 +286,12 @@ End with the pull request's URL, for the user to open.''';
       );
     }
     final cwdNote = _followCwd(cwdFile, context);
+    final settings = session.settings;
     final maxOutput =
         asInt(session.environment['BASH_MAX_OUTPUT_LENGTH']) ??
-        defaultMaxOutput;
+        (settings.contextManagementEnabled && settings.contextCcrMinTokens > 0
+            ? spillMaxOutput
+            : defaultMaxOutput);
     final stdout = _truncate(_trimEnd(running.stdout.toString()), maxOutput);
     final stderr = _truncate(_trimEnd(running.stderr.toString()), maxOutput);
     final parts = <String>[

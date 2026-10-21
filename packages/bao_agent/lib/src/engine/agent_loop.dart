@@ -16,6 +16,7 @@ import '../util/json.dart';
 import 'agent_run.dart';
 import 'compaction.dart';
 import 'compression_blocks.dart';
+import 'repeat_guard.dart';
 import 'session.dart';
 import 'session_store.dart';
 import 'transcript.dart';
@@ -171,8 +172,12 @@ class AgentLoop {
   final List<Map<String, Object?>> denials = [];
   String _lastText = '';
 
+  /// The same call, over and over: said once at 3, 5 and 8 in a row.
+  final RepeatGuard _repeats = RepeatGuard();
+
   /// Runs the agent until it ends its turn.
   Future<LoopResult> runTurn(CancelToken cancel) async {
+    _repeats.reset();
     var stopHookActive = false;
     var compactedForLength = false;
     while (true) {
@@ -835,6 +840,9 @@ class AgentLoop {
 
   /// A message sent while the turn ran, taken up now.
   void _appendQueued(Map<String, Object?> message) {
+    // A new user message is a new attempt: the same call may be the right
+    // one again.
+    _repeats.reset();
     final uuid = asString(message['uuid']) ?? newUuid();
     session.emit({
       'type': 'command_lifecycle',
@@ -916,13 +924,23 @@ class AgentLoop {
     final text = output.text;
     final tokens = estimateTokens(text);
     if (tokens < settings.contextCcrMinTokens) return;
-    final take = math.min(text.length, settings.contextCcrPreviewChars);
-    final preview = take <= 0 ? '' : text.substring(0, take);
+    final previewChars = settings.contextCcrPreviewChars;
+    final headChars = previewChars <= 1
+        ? previewChars
+        : (previewChars / 2).ceil();
+    final tailChars = previewChars - headChars;
+    final preview = headChars <= 0
+        ? ''
+        : text.substring(0, math.min(text.length, headChars));
+    final tail = tailChars <= 0 || text.length <= headChars + tailChars
+        ? ''
+        : text.substring(text.length - tailChars);
     store.append(
       OffloadedResult(
         toolUseId: call.id,
         tokens: tokens,
         preview: preview,
+        tail: tail,
       ).entry(logicalParentUuid: store.leaf),
     );
     // The last request's count included what is now a placeholder: the
@@ -1061,6 +1079,9 @@ class AgentLoop {
     }
     call.done = true;
     _appendResult(call, output);
+    // The same call, again, is worth saying once; it is advice, not a stop.
+    final reminder = _repeats.record(call.name, call.input);
+    if (reminder != null) _appendUser(reminder, meta: true, emitIt: false);
     return stop;
   }
 
@@ -1071,7 +1092,11 @@ class AgentLoop {
   ) async {
     ToolOutput output;
     try {
-      output = await tool.call(input, context);
+      output = await callWithTimeout(
+        () => tool.call(input, context),
+        timeout: tool.timeout,
+        cancel: context.cancel,
+      );
     } on ToolFailure catch (failure) {
       output = ToolOutput.error(failure.message, result: failure.result);
     } on Cancelled {

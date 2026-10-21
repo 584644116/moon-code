@@ -605,7 +605,9 @@ class AgentEngine {
         : compaction.usedTokens();
     final messages = (used - fixed).clamp(0, 1 << 40);
     final window = session.contextWindow;
-    final buffer = compaction.autoEnabled ? session.compactBuffer : 0;
+    // What automatic compaction keeps free is what its threshold leaves:
+    // one sum, not a second estimate of it.
+    final buffer = compaction.autoEnabled ? compaction.reserve : 0;
     final total = fixed + messages;
     return {
       'categories': [

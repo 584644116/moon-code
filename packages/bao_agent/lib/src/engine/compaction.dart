@@ -99,6 +99,14 @@ class Compaction {
     return math.max((window * 0.5).round(), window - reserve);
   }
 
+  /// The room this conversation keeps free before it is compacted: what the
+  /// threshold leaves of the window.
+  int get reserve => (contextWindow - threshold).clamp(0, contextWindow);
+
+  /// The reserve of a [window], for a caller that has only the window.
+  static int reserveOf(int window, {int maxOutput = 0}) =>
+      (window - thresholdOf(window, maxOutput: maxOutput)).clamp(0, window);
+
   /// The most of a window a model's answer is given.
   static const _answerReserve = 21000;
 
