@@ -6,7 +6,7 @@
 >
 > 编写日期：2026-10-21
 >
-> 2026-10-21 更新：批次 5 已实施（提交 `2df662f`），P0-2 完成第一步；状态见 §8.1。
+> 2026-10-21 更新：P0 全部完成（P0-2 的独立 `tool-results/` spill 除外），P1 除 P1-10（等待真实错误样本）外全部完成；P2 未排期。提交与验证见 §8.1。
 
 ---
 
@@ -395,9 +395,16 @@
 | P0-6 审批风险与审计 | 已完成 | `203a3f7`：`ApprovalRisk` / 可逆性 / 来源，面板标签，`approvals/<session>.jsonl` 审计；只展示与审计，不改判定 |
 | P0-7 浏览器敏感工具确认 | 已完成 | `203a3f7`：`browser_evaluate` 命中 cookie/存储/网络脚本即询问，`browser_intercept` 询问；全访问下也不自动放行 |
 | P1-6 诊断包秘密清洗 | 已完成 | `203a3f7`：`scrubSecrets` 覆盖 `sk-` / Bearer / api key / cookie / refresh token / 私钥；非 dump 文件先脱敏再打包 |
-| 其余 P1 / P2 | 未开始 | — |
+| P1-3 会话 ZIP 导出 | 已完成 | `16d605e`：`/export` 与标题栏按钮，会话 + `subagents/` + 会话目录文件，单文件/总量上限，超限计入 `omitted` |
+| P1-4 本轮改动与交付物 | 已完成 | `008544d`：`FileChange.turnId` + “本轮”分组；`Present` 工具（最多 8 个）显示为交付卡片，CLI 不提供 |
+| P1-5 MCP 面板细化 | 已完成 | `870bee8`：`McpServer.resources/prompts`，行内展开工具/资源/提示，任意状态显示错误 |
+| P1-7 移动端上下文状态 | 已完成 | `6bb6f25`：`LinkSessionUpdate.context`（window/used/limit/compacted），只增可选字段 |
+| P1-8 跨会话引用 | 已完成 | `76a37fa`：`[Session id: title]` 引用最多 3 个来源、每个 8000 字符，标注为不可信背景；会话缺失时告知模型 |
+| P1-9 会话全文索引 | 已完成（内存倒排） | `f659a3a`：ASCII 词 + 中文二字组倒排；无法收窄（词的一部分、索引缺失）时回退全量扫描。未引入 SQLite |
+| P1-10 图像卸载 | 暂不做 | 等待供应商真实错误样本确认分类条件，见 §5 |
+| P2-1 ~ P2-4 | 未排期 | 见 §6；默认关闭/平台风险高，按产品节奏单独评估 |
 
-> 验证：`compaction_rounds_test`、`context_usage_test`、`context_tools_test`、`session_compression_test`、`repeat_guard_test`、`tool_timeout_test` 共 32 条通过；`empty_answer_test`、`api_error_kind_test`、`request_test` 13 条通过；`approval_risk_test`、`approval_audit_test` 7 条通过；`test/chat/approval_risk_test.dart` 2 条、`scrub_test.dart` 4 条、`kernel_test.dart` 全访问用例通过；`controls_test` 仅剩既有的 Windows 路径失败；`dart analyze packages/bao_agent/lib` 与 `dart analyze lib/diagnostics` 无问题。
+> 验证：`compaction_rounds_test`、`context_usage_test`、`context_tools_test`、`session_compression_test`、`repeat_guard_test`、`tool_timeout_test` 共 32 条通过；`empty_answer_test`、`api_error_kind_test`、`request_test` 13 条通过；`approval_risk_test`、`approval_audit_test` 7 条通过；`test/chat/approval_risk_test.dart` 2 条、`scrub_test.dart` 4 条、`kernel_test.dart` 全访问用例通过；`session_export_test` 5 条、`session_reference_test` 3 条、`session_index_test` 3 条、`conversation_search_test` 2 条、`link_test` 15 条、`workspace_bridge_test` 13 条通过；`tools_test` 的 Present 用例与 `kernel_test` 的 Present/MCP 用例通过；`steps_test` 的 “summarized thought” 为干净树上既有失败；`controls_test` 仅剩既有的 Windows 路径失败；`dart analyze packages/bao_agent/lib`、`packages/bao_link/lib`、`lib/search`、`lib/link`、`lib/chat` 无问题。
 
 ### 批次 5：上下文用量 + 重复提醒 + 工具超时（无协议风险）
 
