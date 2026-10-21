@@ -5318,6 +5318,30 @@ abstract class AppLocalizations {
   /// **'Disable'**
   String get mcpDisable;
 
+  /// No description provided for @mcpOfferings.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools and resources'**
+  String get mcpOfferings;
+
+  /// No description provided for @mcpTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools'**
+  String get mcpTools;
+
+  /// No description provided for @mcpResources.
+  ///
+  /// In en, this message translates to:
+  /// **'Resources'**
+  String get mcpResources;
+
+  /// No description provided for @mcpPrompts.
+  ///
+  /// In en, this message translates to:
+  /// **'Prompts'**
+  String get mcpPrompts;
+
   /// No description provided for @mcpTest.
   ///
   /// In en, this message translates to:

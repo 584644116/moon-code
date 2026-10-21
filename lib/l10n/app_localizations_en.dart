@@ -3096,6 +3096,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mcpDisable => 'Disable';
 
   @override
+  String get mcpOfferings => 'Tools and resources';
+
+  @override
+  String get mcpTools => 'Tools';
+
+  @override
+  String get mcpResources => 'Resources';
+
+  @override
+  String get mcpPrompts => 'Prompts';
+
+  @override
   String get mcpTest => 'Test connection';
 
   @override

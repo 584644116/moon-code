@@ -90,7 +90,7 @@ class McpServersPanel extends StatelessWidget {
   }
 }
 
-class _ServerRow extends StatelessWidget {
+class _ServerRow extends StatefulWidget {
   const _ServerRow({
     required this.server,
     required this.onSetEnabled,
@@ -104,7 +104,20 @@ class _ServerRow extends StatelessWidget {
   final VoidCallback onSignIn;
 
   @override
+  State<_ServerRow> createState() => _ServerRowState();
+}
+
+class _ServerRowState extends State<_ServerRow> {
+  /// Whether what the server offers — its tools, resources and prompts —
+  /// is shown.
+  bool _open = false;
+
+  @override
   Widget build(BuildContext context) {
+    final server = widget.server;
+    final onSetEnabled = widget.onSetEnabled;
+    final onReconnect = widget.onReconnect;
+    final onSignIn = widget.onSignIn;
     // As upstream's MCP server list.
     final colors = themeColors;
     final l10n = context.l10n;
@@ -121,10 +134,19 @@ class _ServerRow extends StatelessWidget {
       ),
       McpServerStatus.disabled => (AppColors.textFaint, l10n.mcpDisabled),
     };
+    final hasOfferings =
+        server.tools.isNotEmpty ||
+        server.resources.isNotEmpty ||
+        server.prompts.isNotEmpty;
     final details = [
       ?server.scope,
       if (server.tools.isNotEmpty) l10n.chatToolCount(server.tools.length),
       if (server.version case final version?) 'v$version',
+      if (server.scope == null &&
+          server.tools.isEmpty &&
+          server.version == null &&
+          hasOfferings)
+        l10n.mcpOfferings,
     ].join(' · ');
     final action = switch (server.status) {
       McpServerStatus.failed => PanelButton(
@@ -171,15 +193,43 @@ class _ServerRow extends StatelessWidget {
                   ],
                 ),
                 if (details.isNotEmpty)
-                  Text(
-                    details,
-                    style: TextStyle(
-                      color: AppColors.textFaint,
-                      fontSize: 11.5,
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: hasOfferings
+                        ? () => setState(() => _open = !_open)
+                        : null,
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            details,
+                            style: TextStyle(
+                              color: AppColors.textFaint,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ),
+                        if (hasOfferings)
+                          Icon(
+                            _open ? Icons.expand_less : Icons.expand_more,
+                            size: 14,
+                            color: AppColors.textFaint,
+                          ),
+                      ],
                     ),
                   ),
-                if (server.error case final error?
-                    when server.status == McpServerStatus.failed)
+                if (_open) ...[
+                  if (server.tools.isNotEmpty)
+                    _Offering(label: l10n.mcpTools, names: server.tools),
+                  if (server.resources.isNotEmpty)
+                    _Offering(
+                      label: l10n.mcpResources,
+                      names: server.resources,
+                    ),
+                  if (server.prompts.isNotEmpty)
+                    _Offering(label: l10n.mcpPrompts, names: server.prompts),
+                ],
+                if (server.error case final error?)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
@@ -211,6 +261,42 @@ class _ServerRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// What a server offers, by kind, in its row.
+class _Offering extends StatelessWidget {
+  const _Offering({required this.label, required this.names});
+
+  final String label;
+  final List<String> names;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 3, right: 8),
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: TextStyle(color: AppColors.textFaint, fontSize: 11),
+            ),
+            TextSpan(
+              text: names.join(', '),
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontFamily: AppFonts.mono,
+                fontFamilyFallback: AppFonts.monoFallbacks,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

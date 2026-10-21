@@ -245,6 +245,8 @@ class McpServer {
     this.scope,
     this.version,
     this.tools = const [],
+    this.resources = const [],
+    this.prompts = const [],
   });
 
   final String name;
@@ -259,6 +261,12 @@ class McpServer {
 
   /// The names of its tools, once connected.
   final List<String> tools;
+
+  /// Its resources' names (or URIs), once connected.
+  final List<String> resources;
+
+  /// Its prompts' names, once connected.
+  final List<String> prompts;
 
   bool get needsAttention =>
       status == McpServerStatus.failed || status == McpServerStatus.needsAuth;

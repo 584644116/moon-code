@@ -4755,6 +4755,12 @@ void main() {
                 'tools': [
                   {'name': 'search_issues'},
                 ],
+                'resources': [
+                  {'name': 'issues', 'uri': 'github://issues'},
+                ],
+                'prompts': [
+                  {'name': 'review'},
+                ],
               },
               {'name': 'linear', 'status': 'needs-auth', 'scope': 'user'},
               {
@@ -4782,6 +4788,8 @@ void main() {
         McpServerStatus.failed,
       ]);
       expect(servers.first.tools, ['search_issues']);
+      expect(servers.first.resources, ['issues']);
+      expect(servers.first.prompts, ['review']);
       expect(servers.first.version, '1.0.0');
       expect(servers.last.error, 'ECONNREFUSED');
       expect(servers.where((s) => s.needsAttention), hasLength(2));

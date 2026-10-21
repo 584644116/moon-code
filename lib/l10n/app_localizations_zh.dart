@@ -2988,6 +2988,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpDisable => '禁用';
 
   @override
+  String get mcpOfferings => '工具与资源';
+
+  @override
+  String get mcpTools => '工具';
+
+  @override
+  String get mcpResources => '资源';
+
+  @override
+  String get mcpPrompts => '提示';
+
+  @override
   String get mcpTest => '测试连接';
 
   @override

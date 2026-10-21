@@ -1380,6 +1380,8 @@ class ClaudeCodeKernel
                 scope: server.scope,
                 version: server.version,
                 tools: server.tools,
+                resources: server.resources,
+                prompts: server.prompts,
               )
             : server,
     ];
@@ -1411,6 +1413,17 @@ class ClaudeCodeKernel
       tools: [
         for (final tool in raw['tools'] as List? ?? const [])
           if (tool is Map && tool['name'] is String) tool['name'] as String,
+      ],
+      resources: [
+        for (final resource in raw['resources'] as List? ?? const [])
+          if (resource is Map)
+            if (resource['name'] ?? resource['uri'] case final name?)
+              '$name',
+      ],
+      prompts: [
+        for (final prompt in raw['prompts'] as List? ?? const [])
+          if (prompt is Map && prompt['name'] is String)
+            prompt['name'] as String,
       ],
     );
   }
