@@ -161,8 +161,11 @@ class ChatComposerState extends State<ChatComposer>
 
   bool _hasContent = false;
 
-  /// Polish asked, its answer awaited (see [_polish]).
+  /// Polish or Enhance asked, its answer awaited (see [_polish]).
   bool _polishing = false;
+
+  /// Which was asked (see [_polish]): Enhance's, or Polish's.
+  bool _enhancing = false;
 
   /// Every image put in, by number, kept until sent: the text's references
   /// pick which go (see [_images]), so one taken out and brought back by
@@ -1383,11 +1386,12 @@ class ChatComposerState extends State<ChatComposer>
       _historyAt = at;
       _historyShown = _controller.document.toPlainText();
     }
+    _recalling = false;
   }
 
-  // --- Polish --------------------------------------------------------------
+  // --- Polish and Enhance ---------------------------------------------------
 
-  /// The text as the model is given it to polish (see [composerPolishText]).
+  /// The text as the model is given it to rewrite (see [composerPolishText]).
   ComposerPolishText _polishText() {
     final document = _controller.document;
     return composerPolishText(
@@ -1395,21 +1399,28 @@ class ChatComposerState extends State<ChatComposer>
     );
   }
 
-  /// Has the auxiliary model polish the text, its tags, images, code and
-  /// links kept as they are; put in its place as one change (⌘Z takes it
-  /// back), unless the text changed meanwhile. Why not, in a notification.
-  Future<void> _polish() async {
+  /// Has the auxiliary model rewrite the text — polished (made clearer in
+  /// its own words), or with [enhance] enhanced (the project read for what
+  /// it touches, said as the whole instruction an agent needs) — its tags,
+  /// images, code and links kept as they are; put in its place as one
+  /// change (⌘Z takes it back), unless the text changed meanwhile. Why not,
+  /// in a notification.
+  Future<void> _polish({bool enhance = false}) async {
     if (_polishing) return;
     final asked = _polishText();
     if (!asked.hasWords) return;
     final before = _controller.document.toDelta();
     final notifications = IdeNotificationsScope.maybeOf(context);
     final l10n = context.l10n;
-    setState(() => _polishing = true);
+    setState(() {
+      _polishing = true;
+      _enhancing = enhance;
+    });
     try {
       final Delta polished;
       try {
-        polished = await polishComposerText(
+        final ask = enhance ? enhanceComposerText : polishComposerText;
+        polished = await ask(
           asked,
           model: widget.session.selected(KernelChoiceKind.model),
           location: widget.session.kernelContext.cwd,
@@ -1417,7 +1428,9 @@ class ChatComposerState extends State<ChatComposer>
       } on ComposerPolishException catch (error) {
         notifications?.notify(
           IdeSeverity.error,
-          l10n.composerPolishFailed(error.message ?? l10n.stashAiNoAnswer),
+          enhance
+              ? l10n.composerEnhanceFailed(error.message ?? l10n.stashAiNoAnswer)
+              : l10n.composerPolishFailed(error.message ?? l10n.stashAiNoAnswer),
         );
         return;
       }
@@ -1437,7 +1450,12 @@ class ChatComposerState extends State<ChatComposer>
       history.lastRecorded = 0;
       _focusNode.requestFocus();
     } finally {
-      if (mounted) setState(() => _polishing = false);
+      if (mounted) {
+        setState(() {
+          _polishing = false;
+          _enhancing = false;
+        });
+      }
     }
   }
 
@@ -2038,9 +2056,18 @@ class ChatComposerState extends State<ChatComposer>
           const SizedBox(width: 8),
           if (ComposerPolishSetting.current()) ...[
             _PolishButton(
-              busy: _polishing,
+              busy: _polishing && !_enhancing,
               enabled: _polishing || _polishText().hasWords,
               onTap: () => unawaited(_polish()),
+            ),
+            const SizedBox(width: 2),
+          ],
+          if (ComposerEnhanceSetting.current()) ...[
+            _PolishButton(
+              enhance: true,
+              busy: _polishing && _enhancing,
+              enabled: _polishing || _polishText().hasWords,
+              onTap: () => unawaited(_polish(enhance: true)),
             ),
             const SizedBox(width: 2),
           ],
@@ -2075,14 +2102,18 @@ class ChatComposerState extends State<ChatComposer>
 }
 
 /// Polish (see [ChatComposerState._polish]): a sparkle, spinning while the
-/// model answers; faint with no words to polish.
+/// model answers; faint with no words to polish. Enhance's the same, with
+/// a wand, turning the message into the whole instruction.
 class _PolishButton extends StatelessWidget {
   const _PolishButton({
+    this.enhance = false,
     required this.busy,
     required this.enabled,
     required this.onTap,
   });
 
+  /// Whether this is Enhance's, not Polish's.
+  final bool enhance;
   final bool busy;
   final bool enabled;
   final VoidCallback onTap;
@@ -2093,12 +2124,17 @@ class _PolishButton extends StatelessWidget {
     final colors = themeColors;
     final active = enabled && !busy;
     final icon = Icon(
-      busy ? Codicons.loading : Codicons.sparkle,
+      busy ? Codicons.loading : (enhance ? Codicons.wand : Codicons.sparkle),
       size: 14,
       color: enabled ? colors['icon.foreground'] : AppColors.textFaint,
     );
     return IdeHover(
-      message: busy ? l10n.composerPolishing : l10n.composerPolishHint,
+      message: switch ((enhance, busy)) {
+        (true, true) => l10n.composerEnhancing,
+        (true, false) => l10n.composerEnhanceHint,
+        (false, true) => l10n.composerPolishing,
+        (false, false) => l10n.composerPolishHint,
+      },
       child: HoverBuilder(
         cursor: active ? SystemMouseCursors.click : SystemMouseCursors.basic,
         builder: (context, hovered) => GestureDetector(

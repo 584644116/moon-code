@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import '../ide/ide_button.dart';
 import '../ide/ide_dialog.dart';
 import '../l10n/l10n.dart';
+import '../platform/app_identity.dart';
 import '../platform/data_dir.dart';
 import '../theme/codicons.dart';
 import '../theme/app_theme.dart';
@@ -55,7 +56,7 @@ class DataDirectoryRecoveryApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'BaoCode',
+    title: AppIdentity.name,
     debugShowCheckedModeBanner: false,
     theme: buildAppTheme(),
     // The display language setting is in the folder that is not there:
@@ -131,6 +132,7 @@ class _DataDirectoryRecoveryState extends State<DataDirectoryRecovery> {
     DataDirectory(
       _problem.defaultPath,
       source: DataDirectorySource.temporaryDefault,
+      shared: sharedBeside(_problem.defaultPath),
     ),
   );
 
@@ -164,7 +166,13 @@ class _DataDirectoryRecoveryState extends State<DataDirectoryRecovery> {
         dataDir: path,
         previousDataDir: kept?.previousDataDir,
       ).write(File(_problem.pointerFile));
-      _resolve(DataDirectory(path, source: DataDirectorySource.pointer));
+      _resolve(
+        DataDirectory(
+          path,
+          source: DataDirectorySource.pointer,
+          shared: sharedBeside(path),
+        ),
+      );
     } on FileSystemException catch (error) {
       if (mounted) {
         setState(

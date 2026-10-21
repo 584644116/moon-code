@@ -6,12 +6,15 @@
 
 #include <vector>
 
+#include "app_identity.h"
 #include "utils.h"
 
 namespace log_folder {
 namespace {
 
-constexpr wchar_t kSettingsKey[] = L"Software\\BaoCode";
+// This build's own key (app_identity.h): BaoCode Lab's logs folder is not
+// the installed app's.
+const wchar_t* const kSettingsKey = app_identity::SettingsKey();
 constexpr wchar_t kFolderValue[] = L"LogsFolder";
 
 // Windows' own lock, not std::mutex: built with MSVC 14.40 or later, a
@@ -53,7 +56,7 @@ std::wstring KeptFolder() {
   return std::wstring(folder.data());
 }
 
-// %APPDATA%\baocode\logs; empty if there is no %APPDATA%.
+// %APPDATA%\<the app's folder>\logs; empty if there is no %APPDATA%.
 std::wstring DefaultFolder() {
   wchar_t app_data[MAX_PATH];
   const DWORD length =
@@ -61,7 +64,8 @@ std::wstring DefaultFolder() {
   if (length == 0 || length >= MAX_PATH) {
     return std::wstring();
   }
-  return std::wstring(app_data) + L"\\baocode\\logs";
+  return std::wstring(app_data) + L"\\" + app_identity::DataFolder() +
+         L"\\logs";
 }
 
 // Whether |folder| is there, made if need be — with the folders above it:

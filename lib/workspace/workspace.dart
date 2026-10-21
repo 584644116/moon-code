@@ -2414,6 +2414,15 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
     notifyListeners();
   }
 
+  /// Shows [thread], and lists it again where it was archived or its
+  /// project hidden: a conversation found by what it says is one to go
+  /// back to, whether or not the sidebar was showing it.
+  void reveal(AgentThread thread) {
+    if (thread.archived) _setArchived(thread, false);
+    _unhide(thread.project.path);
+    select(thread);
+  }
+
   void _focus(AgentThread thread) {
     thread._markSeen();
     _snapshots[thread] = thread._snapshot;

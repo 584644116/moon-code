@@ -83,6 +83,32 @@ void main() {
     expect(off.betas, isEmpty);
   });
 
+  test('a window too small for the output asked: what is sent is smaller', () async {
+    // A model's own default is its own size, not this conversation's. Sent
+    // as it is, input and output together pass the window and the API
+    // refuses the request before the model is asked, so the turn is lost
+    // and asked again smaller. It is asked for the room that is left, the
+    // reserve kept free below that.
+    final request = await asked(
+      'claude-sonnet-5-5',
+      settings: {'autoCompactWindow': 20000},
+    );
+    final sent = request.body['max_tokens'] as int;
+    // Its own default is 128,000 — far past a 20,000 window.
+    expect(sent, lessThan(20000));
+    // And low enough that the input has room beside it.
+    expect(sent, lessThan(20000 - 4096));
+  });
+
+  test('a window with room to spare: what was asked for', () async {
+    final request = await asked(
+      'claude-sonnet-5-5',
+      settings: {'autoCompactWindow': 200000},
+    );
+    // 128,000 is the model's own default, and 200,000 has room for it.
+    expect(request.body['max_tokens'], 128000);
+  });
+
   test("a provider's model: nothing it may not take", () async {
     final request = await asked('some-provider-model');
     expect(request.body['max_tokens'], 32000);

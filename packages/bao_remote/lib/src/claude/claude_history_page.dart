@@ -6,11 +6,20 @@ class ClaudeHistoryPage {
   /// The whole of it: nothing before.
   const ClaudeHistoryPage.whole(this.entries) : earlier = null;
 
+  /// What [json] says of a page. Read off the wire — from a host that may
+  /// run another version of this code — so a line not shaped as one is
+  /// left out and the rest of the page kept.
   factory ClaudeHistoryPage.fromJson(Map<String, Object?> json) =>
       ClaudeHistoryPage([
-        for (final entry in json['entries'] as List)
-          (entry as Map).cast<String, Object?>(),
-      ], earlier: json['earlier'] as String?);
+        for (final entry in switch (json['entries']) {
+          final List<Object?> entries => entries,
+          _ => const <Object?>[],
+        })
+          if (entry is Map) entry.cast<String, Object?>(),
+      ], earlier: switch (json['earlier']) {
+        final String earlier => earlier,
+        _ => null,
+      });
 
   /// Its lines, oldest first.
   final List<Map<String, Object?>> entries;

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 /// What a model can do and costs, as far as the agent needs to know.
 class ModelInfo {
   const ModelInfo({
@@ -54,7 +56,33 @@ class ModelInfo {
   /// Whether this table knows it, rather than guessed.
   final bool known;
 
+  // What it can be asked for, as the rest of the agent asks it: a model
+  // not in this table may be on a provider that knows none of it, so what
+  // is not known is not asked.
+
   bool get supportsEffort => effortLevels.isNotEmpty;
+
+  /// Whether it takes `thinking: {type: "disabled"}` at all.
+  bool get canTurnThinkingOff =>
+      known && canDisableThinking && thinking != ThinkingStyle.none;
+
+  /// Whether [level] is one of its efforts.
+  bool takesEffort(String level) => known && effortLevels.contains(level);
+
+  /// The effort asked for when nothing is: its own, for a model known.
+  String? get effortUnlessAsked => known ? defaultEffort : null;
+
+  /// The `max_tokens` asked for when nothing is.
+  int get outputUnlessAsked => known ? defaultMaxTokens : 32000;
+
+  /// The most an errand of the agent's (a summary, a title) may answer
+  /// with: less than a turn's, as the answer is short.
+  int get errandMaxTokens => known ? math.min(20000, maxOutput) : 16000;
+
+  /// Whether the million-token window is one it is asked for, rather than
+  /// one it has.
+  bool get asksForLongContext =>
+      known && contextWindow <= 200000 && family == 'sonnet';
 
   /// The cost of [usage] (an API usage object), in dollars.
   double cost(Map<String, Object?> usage) {

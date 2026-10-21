@@ -22,8 +22,12 @@ typedef ClaudeGoalReader = Future<List<Map<String, Object?>>> Function(
 
 /// The condition of the goal [listing] (an answer to `get_hooks_listing`)
 /// has in effect; null with none.
+///
+/// Its hooks are read as loosely as anything else the CLI says: `hooks`
+/// not being the list it is elsewhere (a newer CLI, a proxy in between)
+/// means no goal is listed, not that the session breaks.
 String? hookedGoal(Map<String, Object?> listing) {
-  for (final hook in listing['hooks'] as List? ?? const []) {
+  for (final hook in _list(listing['hooks'])) {
     if (hook case {
       'event': 'Stop',
       'source': 'sessionHook',
@@ -35,6 +39,18 @@ String? hookedGoal(Map<String, Object?> listing) {
   }
   return null;
 }
+
+/// A whole number, however it was written: see claude_code_translator.dart.
+int? _int(Object? value) => switch (value) {
+  final int value => value,
+  final num value => value.toInt(),
+  final String value => int.tryParse(value.trim()),
+  _ => null,
+};
+
+/// The items of [value], if it is a list; none otherwise.
+List<Object?> _list(Object? value) =>
+    value is List ? value.cast<Object?>() : const [];
 
 /// The goal as [records], `goal_status` lines, have it. One met or given
 /// up on at a record before [seen] (before now) is no goal any more.
@@ -69,16 +85,14 @@ KernelGoal? keptGoal(List<Map<String, Object?>> records, {int seen = 0}) {
                 condition,
                 state: met ? GoalState.met : GoalState.failed,
                 checks:
-                    (record['iterations'] as num?)?.toInt() ??
-                    known?.checks ??
-                    0,
+                    _int(record['iterations']) ?? known?.checks ?? 0,
                 lastReason: reason ?? known?.lastReason,
                 setAt: known?.setAt,
                 duration: switch (record['durationMs']) {
                   final num ms => Duration(milliseconds: ms.round()),
                   _ => null,
                 },
-                tokens: (record['tokens'] as num?)?.toInt(),
+                tokens: _int(record['tokens']),
               );
         continue;
       }

@@ -17,4 +17,6 @@ export 'src/engine/engine.dart'
 export 'src/engine/isolate.dart' show AgentIsolate;
 export 'src/engine/session.dart' show EngineOptions, MissingCredentials;
 export 'src/engine/session_store.dart' show agentVersion;
+export 'src/hooks/hooks.dart' show extractJson;
+export 'src/prompts/task_prompts.dart' show classifierPrompt, classifierSystem;
 export 'src/util/cancel.dart' show CancelToken, Cancelled;

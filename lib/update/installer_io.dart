@@ -5,19 +5,23 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import '../channel/channel_setup.dart' show ChannelSetup;
+import '../platform/app_identity.dart';
 import 'update_io.dart';
 import 'update_manifest.dart';
 import 'update_service.dart';
 import 'version.dart';
 
 /// What updates the app where it runs: the platform's download, and what
-/// installs it. Null where there are none: not macOS, Windows or Linux, or a
-/// debug build (which would replace the build folder's app), unless
+/// installs it. Null where there are none: not macOS, Windows or Linux, a
+/// debug build (which would replace the build folder's app), or a build
+/// kept beside an installed app (BaoCode Lab, see [AppIdentity]: its
+/// installer is not the one the releases are made for), unless
 /// [manifestUrlVariable] points at a manifest to try.
 PlatformUpdates? platformUpdates({required String updatesDirectory}) {
   final environment = Platform.environment;
   final override = environment[manifestUrlVariable]?.trim() ?? '';
   if (!kReleaseMode && override.isEmpty) return null;
+  if (AppIdentity.isLab && override.isEmpty) return null;
   final manifestUrl = Uri.tryParse(
     override.isEmpty ? defaultManifestUrl : override,
   );

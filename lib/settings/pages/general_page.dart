@@ -12,7 +12,8 @@ import '../../kernel/claude_code/claude_core_setting.dart';
 import '../../kernel/claude_code/claude_path_setting.dart';
 import '../../kernel/commit_attribution.dart';
 import '../../kernel/prompt_suggestions.dart';
-import '../../chat/composer/composer_polish.dart' show ComposerPolishSetting;
+import '../../chat/composer/composer_polish.dart'
+    show ComposerEnhanceSetting, ComposerPolishSetting;
 import '../../chat/widgets/turn_footer.dart' show LiveTurnStatsSetting;
 import '../../kernel/queued_messages.dart';
 import '../../l10n/l10n.dart';
@@ -373,6 +374,17 @@ class GeneralSettingsPage extends StatelessWidget {
                   onChanged: (on) => _write(
                     ComposerPolishSetting.settingKey,
                     on ? null : ComposerPolishSetting.off,
+                  ),
+                ),
+                SettingsSwitchRow(
+                  label: l10n.generalSettingsComposerEnhance,
+                  description: l10n.generalSettingsComposerEnhanceDescription,
+                  value: ComposerEnhanceSetting.enabled(
+                    settings?[ComposerEnhanceSetting.settingKey],
+                  ),
+                  onChanged: (on) => _write(
+                    ComposerEnhanceSetting.settingKey,
+                    on ? null : ComposerEnhanceSetting.off,
                   ),
                 ),
                 SettingsSwitchRow(

@@ -2,10 +2,20 @@
 library;
 
 /// Asks for the conversation so far, summed up to go on from.
-String compactPrompt([String? instructions]) {
+///
+/// [keep] is what must not be lost whatever else is left out: the user's
+/// own words, the files the work is in. It is given to the model as what
+/// the summary has to hold, not as something to weigh against the rest.
+String compactPrompt([String? instructions, List<String> keep = const []]) {
   final extra = instructions == null || instructions.trim().isEmpty
       ? ''
       : '\n\nThe user asks this of the summary:\n${instructions.trim()}';
+  final must = keep.isEmpty
+      ? ''
+      : '\n\nThese are the things the work cannot go on without. Each one '
+            'must be in the summary as it stands here, word for word, '
+            'however long the summary has to be:\n\n'
+            '${keep.join('\n')}';
   return '''The conversation above is about to be cleared, and the work will go on from a summary of it alone. Write that summary now: all that whoever picks the work up needs, so that nothing has to be asked again or found out twice.
 
 First go through the conversation from start to end in <analysis> tags, as notes for yourself: what the user asked for, word by word where it matters; what was decided and why; the files read and changed; the code that matters; what went wrong and how it was put right; anything the user corrected or asked to be done otherwise.
@@ -19,7 +29,7 @@ Then the summary itself, in <summary> tags, under these headings:
 - The user's words: each thing the user wrote (not tool results), as nearly as it was written.
 - Still to do: what the user asked for and is not done.
 - Where it stopped: exactly what was being done last, with files and code.
-- Next: the one step that comes next, if it follows from what the user asked last; quote the last messages to show where things stood. Leave it out if there is none.$extra
+- Next: the one step that comes next, if it follows from what the user asked last; quote the last messages to show where things stood. Leave it out if there is none.$extra$must
 
 Write only the <analysis> and the <summary>, and call no tools.''';
 }

@@ -252,6 +252,14 @@ class _DataDirectoryPageState extends State<DataDirectoryPage> {
                     ),
                 ] else ...[
                   Text(source, style: SettingsText.description),
+                  // A build kept beside an installed one (BaoCode Lab)
+                  // reads that one's files: said, so that what a setting
+                  // changed here changes there too is no surprise.
+                  if (current.shared case final shared?)
+                    Text(
+                      l10n.dataDirSharedFiles(shared),
+                      style: SettingsText.description,
+                    ),
                   if (fromEnvironment)
                     Text(
                       l10n.dataDirEnvDecides(DataDirectory.environmentVariable),

@@ -72,6 +72,17 @@ IDI_APP_ICON            ICON                    "resources\\app_icon.ico"
 #define VERSION_AS_STRING "1.0.0"
 #endif
 
+// What Windows shows for the app (Properties → Details, the task manager):
+// the build kept beside an installed BaoCode calls itself BaoCode Lab
+// (windows/CMakeLists.txt, BAOCODE_LAB).
+#if defined(BAOCODE_LAB)
+#define APP_NAME "BaoCode Lab"
+#define APP_EXE "baocodelab.exe"
+#else
+#define APP_NAME "BaoCode"
+#define APP_EXE "baocode.exe"
+#endif
+
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION VERSION_AS_NUMBER
  PRODUCTVERSION VERSION_AS_NUMBER
@@ -90,12 +101,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "BaoCode" "\0"
-            VALUE "FileDescription", "BaoCode" "\0"
+            VALUE "FileDescription", APP_NAME "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "baocode" "\0"
+            VALUE "InternalName", APP_EXE "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 BaoCode. All rights reserved." "\0"
-            VALUE "OriginalFilename", "baocode.exe" "\0"
-            VALUE "ProductName", "BaoCode" "\0"
+            VALUE "OriginalFilename", APP_EXE "\0"
+            VALUE "ProductName", APP_NAME "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

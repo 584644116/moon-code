@@ -1,5 +1,7 @@
 #include "app_windows.h"
 
+#include "app_identity.h"
+
 #include <flutter/standard_method_codec.h>
 
 #include <algorithm>
@@ -50,8 +52,10 @@ constexpr int kStashHeight = 420;
 constexpr unsigned int kStashMinWidth = 380;
 constexpr unsigned int kStashMinHeight = 220;
 
-// Where the main window's word on showing at launch is kept.
-constexpr wchar_t kSettingsKey[] = L"Software\\BaoCode";
+// Where the main window's word on showing at launch is kept: this build's
+// own key, so that BaoCode Lab keeps its windows' frames apart from the
+// installed app's (app_identity.h).
+const wchar_t* const kSettingsKey = app_identity::SettingsKey();
 constexpr wchar_t kMainShownValue[] = L"MainShownAtLaunch";
 // Where the stash's panel was left, and how big (a RECT, in physical
 // pixels of the virtual screen).
@@ -649,7 +653,7 @@ std::optional<int64_t> AppWindows::Create(
   // Made hidden, at the default size, then put in place (in physical
   // pixels, which Create does not take); shown when Flutter focuses it,
   // once it has drawn.
-  if (!window->Create(title.empty() ? L"BaoCode" : title,
+  if (!window->Create(title.empty() ? app_identity::Name() : title,
                       Win32Window::Point(10, 10),
                       Win32Window::Size(kDefaultWidth, kDefaultHeight))) {
     return std::nullopt;

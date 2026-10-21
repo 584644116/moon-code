@@ -8811,6 +8811,12 @@ abstract class AppLocalizations {
   /// **'The default location, this time only: the folder set in {file} is not available.'**
   String dataDirTemporaryDefault(String file);
 
+  /// No description provided for @dataDirSharedFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Your settings, keybindings, argv.json, keymaps and keys are read from {folder}, which the BaoCode installed on this machine uses too; sessions, caches, checkpoints and logs are only here.'**
+  String dataDirSharedFiles(String folder);
+
   /// No description provided for @dataDirTitle.
   ///
   /// In en, this message translates to:
@@ -14181,6 +14187,30 @@ abstract class AppLocalizations {
   /// **'Could not polish: {error}'**
   String composerPolishFailed(String error);
 
+  /// No description provided for @composerEnhance.
+  ///
+  /// In en, this message translates to:
+  /// **'Enhance'**
+  String get composerEnhance;
+
+  /// No description provided for @composerEnhancing.
+  ///
+  /// In en, this message translates to:
+  /// **'Enhancing…'**
+  String get composerEnhancing;
+
+  /// No description provided for @composerEnhanceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enhance: the auxiliary model reads the project and writes the message out again as the whole instruction — the files and names it touches, the order, what must not change, how to check it; pictures, files, code and links stay as they are; Undo takes it back'**
+  String get composerEnhanceHint;
+
+  /// No description provided for @composerEnhanceFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not enhance: {error}'**
+  String composerEnhanceFailed(String error);
+
   /// No description provided for @generalSettingsComposerPolish.
   ///
   /// In en, this message translates to:
@@ -14192,6 +14222,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A button in the message box that has the auxiliary model make what you wrote clearer before you send it'**
   String get generalSettingsComposerPolishDescription;
+
+  /// No description provided for @generalSettingsComposerEnhance.
+  ///
+  /// In en, this message translates to:
+  /// **'Enhance button'**
+  String get generalSettingsComposerEnhance;
+
+  /// No description provided for @generalSettingsComposerEnhanceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'A button in the message box that has the auxiliary model read the project and write what you wrote out again as the whole instruction — the files it touches, the order, how to check it'**
+  String get generalSettingsComposerEnhanceDescription;
 
   /// No description provided for @generalSettingsLiveTurnStats.
   ///

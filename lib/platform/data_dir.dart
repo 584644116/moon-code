@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'app_identity.dart';
 import 'app_paths.dart';
 
 /// Where [DataDirectory.current] was found.
@@ -48,6 +49,7 @@ class DataDirectory {
   const DataDirectory(
     this.path, {
     this.source = DataDirectorySource.defaultLocation,
+    this.shared,
   });
 
   /// The one this run uses, resolved once as the app starts (main.dart,
@@ -58,6 +60,11 @@ class DataDirectory {
     Platform.environment.containsKey('FLUTTER_TEST')
         ? p.join(Directory.systemTemp.path, 'baocode-test-data-$pid')
         : defaultPath(Platform.environment),
+    // Before main.dart has resolved the folder: a build kept beside another
+    // already reads the other's files, not none at all.
+    shared: Platform.environment.containsKey('FLUTTER_TEST')
+        ? null
+        : sharedDataDirectory(),
   );
   static set current(DataDirectory value) => _current = value;
   static DataDirectory? _current;
@@ -65,15 +72,29 @@ class DataDirectory {
   final String path;
   final DataDirectorySource source;
 
+  /// Where the user's own files are, when this build keeps them beside
+  /// another's rather than its own: BaoCode Lab reads and writes the
+  /// installed BaoCode's `User/`, `argv.json`, `keymaps/` and `secrets/`
+  /// (see [AppIdentity]). Null for a build that keeps its own.
+  final String? shared;
+
+  /// The folder the user's files are in: [shared], else [path].
+  String get userRoot => shared ?? path;
+
   /// What the user edits: settings, keybindings, language servers.
-  String get userDir => p.join(path, 'User');
+  String get userDir => p.join(userRoot, 'User');
   String get settingsFile => p.join(userDir, 'settings.json');
   String get keybindingsFile => p.join(userDir, 'keybindings.json');
   String get lspSettingsFile => p.join(userDir, 'lsp.json');
 
   /// The display language (`locale`), as VS Code's `argv.json`.
-  String get argvFile => p.join(path, 'argv.json');
-  String get keymapsDir => p.join(path, 'keymaps');
+  String get argvFile => p.join(userRoot, 'argv.json');
+  String get keymapsDir => p.join(userRoot, 'keymaps');
+
+  /// The providers' keys, where the system has no keychain of its own:
+  /// read as an installed BaoCode's are, so that a key added in one is
+  /// there in the other.
+  String get secretsDir => p.join(userRoot, 'secrets');
 
   /// What the app keeps for itself.
   String get stateDir => p.join(path, 'state');
@@ -164,9 +185,9 @@ class DataDirectory {
 
   /// The platform's place for it: `%APPDATA%\baocode` on Windows,
   /// `~/Library/Application Support/baocode` on macOS, `~/.config/baocode`
-  /// elsewhere.
+  /// elsewhere; BaoCode Lab's own folder beside it (`baocodelab`).
   static String defaultPath(Map<String, String> environment) =>
-      AppPaths.dataDir(environment);
+      AppPaths.dataDir(environment, folder: AppIdentity.dataFolder);
 
   /// The environment variable that overrides everything else.
   static const environmentVariable = 'BAOCODE_DATA_DIR';
@@ -193,9 +214,10 @@ class DataDirectoryPointer {
   final String? dataDir;
   final String? previousDataDir;
 
-  /// Where it is, under [home].
+  /// Where it is, under [home]: `~/.baocode/config-dir.json`, or this
+  /// build's own folder beside it (`~/.baocodelab`, see [AppIdentity]).
   static String fileIn(String home) =>
-      p.join(home, '.baocode', 'config-dir.json');
+      p.join(home, AppIdentity.pointerFolder, 'config-dir.json');
 
   /// What [file] says; null when there is no such file. Throws a
   /// [FormatException] when it is not a pointer (or cannot be read).
@@ -288,6 +310,8 @@ class DataDirectoryResolution {
     required this.pointerFile,
     this.problem,
     this.error,
+    this.environment,
+    this.home,
   });
 
   /// The folder found; with an invalid pointer, [defaultPath].
@@ -306,9 +330,26 @@ class DataDirectoryResolution {
   /// [problem] for the user.
   final String? error;
 
+  /// The environment and home [path] was found by, when they were given
+  /// (the process's and the user's otherwise): where the folder of the app
+  /// this one is kept beside is looked for.
+  final Map<String, String>? environment;
+  final String? home;
+
   bool get ok => problem == null;
 
-  DataDirectory get directory => DataDirectory(path, source: source);
+  /// Where the user's own files are, for a build that keeps them beside
+  /// the installed app's: the folder that app uses — the one its pointer
+  /// names when the user moved it, else the platform's default — when it
+  /// is there (a build that runs alone keeps its own, and finds none).
+  String? get sharedPath =>
+      sharedBeside(path, environment: environment, home: home);
+
+  DataDirectory get directory => DataDirectory(
+    path,
+    source: source,
+    shared: sharedPath,
+  );
 }
 
 /// Where the data directory is: `BAOCODE_DATA_DIR`, else the folder
@@ -338,6 +379,8 @@ DataDirectoryResolution resolveDataDirectory({
     pointerFile: pointerFile,
     problem: problem,
     error: error,
+    environment: environment,
+    home: home,
   );
 
   DataDirectoryResolution checked(String path, DataDirectorySource source) {
@@ -379,6 +422,41 @@ DataDirectoryResolution resolveDataDirectory({
     return checked(p.normalize(path), DataDirectorySource.pointer);
   }
   return resolved(defaultPath, DataDirectorySource.defaultLocation);
+}
+
+/// The folder the app kept beside this one ([AppIdentity.sharedFolder])
+/// keeps its data in: the one `~/.baocode/config-dir.json` names, when the
+/// user moved it, else the platform's default. Null for a build that runs
+/// alone.
+String? sharedDataDirectory({Map<String, String>? environment, String? home}) {
+  final folder = AppIdentity.sharedFolder;
+  if (folder == null) return null;
+  environment ??= Platform.environment;
+  home ??= AppPaths.home(environment);
+  final pointer = File(
+    p.join(home, '.${AppIdentity.sharedFolder}', 'config-dir.json'),
+  );
+  try {
+    if (DataDirectoryPointer.read(pointer)?.dataDir case final dataDir?) {
+      final path = expandDataDirectory(dataDir, home);
+      if (p.isAbsolute(path)) return p.normalize(path);
+    }
+  } on FormatException {
+    // Not a pointer: the default, as the app itself would take it.
+  }
+  return AppPaths.dataDir(environment, folder: folder);
+}
+
+/// [sharedDataDirectory], when it is there and is not [path] itself: what a
+/// [DataDirectory] whose files are in it has for [DataDirectory.shared].
+String? sharedBeside(
+  String path, {
+  Map<String, String>? environment,
+  String? home,
+}) {
+  final shared = sharedDataDirectory(environment: environment, home: home);
+  if (shared == null || p.equals(shared, path)) return null;
+  return Directory(shared).existsSync() ? shared : null;
 }
 
 /// [path] with a leading `~` spelled out as [home].

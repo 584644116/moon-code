@@ -19,16 +19,26 @@ class ClaudeSessionSummary {
     required this.path,
   });
 
-  factory ClaudeSessionSummary.fromJson(Map<String, Object?> json) =>
-      ClaudeSessionSummary(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        updatedAt: DateTime.fromMicrosecondsSinceEpoch(
-          json['updatedAt'] as int,
-        ),
-        cwd: json['cwd'] as String,
-        path: json['path'] as String,
-      );
+  /// What [json] says of a session; null for one without what makes it
+  /// one. Read off the wire — from a host that may run another version of
+  /// this code — so nothing in it is taken for granted: a session skipped
+  /// is one not listed, not the whole list lost.
+  static ClaudeSessionSummary? fromJson(Map<String, Object?> json) {
+    final id = json['id'];
+    final cwd = json['cwd'];
+    final path = json['path'];
+    if (id is! String || cwd is! String || path is! String) return null;
+    return ClaudeSessionSummary(
+      id: id,
+      title: switch (json['title']) {
+        final String title => title,
+        _ => '',
+      },
+      updatedAt: _time(json['updatedAt']),
+      cwd: cwd,
+      path: path,
+    );
+  }
 
   final String id;
 
@@ -52,20 +62,41 @@ class ClaudeSessionSummary {
   };
 }
 
+/// When [value] says, in microseconds since the epoch; the epoch itself
+/// for one saying nothing readable, so that a session listed is still
+/// listed — at its worst place in the order, which is where one of
+/// unknown time belongs.
+DateTime _time(Object? value) => DateTime.fromMicrosecondsSinceEpoch(
+  switch (value) {
+    final int at => at,
+    final num at => at.toInt(),
+    final String at => int.tryParse(at.trim()) ?? 0,
+    _ => 0,
+  },
+);
+
 /// A project directory and its sessions, newest first.
 class ClaudeProjectSummary {
   const ClaudeProjectSummary({required this.path, required this.sessions});
 
-  factory ClaudeProjectSummary.fromJson(Map<String, Object?> json) =>
-      ClaudeProjectSummary(
-        path: json['path'] as String,
-        sessions: [
-          for (final session in json['sessions'] as List)
-            ClaudeSessionSummary.fromJson(
-              (session as Map).cast<String, Object?>(),
-            ),
+  /// What [json] says of a project; null for one without a folder to be
+  /// in. Its sessions are read as loosely as they are written: one that
+  /// cannot be read is left out, not the project.
+  static ClaudeProjectSummary? fromJson(Map<String, Object?> json) {
+    final path = json['path'];
+    if (path is! String) return null;
+    return ClaudeProjectSummary(path: path, sessions: _sessions(json));
+  }
+
+  static List<ClaudeSessionSummary> _sessions(Map<String, Object?> json) =>
+      switch (json['sessions']) {
+        final List<Object?> sessions => [
+          for (final session in sessions)
+            if (session is Map)
+              ?ClaudeSessionSummary.fromJson(session.cast<String, Object?>()),
         ],
-      );
+        _ => const [],
+      };
 
   final String path;
   final List<ClaudeSessionSummary> sessions;

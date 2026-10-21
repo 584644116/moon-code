@@ -11,6 +11,7 @@
 #include <cwctype>
 #include <utility>
 
+#include "app_identity.h"
 #include "app_windows.h"
 #include "resource.h"
 #include "utils.h"
@@ -525,7 +526,7 @@ void Attention::ShowIcon() {
   data.uCallbackMessage = kTrayMessage;
   data.hIcon = icon;
   const std::wstring tooltip =
-      tray_ && !tray_->tooltip.empty() ? tray_->tooltip : L"BaoCode";
+      tray_ && !tray_->tooltip.empty() ? tray_->tooltip : app_identity::Name();
   wcsncpy_s(data.szTip, tooltip.c_str(), _TRUNCATE);
   if (icon_added_) {
     ::Shell_NotifyIconW(NIM_MODIFY, &data);

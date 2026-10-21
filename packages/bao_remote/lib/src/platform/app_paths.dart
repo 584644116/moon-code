@@ -20,16 +20,20 @@ abstract final class AppPaths {
   /// The platform's place for the app's data: `%APPDATA%\baocode` on
   /// Windows, `~/Library/Application Support/baocode` on macOS,
   /// `~/.config/baocode` elsewhere. The user may move it: the folder in use is
-  /// `DataDirectory.current`.
-  static String dataDir(Map<String, String> environment) {
+  /// `DataDirectory.current`. [folder] names it, for a build kept beside
+  /// the app's own (`baocodelab`).
+  static String dataDir(
+    Map<String, String> environment, {
+    String folder = 'baocode',
+  }) {
     final homeDir = home(environment);
     if (Platform.isWindows) {
       final appData = environment['APPDATA'] ?? '';
-      return p.join(appData.isEmpty ? homeDir : appData, 'baocode');
+      return p.join(appData.isEmpty ? homeDir : appData, folder);
     }
     return Platform.isMacOS
-        ? p.join(homeDir, 'Library', 'Application Support', 'baocode')
-        : p.join(homeDir, '.config', 'baocode');
+        ? p.join(homeDir, 'Library', 'Application Support', folder)
+        : p.join(homeDir, '.config', folder);
   }
 
   /// Where what a session's tasks print is kept: `/tmp`, where that is

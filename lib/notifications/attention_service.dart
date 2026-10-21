@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import '../chat/chat_models.dart';
 import '../kernel/kernel_types.dart';
 import '../l10n/l10n.dart';
+import '../platform/app_identity.dart';
 import '../workspace/workspace.dart';
 import 'attention_host.dart';
 import 'attention_settings.dart';
@@ -171,8 +172,8 @@ class AttentionService {
           (id: _id(thread), title: thread.localizedTitle(l10n)),
       ],
       tooltip: waiting.isEmpty
-          ? 'BaoCode'
-          : 'BaoCode · ${l10n.trayWaitingCount(waiting.length)}',
+          ? AppIdentity.name
+          : '${AppIdentity.name} · ${l10n.trayWaitingCount(waiting.length)}',
       labels: {
         'show': l10n.trayShow,
         'waiting': l10n.trayWaiting,

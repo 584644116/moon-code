@@ -24,6 +24,7 @@ import '../kernel_types.dart';
 import '../prompt_suggestions.dart';
 import '../transcript.dart';
 import '../queued_messages.dart';
+import 'claude_classifier.dart';
 import 'claude_code_transport.dart';
 import 'claude_code_translator.dart';
 import 'claude_elicitation.dart';
@@ -121,8 +122,10 @@ class ClaudeCodeKernel
     this._rejectTooOld,
     ModelProviders? providers,
     ProviderEnvironment? providerEnvironment,
+    ClaudeClassifier? classify,
     Future<bool> Function(String url)? openLink,
   }) : _openLink = openLink ?? openExternal,
+       _classifier = classify,
        _usageOffBy = usageOffBy ?? _usageOn,
        _providers = providers ?? ModelProviders.current,
        _providerEnvironment = providerEnvironment ?? providerLaunchEnvironment {
@@ -205,6 +208,11 @@ class ClaudeCodeKernel
   final ModelProviders _providers;
   final ProviderEnvironment _providerEnvironment;
 
+  /// Auto mode's classifier where the CLI's own does not run on the model
+  /// (see [_classifies]). Null: the provider's model is asked (see
+  /// [_askClassifier]).
+  final ClaudeClassifier? _classifier;
+
   static Future<String?> _usageOn() async => null;
 
   ClaudeCodeTransport? _transport;
@@ -268,6 +276,11 @@ class ClaudeCodeKernel
   DateTime? _turnStarted;
   final Map<String, KernelTurn> _sent = {};
   final Set<String> _queued = {};
+
+  /// The user messages written to the CLI, in order: what auto mode's
+  /// classifier reads of what was asked (see [_permission]). A few, and
+  /// only as much of them as is of use to judge one action.
+  final Map<String, String> _asked = {};
 
   /// Turns stopped here: the CLI's word that it took one up (sent just
   /// before, it may not have yet) does not start it again.
@@ -912,6 +925,7 @@ class ClaudeCodeKernel
     final askEnded = _inAsk && !ask;
     _inAsk = ask;
     _whenReady((transport) {
+      _noteAsked(turn);
       transport.write({
         'type': 'user',
         'uuid': turn.id,
@@ -1423,6 +1437,41 @@ class ClaudeCodeKernel
     });
   }
 
+  /// Auto mode's classifier, asked of the model picked: a provider's Haiku
+  /// model, or itself when it sets none.
+  Future<ClaudeVerdict?> _askClassifier(String transcript, String action) =>
+      classifyClaudeAction(transcript, action, model: _model, location: _cwd);
+
+  /// [turn] as one of the messages auto mode's classifier reads.
+  void _noteAsked(KernelTurn turn) {
+    if (turn.text.isEmpty) return;
+    _asked.remove(turn.id);
+    _asked[turn.id] = turn.text;
+    if (_asked.length > 6) _asked.remove(_asked.keys.first);
+  }
+
+  /// What was asked, most recent last, as far as is of use to judge an
+  /// action.
+  String get _askedText {
+    final text = _asked.values.join('\n\n');
+    return text.length > 8000 ? text.substring(text.length - 8000) : text;
+  }
+
+  /// What the agent is about to do, for auto mode's classifier: the tool
+  /// and its input, the long ones cut short.
+  String _classifierAction(String tool, Map<String, Object?> input) {
+    final text = input.entries
+        .where((e) => e.key != 'content' || '${e.value}'.length < 2000)
+        .map((e) => '${e.key}: ${e.value}')
+        .join('\n');
+    final action =
+        '$tool: ${text.length > 4000 ? '${text.substring(0, 4000)}…' : text}';
+    return _work == 'plan'
+        ? '$action\n(The session is in plan mode: only actions that change '
+              'nothing may be allowed.)'
+        : action;
+  }
+
   Future<void> _permission(
     String requestId,
     Map<String, Object?> request,
@@ -1462,6 +1511,40 @@ class ClaudeCodeKernel
         'updatedInput': input,
       });
       return;
+    }
+    // Auto on a model the CLI's classifier does not run on (another
+    // provider's, or one without it): judged here, as the classifier
+    // would, and asked about only when it cannot tell. What the CLI would
+    // ask in any case (manual-only checks, explicit ask rules, tools that
+    // need the user) is asked here too.
+    if (_approval == 'auto' &&
+        !_classifies &&
+        tool != 'AskUserQuestion' &&
+        !_askedInFullAccess(request)) {
+      final verdict = await (_classifier ?? _askClassifier)(
+        _askedText,
+        _classifierAction(tool, input),
+      );
+      final control = _control;
+      if (control == null) return;
+      switch (verdict) {
+        case ClaudeVerdict(allowed: true):
+          control.respond(requestId, {
+            'behavior': 'allow',
+            'updatedInput': input,
+          });
+          return;
+        case ClaudeVerdict(allowed: false, :final reason):
+          control.respond(requestId, {
+            'behavior': 'deny',
+            'message':
+                'Blocked by auto mode: $reason. Find a safer way, or ask '
+                'the user to run it themselves.',
+          });
+          return;
+        case null:
+          break;
+      }
     }
     final InteractionRequest interaction;
     var questions = const <String>[];
@@ -1604,6 +1687,17 @@ class ClaudeCodeKernel
 
   void _receive(Map<String, Object?> message) {
     if (_control?.receive(message) ?? false) return;
+    // What the CLI says is not all this version knows: a message it shapes
+    // another way, or says something new in, is one to go on without, not
+    // one that ends the conversation. See _lost.
+    try {
+      _handle(message);
+    } catch (error, stack) {
+      _lost(message, error, stack);
+    }
+  }
+
+  void _handle(Map<String, Object?> message) {
     switch (message['type']) {
       case ClaudeExit.type:
         _exited(
@@ -1625,7 +1719,10 @@ class ClaudeCodeKernel
           _appliedEffort = message['effort'] as String?;
         }
         if (message['permissionMode'] case final String mode) {
-          _reported(mode);
+          // What the session was resumed on, not what it is to run in now:
+          // the pick here is told it again (see _applyMode).
+          _cliMode = mode;
+          if (mode != _mode) _applyMode();
         }
         // Only the servers up at start: the full list is asked for.
         if (message['mcp_servers'] case final List<Object?> servers
@@ -1692,6 +1789,33 @@ class ClaudeCodeKernel
         _translator.translate(message);
     }
   }
+
+  /// A message this version could not make sense of: said in the log, once
+  /// per kind, and the conversation goes on. A message the app cannot read
+  /// is the CLI's to change, not the user's to be stopped by — and the one
+  /// after it may well be one we know.
+  void _lost(Map<String, Object?> message, Object error, StackTrace stack) {
+    final kind = '${message['type']}/${message['subtype'] ?? ''}';
+    debugPrint('Claude Code said a $kind message not understood: $error');
+    if (!_lostKinds.add(kind)) return;
+    // The trace once per kind, where the first one came from: every one of
+    // them would bury the log. The user is told what was dropped.
+    debugPrintStack(stackTrace: stack);
+    emit(
+      ItemUpserted(
+        nextSeq,
+        'lost:$kind',
+        NoticeItem(
+          NoticeKind.warning,
+          'Something from Claude Code could not be shown '
+          '(a $kind message); the rest of the conversation is kept.',
+        ),
+      ),
+    );
+  }
+
+  /// The kinds of message already said to be not understood.
+  final Set<String> _lostKinds = {};
 
   void _controlRequest(Map<String, Object?> message) {
     final id = message['request_id'] as String?;
@@ -1901,31 +2025,45 @@ class ClaudeCodeKernel
   Future<void> _readGoalNow() async {
     final id = _sessionId;
     if (id == null) return;
-    final control = _control;
-    // Asked of both at once; either may not answer (an older CLI, a host
-    // gone).
-    final (hooks, records) = await (
-      _orNull(
-        control?.request('get_hooks_listing', {}, const Duration(seconds: 10)),
-      ),
-      _orNull(_readGoal?.call(_cwd, id)),
-    ).wait;
-    if (_disposed || (hooks == null && records == null)) return;
-    if (records != null) {
-      _goalSeen ??= _context.resume == null ? 0 : records.length;
-    }
-    final kept = keptGoal(records ?? const [], seen: _goalSeen ?? 0);
-    final goal = hooks == null ? kept : goalInEffect(kept, hookedGoal(hooks));
-    _translator.reportGoal(goal);
-    // The file is written a moment after the hooks change.
-    if (hooks != null && records != null && goal != kept) {
-      if (!_goalRetried) {
-        _goalRetried = true;
-        _goalRetry?.cancel();
-        _goalRetry = Timer(const Duration(seconds: 1), _syncGoal);
+    // Read from two places that do not promise their shape (a newer CLI's
+    // hooks, a host's answer): a reading gone wrong is no goal shown, not
+    // a session broken, and nothing here is awaited by anyone who could
+    // catch it. See _syncGoal.
+    try {
+      final control = _control;
+      // Asked of both at once; either may not answer (an older CLI, a host
+      // gone).
+      final (hooks, records) = await (
+        _orNull(
+          control?.request(
+            'get_hooks_listing',
+            {},
+            const Duration(seconds: 10),
+          ),
+        ),
+        _orNull(_readGoal?.call(_cwd, id)),
+      ).wait;
+      if (_disposed || (hooks == null && records == null)) return;
+      if (records != null) {
+        _goalSeen ??= _context.resume == null ? 0 : records.length;
       }
-    } else {
-      _goalRetried = false;
+      final kept = keptGoal(records ?? const [], seen: _goalSeen ?? 0);
+      final goal = hooks == null ? kept : goalInEffect(kept, hookedGoal(hooks));
+      _translator.reportGoal(goal);
+      // The file is written a moment after the hooks change.
+      if (hooks != null && records != null && goal != kept) {
+        if (!_goalRetried) {
+          _goalRetried = true;
+          _goalRetry?.cancel();
+          _goalRetry = Timer(const Duration(seconds: 1), _syncGoal);
+        }
+      } else {
+        _goalRetried = false;
+      }
+    } catch (error) {
+      // Said once, then let go: the goal is worked out afresh next time it
+      // is asked for, so nothing is left half-made by this.
+      debugPrint('The goal could not be read: $error');
     }
   }
 
@@ -2675,6 +2813,9 @@ class ClaudeCodeKernel
             },
           ),
       ]);
+      // Whether auto runs on the CLI's classifier may have changed with
+      // the model: told the mode it is now (see _cliApproval).
+      _applyMode();
       return;
     }
     if (sameProvider) {
@@ -2695,6 +2836,9 @@ class ClaudeCodeKernel
         ),
         if (!provider.protocol.proxied) ?_thinkingSettings(effort),
       ]);
+      // Whether auto runs on the CLI's classifier may have changed with
+      // the model: told the mode it is now (see _cliApproval).
+      _applyMode();
       return;
     }
     _model = variant?.value ?? id;
@@ -2702,7 +2846,9 @@ class ClaudeCodeKernel
       restart();
       return;
     }
-    // Taken up with the next message (see _applyWindow).
+    // Taken up with the next message (see _applyWindow): the process on
+    // another provider is let go, and the next one starts on this model,
+    // told the mode then.
     emitInfoChanged();
   }
 
@@ -3034,9 +3180,14 @@ class ClaudeCodeKernel
   /// The CLI's mode for the approvals picked. Full access is not the
   /// CLI's bypassPermissions, which it refuses as root and cannot switch
   /// to unless started allowing it: it accepts edits, and what it asks
-  /// about otherwise is approved in [_permission].
-  String get _cliApproval =>
-      _approval == 'bypassPermissions' ? 'acceptEdits' : _approval;
+  /// about otherwise is approved in [_permission]. Auto is the CLI's own
+  /// only where its classifier runs on the model; elsewhere the CLI only
+  /// asks, and [_permission] classifies.
+  String get _cliApproval => switch (_approval) {
+    'bypassPermissions' => 'acceptEdits',
+    'auto' when !_classifies => 'default',
+    _ => _approval,
+  };
 
   /// What the CLI would still ask in full access: safety checks requiring
   /// manual approval (also inside compound commands), explicit ask rules,
@@ -3050,13 +3201,16 @@ class ClaudeCodeKernel
       request['requires_user_interaction'] == true ||
       request['decision_reason_code'] != null;
 
-  /// Plan's commands are left to the classifier with the approvals that
-  /// approve for the user; asked about with the others.
+  /// Plan's commands are left to the CLI's classifier with the approvals
+  /// that approve for the user; asked about with the others. Only where
+  /// that classifier runs on the model: elsewhere [_permission] reviews
+  /// the plan, and the CLI is told nothing of it.
   bool get _reviewsPlan =>
-      _approval == 'auto' || _approval == 'bypassPermissions';
+      (_approval == 'auto' || _approval == 'bypassPermissions') && _classifies;
 
-  /// Whether the auto mode classifier runs on the model: not on another
-  /// provider's.
+  /// Whether the CLI's auto mode classifier runs on the model: not on
+  /// another provider's, nor on one it does not support. Elsewhere auto
+  /// mode is BaoCode's (see [_permission]).
   bool get _classifies =>
       _custom == null && (_currentModel?.supportsAuto ?? true);
 
@@ -3086,8 +3240,13 @@ class ClaudeCodeKernel
       _work = 'plan';
     } else {
       if (_work == 'plan') _work = 'agent';
-      _approval = mode;
-      _applyPlanReview();
+      // What the CLI runs in as the pick maps to it (Full access runs as
+      // Accept edits, Auto on another provider's as Default): that is the
+      // pick already made, not a change of it.
+      if (mode != _cliApproval) {
+        _approval = mode;
+        _applyPlanReview();
+      }
     }
     emitInfoChanged();
   }
@@ -3118,10 +3277,9 @@ class ClaudeCodeKernel
 
   @override
   late final KernelChoiceSource permission = _Choice(
-    options: () => [
-      for (final option in _approvals)
-        if (option.id != 'auto' || _classifies) option,
-    ],
+    // Auto is offered on every model: where the CLI's classifier does not
+    // run on the one picked, BaoCode's does (see _permission).
+    options: () => _approvals,
     selected: () => _approval,
     select: (id) {
       _approval = id;

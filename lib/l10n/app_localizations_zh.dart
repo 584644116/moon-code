@@ -5094,6 +5094,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String dataDirSharedFiles(String folder) {
+    return '设置、快捷键、argv.json、keymaps 和密钥读自 $folder(与本机安装的 BaoCode 共用);会话、缓存、快照和日志只在这里。';
+  }
+
+  @override
   String get dataDirTitle => '数据文件夹';
 
   @override
@@ -8228,11 +8233,33 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get composerEnhance => '增强';
+
+  @override
+  String get composerEnhancing => '增强中…';
+
+  @override
+  String get composerEnhanceHint =>
+      '增强：辅助模型会读一遍项目，把消息重写成一条完整指令——涉及哪些文件和符号、先后顺序、哪些行为不能变、怎么验证；图片、文件、代码和链接原样不动，可撤销';
+
+  @override
+  String composerEnhanceFailed(String error) {
+    return '增强失败：$error';
+  }
+
+  @override
   String get generalSettingsComposerPolish => '润色按钮';
 
   @override
   String get generalSettingsComposerPolishDescription =>
       '在输入框里显示润色按钮，发送前用辅助模型把写的内容改得更清楚';
+
+  @override
+  String get generalSettingsComposerEnhance => '增强按钮';
+
+  @override
+  String get generalSettingsComposerEnhanceDescription =>
+      '在输入框里显示增强按钮，发送前用辅助模型读一遍项目，把写的内容重写成一条完整指令（涉及哪些文件、先后顺序、怎么验证）';
 
   @override
   String get generalSettingsLiveTurnStats => '运行时实时显示详细速率和时间';

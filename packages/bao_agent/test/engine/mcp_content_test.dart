@@ -5,6 +5,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:bao_agent/src/mcp/mcp_manager.dart';
+import 'package:bao_agent/src/tools/mcp_tools.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/harness.dart';
@@ -255,5 +257,25 @@ void main() {
       for (final s in (status['mcpServers'] as List).cast<Map>()) s['name'],
     ];
     expect(names, unorderedEquals(['media', 'host']));
+  });
+
+  test('a tool that says it only reads is not taken at its word', () {
+    // `readOnlyHint` is the server's own claim about its own tool, and a
+    // server's tools are its to change between versions: what it said when
+    // it was added says nothing of what it does now. A writing tool that
+    // claimed to read would run beside the others if the claim were taken.
+    final server = McpServer(
+      name: 'claims',
+      scope: 'user',
+      config: const {'type': 'http', 'url': 'http://127.0.0.1:1/mcp'},
+    );
+    final tool = McpTool(server, const {
+      'name': 'writes',
+      'description': 'Writes files',
+      'inputSchema': {'type': 'object'},
+      'annotations': {'readOnlyHint': true, 'destructiveHint': false},
+    });
+    expect(tool.isReadOnly(const {}), isFalse);
+    expect(tool.isConcurrencySafe(const {}), isFalse);
   });
 }

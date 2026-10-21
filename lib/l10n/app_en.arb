@@ -3897,6 +3897,14 @@
       }
     }
   },
+  "dataDirSharedFiles": "Your settings, keybindings, argv.json, keymaps and keys are read from {folder}, which the BaoCode installed on this machine uses too; sessions, caches, checkpoints and logs are only here.",
+  "@dataDirSharedFiles": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
   "dataDirTitle": "Data Folder",
   "dataDirDescription": "Where BaoCode keeps your settings, keybindings, language servers and its own state. Other programs keep files there too (the web view's caches); BaoCode never moves or removes those.",
   "dataDirCurrentFolder": "Current folder",
@@ -6262,8 +6270,21 @@
       }
     }
   },
+  "composerEnhance": "Enhance",
+  "composerEnhancing": "Enhancing…",
+  "composerEnhanceHint": "Enhance: the auxiliary model reads the project and writes the message out again as the whole instruction — the files and names it touches, the order, what must not change, how to check it; pictures, files, code and links stay as they are; Undo takes it back",
+  "composerEnhanceFailed": "Could not enhance: {error}",
+  "@composerEnhanceFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "generalSettingsComposerPolish": "Polish button",
   "generalSettingsComposerPolishDescription": "A button in the message box that has the auxiliary model make what you wrote clearer before you send it",
+  "generalSettingsComposerEnhance": "Enhance button",
+  "generalSettingsComposerEnhanceDescription": "A button in the message box that has the auxiliary model read the project and write what you wrote out again as the whole instruction — the files it touches, the order, how to check it",
   "generalSettingsLiveTurnStats": "Live Speed and Time",
   "generalSettingsLiveTurnStatsDescription": "While the agent works, a line under the reply with how long the turn has taken, how fast the model writes and the tokens so far, changing as it goes. The figures under a finished turn always show.",
   "stashPolishFailed": "Could not polish: {error}",

@@ -6,11 +6,15 @@ import 'package:path/path.dart' as p;
 
 import '../kernel/claude_code/claude_environment.dart';
 import '../window/code_args.dart';
+import 'app_identity.dart';
 import 'app_platform.dart';
 import 'shell_command.dart';
 
-/// The command for the platform the app runs on: macOS's or Windows'.
+/// The command for the platform the app runs on: macOS's or Windows'; none
+/// for a build kept beside an installed app (BaoCode Lab), whose `code`
+/// command would take the installed app's place on the PATH.
 ShellCommandInstaller? platformShellCommand() {
+  if (AppIdentity.isLab) return null;
   if (AppPlatform.isMacOS) return MacShellCommand();
   if (AppPlatform.isWindows) return WindowsShellCommand();
   return null;

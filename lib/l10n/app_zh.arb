@@ -1451,6 +1451,14 @@
   "dataDirSetIn": "在 {file} 中设置。",
   "dataDirDefaultLocation": "默认位置。",
   "dataDirTemporaryDefault": "默认位置(仅本次): {file} 中设置的文件夹不可用。",
+  "dataDirSharedFiles": "设置、快捷键、argv.json、keymaps 和密钥读自 {folder}(与本机安装的 BaoCode 共用);会话、缓存、快照和日志只在这里。",
+  "@dataDirSharedFiles": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
   "dataDirTitle": "数据文件夹",
   "dataDirDescription": "BaoCode 存放你的设置、快捷键、语言服务器及其自身状态的位置。其他程序也会在此存放文件(如网页视图的缓存)；BaoCode 从不移动或删除这些文件。",
   "dataDirCurrentFolder": "当前文件夹",
@@ -2346,8 +2354,14 @@
   "composerPolishing": "润色中…",
   "composerPolishHint": "润色：用辅助模型把消息改得更清楚，保留你的意思和口吻；图片、文件、代码和链接原样不动，可撤销",
   "composerPolishFailed": "润色失败：{error}",
+  "composerEnhance": "增强",
+  "composerEnhancing": "增强中…",
+  "composerEnhanceHint": "增强：辅助模型会读一遍项目，把消息重写成一条完整指令——涉及哪些文件和符号、先后顺序、哪些行为不能变、怎么验证；图片、文件、代码和链接原样不动，可撤销",
+  "composerEnhanceFailed": "增强失败：{error}",
   "generalSettingsComposerPolish": "润色按钮",
   "generalSettingsComposerPolishDescription": "在输入框里显示润色按钮，发送前用辅助模型把写的内容改得更清楚",
+  "generalSettingsComposerEnhance": "增强按钮",
+  "generalSettingsComposerEnhanceDescription": "在输入框里显示增强按钮，发送前用辅助模型读一遍项目，把写的内容重写成一条完整指令（涉及哪些文件、先后顺序、怎么验证）",
   "generalSettingsLiveTurnStats": "运行时实时显示详细速率和时间",
   "generalSettingsLiveTurnStatsDescription": "运行中在回复下方实时显示本轮耗时、输出速度和已输出的 token。一轮结束后的统计始终显示",
   "stashPolishFailed": "没能润色：{error}",

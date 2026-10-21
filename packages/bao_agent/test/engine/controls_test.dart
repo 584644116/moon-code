@@ -260,6 +260,80 @@ void main() {
       expect(sentIn(h.model.turns.last), contains('Earlier talk.'));
     });
 
+    test('a summary the model refuses: the newest messages kept', () async {
+      h = await Harness.start();
+      h.model.script.addAll([
+        Reply.text('first answer'),
+        Reply.failing(
+          const ApiError(
+            'prompt is too long: 210000 tokens > 200000 maximum',
+            status: 400,
+          ),
+        ),
+        // The summary, refused, however often it is asked for.
+        Reply.failing(const ApiError('overloaded', status: 529)),
+        Reply.text('answered'),
+      ]);
+      await h.turn('one');
+      await h.turn('two');
+      expect(h.lastResult['result'], 'answered');
+      final boundary = h.of('system', 'compact_boundary').single;
+      expect((boundary['compact_metadata'] as Map)['trigger'], 'auto');
+      // What the conversation goes on from is what was said, not a summary.
+      final sent = sentIn(h.model.turns.last);
+      expect(sent, contains('first answer'));
+      expect(sent, contains('What was said lately is kept below'));
+      // Kept, and marked: it is a compaction, not a second telling.
+      final lines = h
+          .of('system', 'compact_boundary')
+          .map((m) => m['uuid'])
+          .toSet();
+      expect(lines, isNotEmpty);
+    });
+
+    test("a subagent's context fills: compacted on its own model", () async {
+      h = await Harness.start();
+      final summaries = <String>[];
+      var asked = 0;
+      h.model.route = (request) {
+        final body = jsonEncode(request.body);
+        if (!body.contains('SUB')) return null;
+        if (jsonEncode(request.body['system'])
+            .contains('summary of a conversation')) {
+          summaries.add(request.model);
+          return Reply.text('<summary>SUB talk.</summary>');
+        }
+        asked++;
+        return asked == 1
+            ? Reply.failing(
+                const ApiError(
+                  'prompt is too long: 210000 tokens > 200000 maximum',
+                  status: 400,
+                ),
+              )
+            : Reply.text('sub done');
+      };
+      h.model.script.addAll([
+        Reply.tool('Agent', {
+          'description': 'Look',
+          'prompt': 'SUB: look',
+          'model': 'haiku',
+        }),
+        Reply.text('ok'),
+      ]);
+      await h.turn('go');
+      // Its own conversation, summed up by its own model, and gone on
+      // with: it used to end here, its context being its own to fill.
+      expect(summaries, hasLength(1));
+      expect(summaries.single, contains('haiku'));
+      expect(
+        (h.toolResults.single['tool_use_result'] as Map)['status'],
+        'completed',
+      );
+      // Its compaction is the call's to show, not the conversation's.
+      expect(h.of('system', 'compact_boundary'), isEmpty);
+    });
+
     test("a subagent's model the provider lacks: the session's own", () async {
       h = await Harness.start();
       final models = <String>[];
@@ -462,6 +536,68 @@ void main() {
         expect(noList, contains('is connected'));
       },
     );
+
+    test('a long answer is cut where it is least missed', () async {
+      h = await Harness.start(
+        sdkServers: ['kit'],
+        environment: {'MAX_MCP_OUTPUT_TOKENS': '40'},
+      );
+      // A log says what happened in its last lines, a table in its first.
+      final log = [
+        for (var i = 0; i < 40; i++)
+          '2026-10-21T09:00:${i.toString().padLeft(2, '0')} '
+              'INFO step $i',
+        '2026-10-21T09:01:00 ERROR the thing that matters',
+      ].join('\n');
+      final table = [
+        for (var i = 0; i < 40; i++) 'row$i\tvalue$i\t${i * 2}',
+      ].join('\n');
+      h.onRequest = (request) async {
+        final message = request['message'] as Map;
+        final id = message['id'];
+        Map<String, Object?> answer(Object result) => {
+          'mcp_response': {'jsonrpc': '2.0', 'id': id, 'result': result},
+        };
+        final params = (message['params'] as Map?) ?? {};
+        return switch (message['method']) {
+          'initialize' => answer({
+            'protocolVersion': '2025-06-18',
+            'capabilities': {'tools': {}},
+            'serverInfo': {'name': 'kit', 'version': '1'},
+          }),
+          'tools/list' => answer({
+            'tools': [
+              for (final name in ['log', 'table'])
+                {
+                  'name': name,
+                  'description': name,
+                  'inputSchema': {'type': 'object'},
+                },
+            ],
+          }),
+          'tools/call' => answer({
+            'content': [
+              {'type': 'text', 'text': params['name'] == 'log' ? log : table},
+            ],
+          }),
+          _ => answer({}),
+        };
+      };
+      h.model.script.addAll([
+        Reply.tools([('mcp__kit__log', {}), ('mcp__kit__table', {})]),
+        Reply.text('ok'),
+      ]);
+      await h.turn('go');
+      final [keptLog, keptTable] = [
+        for (final r in h.toolResults) jsonEncode(r['content']),
+      ];
+      // The log's end, where the error is; the table's start, its rows.
+      expect(keptLog, contains('the thing that matters'));
+      expect(keptLog, contains('step 39'));
+      expect(keptLog, isNot(contains('step 20')));
+      expect(keptTable, contains('row0'));
+      expect(keptTable, isNot(contains('row39')));
+    });
 
     String? python() {
       try {

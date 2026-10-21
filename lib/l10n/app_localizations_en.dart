@@ -5443,6 +5443,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String dataDirSharedFiles(String folder) {
+    return 'Your settings, keybindings, argv.json, keymaps and keys are read from $folder, which the BaoCode installed on this machine uses too; sessions, caches, checkpoints and logs are only here.';
+  }
+
+  @override
   String get dataDirTitle => 'Data Folder';
 
   @override
@@ -8716,11 +8721,33 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get composerEnhance => 'Enhance';
+
+  @override
+  String get composerEnhancing => 'Enhancing…';
+
+  @override
+  String get composerEnhanceHint =>
+      'Enhance: the auxiliary model reads the project and writes the message out again as the whole instruction — the files and names it touches, the order, what must not change, how to check it; pictures, files, code and links stay as they are; Undo takes it back';
+
+  @override
+  String composerEnhanceFailed(String error) {
+    return 'Could not enhance: $error';
+  }
+
+  @override
   String get generalSettingsComposerPolish => 'Polish button';
 
   @override
   String get generalSettingsComposerPolishDescription =>
       'A button in the message box that has the auxiliary model make what you wrote clearer before you send it';
+
+  @override
+  String get generalSettingsComposerEnhance => 'Enhance button';
+
+  @override
+  String get generalSettingsComposerEnhanceDescription =>
+      'A button in the message box that has the auxiliary model read the project and write what you wrote out again as the whole instruction — the files it touches, the order, how to check it';
 
   @override
   String get generalSettingsLiveTurnStats => 'Live Speed and Time';

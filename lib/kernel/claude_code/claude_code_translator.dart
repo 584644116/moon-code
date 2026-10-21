@@ -305,6 +305,9 @@ class ClaudeTranslator {
 
   void translate(Map<String, Object?> message) {
     final parent = message['parent_tool_use_id'] as String?;
+    // Messages kept as they were past a compaction that could not be
+    // summed up: they are shown where they were, above the boundary.
+    if (message['isRetainedTail'] == true) return;
     switch (message['type']) {
       case 'stream_event' when parent == null:
         _streamEvent(_map(message['event']));
@@ -475,7 +478,9 @@ class ClaudeTranslator {
       case 'message_stop':
         _endMessage();
       case 'content_block_start':
-        final index = event['index'] as int;
+        // A block's place: without it nothing can be said of what it holds.
+        final index = _int(event['index']);
+        if (index == null) return;
         final block = _map(event['content_block']);
         final id = '$_messageId:$index';
         switch (block['type']) {
@@ -502,10 +507,13 @@ class ClaudeTranslator {
             _textLength[id] = 0;
             _put(id, const AssistantTextItem(''), streaming: true);
           case 'tool_use':
+            // A start without what names it is no call to show, and must
+            // not be timed: the whole message says it again, named.
+            final toolId = _string(block['id']);
+            final name = _string(block['name']);
+            if (toolId == null || name == null) return;
             // Its input may come all at once as it ends: timed from here.
             if (!replaying) _meter.startBlock();
-            final toolId = block['id'] as String;
-            final name = block['name'] as String;
             if (!_tools.containsKey(toolId)) {
               _toolUse(toolId, name, const {}, null);
             }
@@ -691,12 +699,13 @@ class ClaudeTranslator {
             );
           }
         case 'tool_use':
-          _toolUse(
-            block['id'] as String,
-            block['name'] as String,
-            _map(block['input']),
-            parent,
-          );
+          // A call is known by what it is called and where it is filed:
+          // without both there is nothing to show of it. The other blocks
+          // of this message are still said.
+          final toolId = _string(block['id']);
+          final name = _string(block['name']);
+          if (toolId == null || name == null) continue;
+          _toolUse(toolId, name, _map(block['input']), parent);
       }
     }
   }
@@ -895,9 +904,11 @@ class ClaudeTranslator {
             ]);
           _reportTodos();
         }
-      case 'TaskCreate' when input['subject'] != null:
+      case 'TaskCreate':
+        final subject = _text(input['subject']);
+        if (subject == null) return;
         _todos[id] = TodoEntry(
-          input['subject'] as String,
+          subject,
           TodoStatus.pending,
           activeForm: _string(input['activeForm']),
         );
@@ -1199,10 +1210,10 @@ class ClaudeTranslator {
               : CommandStatus.failed,
           result: _agentReport(structured, text),
           prompt: _string(structured?['prompt']),
-          tokens: structured?['totalTokens'] as int?,
-          toolUses: structured?['totalToolUseCount'] as int?,
-          duration: switch (structured?['totalDurationMs']) {
-            final int ms => Duration(milliseconds: ms),
+          tokens: _int(structured?['totalTokens']),
+          toolUses: _int(structured?['totalToolUseCount']),
+          duration: switch (_int(structured?['totalDurationMs'])) {
+            final ms? => Duration(milliseconds: ms),
             _ => null,
           },
           model: _string(structured?['resolvedModel']),
@@ -1230,7 +1241,7 @@ class ClaudeTranslator {
         );
         return;
       case 'Bash':
-        final taskId = structured?['backgroundTaskId'] as String?;
+        final taskId = _string(structured?['backgroundTaskId']);
         if (taskId != null && !replaying) {
           final outputFile =
               _string(structured?['outputFile']) ??
@@ -1334,8 +1345,8 @@ class ClaudeTranslator {
     } else {
       for (final raw in hunks) {
         final hunk = _map(raw);
-        var oldLine = hunk['oldStart'] as int? ?? 1;
-        var newLine = hunk['newStart'] as int? ?? 1;
+        var oldLine = _int(hunk['oldStart']) ?? 1;
+        var newLine = _int(hunk['newStart']) ?? 1;
         for (final line in _list(hunk['lines']).whereType<String>()) {
           if (line.isEmpty) continue;
           final text = line.substring(1);
@@ -1477,8 +1488,9 @@ class ClaudeTranslator {
       case 'compact_boundary':
         if (_activity?.kind == KernelActivityKind.compacting) _report(null);
         final meta = _map(message['compact_metadata']);
-        final before = meta['pre_tokens'] as int?;
-        final after = meta['post_tokens'] as int?;
+        final before = _int(meta['pre_tokens']);
+        final after = _int(meta['post_tokens']);
+        final fallback = meta['fallback'] == 'retained_tail';
         _put(
           uuid,
           NoticeItem(
@@ -1487,6 +1499,8 @@ class ClaudeTranslator {
               meta['trigger'] == 'auto'
                   ? 'Conversation compacted automatically'
                   : 'Conversation compacted',
+              if (fallback)
+                'it could not be summed up, so the latest messages were kept',
               if (before != null)
                 '${_tokens(before)}${after == null ? '' : ' → ${_tokens(after)}'} tokens',
             ].join(' · '),
@@ -1495,7 +1509,7 @@ class ClaudeTranslator {
       case 'api_retry' when !replaying:
         final attempt = message['attempt'];
         final max = message['max_retries'];
-        final delay = ((message['retry_delay_ms'] as int? ?? 0) / 1000).ceil();
+        final delay = ((_int(message['retry_delay_ms']) ?? 0) / 1000).ceil();
         final status = message['error_status'];
         _put(
           'retry:$turnId',
@@ -1537,7 +1551,7 @@ class ClaudeTranslator {
         if (_planCalls.containsKey(id)) return;
         _put(id, _toolItem(tool, _Outcome.denied), parent: tool.parent);
       case 'thinking_tokens':
-        final estimate = message['estimated_tokens'] as int?;
+        final estimate = _int(message['estimated_tokens']);
         final id = _thoughts.keys.lastOrNull;
         if (estimate == null || id == null) return;
         _thinkingTokens[id] = estimate;
@@ -1554,9 +1568,10 @@ class ClaudeTranslator {
           ),
         );
       case 'task_started' when !replaying:
-        final taskId = message['task_id'] as String;
+        final taskId = _string(message['task_id']);
+        if (taskId == null) return;
         final agent = message['task_type'] == 'local_agent';
-        final call = message['tool_use_id'] as String?;
+        final call = _string(message['tool_use_id']);
         // A subagent's task is its card's, continued or not.
         final card = agent ? _agentCard(taskId, call) : null;
         if (card != null) _agentCalls[taskId] = card;
@@ -1586,7 +1601,8 @@ class ClaudeTranslator {
           _agentToBackground(card ?? call);
         }
       case 'task_progress' when !replaying:
-        final taskId = message['task_id'] as String;
+        final taskId = _string(message['task_id']);
+        if (taskId == null) return;
         final usage = _map(message['usage']);
         final summary =
             _string(message['summary']) ?? _string(message['description']);
@@ -1594,24 +1610,25 @@ class ClaudeTranslator {
           _tasks[taskId] = task.copyWith(summary: summary);
           _reportTasks();
         }
-        final toolUseId = _agentCard(taskId, message['tool_use_id'] as String?);
+        final toolUseId = _agentCard(taskId, _string(message['tool_use_id']));
         final agent = toolUseId == null ? null : _agents[toolUseId];
         if (agent != null) {
           agent.item = agent.item.copyWith(
-            tokens: usage['total_tokens'] as int?,
-            toolUses: usage['tool_uses'] as int?,
+            tokens: _int(usage['total_tokens']),
+            toolUses: _int(usage['tool_uses']),
             lastTool: _string(message['last_tool_name']),
             activity: _string(message['description']),
           );
           _putAgent(toolUseId!);
         }
       case 'task_updated' when !replaying:
-        final taskId = message['task_id'] as String;
+        final taskId = _string(message['task_id']);
+        if (taskId == null) return;
         final patch = _map(message['patch']);
         if (_tasks[taskId] case final task?) {
           _tasks[taskId] = task.copyWith(
             status: _taskStatus(patch['status']) ?? task.status,
-            background: patch['is_backgrounded'] as bool?,
+            background: _bool(patch['is_backgrounded']),
             description: _string(patch['description']),
             summary: _string(patch['error']),
           );
@@ -1621,10 +1638,12 @@ class ClaudeTranslator {
           }
         }
       case 'task_notification' when !replaying:
+        final taskId = _string(message['task_id']);
+        if (taskId == null) return;
         _taskEnded(
-          message['task_id'] as String,
+          taskId,
           _taskStatus(message['status']) ?? CommandStatus.succeeded,
-          toolUseId: message['tool_use_id'] as String?,
+          toolUseId: _string(message['tool_use_id']),
           summary: _string(message['summary']),
           outputFile: _string(message['output_file']),
           usage: _map(message['usage']),
@@ -1632,7 +1651,7 @@ class ClaudeTranslator {
       case 'background_tasks_changed' when !replaying:
         final live = {
           for (final raw in _list(message['tasks']))
-            _map(raw)['task_id'] as String,
+            ?_string(_map(raw)['task_id']),
         };
         var changed = false;
         for (final id in live) {
@@ -1703,10 +1722,10 @@ class ClaudeTranslator {
     if (_agents[card] case final agent?) {
       agent.item = agent.item.copyWith(
         status: status,
-        tokens: usage['total_tokens'] as int?,
-        toolUses: usage['tool_uses'] as int?,
-        duration: switch (usage['duration_ms']) {
-          final int ms => Duration(milliseconds: ms),
+        tokens: _int(usage['total_tokens']),
+        toolUses: _int(usage['tool_uses']),
+        duration: switch (_int(usage['duration_ms'])) {
+          final ms? => Duration(milliseconds: ms),
           _ => null,
         },
       );
@@ -1741,6 +1760,31 @@ class ClaudeTranslator {
       value is List ? value.cast<Object?>() : const [];
 
   static String? _string(Object? value) => value is String ? value : null;
+
+  /// A whole number, however it was written: a proxy may send one as a
+  /// double, or as the text of one.
+  static int? _int(Object? value) => switch (value) {
+    final int value => value,
+    final num value => value.toInt(),
+    final String value => int.tryParse(value.trim()),
+    _ => null,
+  };
+
+  /// What [value] says as text, where a number or a flag says it too.
+  static String? _text(Object? value) => switch (value) {
+    final String value => value,
+    final num value => '$value',
+    final bool value => '$value',
+    _ => null,
+  };
+
+  /// Whether [value] says yes; null where it says nothing of it.
+  static bool? _bool(Object? value) => switch (value) {
+    final bool value => value,
+    'true' => true,
+    'false' => false,
+    _ => null,
+  };
 
   /// A background subagent stopped, as the CLI tells its agent: how, and
   /// its report.

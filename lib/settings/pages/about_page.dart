@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../ide/ide_button.dart';
 import '../../l10n/l10n.dart';
+import '../../platform/app_identity.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/codicons.dart';
 import '../../tips/star_prompt.dart' show StarPrompt;
@@ -56,7 +57,7 @@ class AboutSettingsPage extends StatelessWidget {
                     textBaseline: TextBaseline.alphabetic,
                     children: [
                       Text(
-                        'BaoCode',
+                        AppIdentity.name,
                         style: TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 17,

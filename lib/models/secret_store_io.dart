@@ -13,12 +13,11 @@ import 'secret_store.dart';
 /// where there is none).
 SecretStore systemSecretStore() {
   if (Platform.isMacOS) return KeychainSecretStore();
-  if (Platform.isWindows) {
-    return DpapiSecretStore(p.join(DataDirectory.current.path, 'secrets'));
-  }
-  return SecretServiceStore(
-    fallback: FileSecretStore(p.join(DataDirectory.current.path, 'secrets')),
-  );
+  // The installed app's keys, where this build keeps the user's files
+  // beside its own: a key added in one is there in the other.
+  final secrets = DataDirectory.current.secretsDir;
+  if (Platform.isWindows) return DpapiSecretStore(secrets);
+  return SecretServiceStore(fallback: FileSecretStore(secrets));
 }
 
 /// Runs [executable] with [arguments], [input] on its stdin.

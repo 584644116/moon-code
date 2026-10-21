@@ -4,13 +4,17 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../window/code_args.dart';
+import 'app_identity.dart';
 import 'app_platform.dart';
 import 'context_menu.dart';
 import 'shell_command_io.dart'
     show ShellCommandRunner, failureSaid, runPowerShell, runShellProcess;
 
-/// The menu for the platform the app runs on: macOS's or Windows'.
+/// The menu for the platform the app runs on: macOS's or Windows'; none for
+/// a build kept beside an installed app (BaoCode Lab), whose items would be
+/// the installed app's, under the same keys.
 ContextMenuInstaller? platformContextMenu() {
+  if (AppIdentity.isLab) return null;
   if (AppPlatform.isMacOS) return MacContextMenu();
   if (AppPlatform.isWindows) return WindowsContextMenu();
   return null;

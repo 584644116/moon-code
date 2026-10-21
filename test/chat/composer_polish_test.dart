@@ -5,7 +5,11 @@ import 'package:baocode/chat/composer/composer.dart';
 import 'package:baocode/chat/composer/composer_embeds.dart';
 import 'package:baocode/chat/composer/composer_polish.dart';
 import 'package:baocode/ide/ide_hover.dart';
+import 'package:baocode/kernel/claude_code/claude_haiku.dart'
+    show ClaudeHaikuTools;
 import 'package:baocode/l10n/l10n.dart';
+import 'package:baocode/models/model_provider.dart';
+import 'package:baocode/models/model_providers.dart';
 import 'package:baocode/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
@@ -96,6 +100,7 @@ void main() {
         model,
         exact = false,
         location,
+        tools,
       }) async => 'x' * 400;
       await expectLater(
         polishComposerText(asked),
@@ -107,6 +112,7 @@ void main() {
         model,
         exact = false,
         location,
+        tools,
       }) async => '  ';
       await expectLater(
         polishComposerText(asked),
@@ -121,6 +127,7 @@ void main() {
         model,
         exact = false,
         location,
+        tools,
       }) async => throw Exception('Not signed in');
       await expectLater(
         polishComposerText(composerPolishText(Delta()..insert('fix it'))),
@@ -133,12 +140,93 @@ void main() {
         ),
       );
     });
+
+    group('the Haiku tier', () {
+      final upstream = ModelProvider(
+        id: 'up',
+        name: 'Up',
+        models: const [
+          ProviderModel(id: 'big'),
+          ProviderModel(id: 'small'),
+        ],
+        roles: const ProviderRoles(main: 'big', haiku: 'small'),
+      );
+      late ModelProviders previous;
+
+      setUp(() {
+        previous = ModelProviders.current;
+        ModelProviders.current = ModelProviders.memory(
+          providers: [upstream],
+        );
+      });
+
+      tearDown(() {
+        ModelProviders.current = previous;
+        forgetFailedPolishTiers();
+      });
+
+      test('gives no answer: the model itself asked, and asked first from '
+          'then on', () async {
+        final asked = <({bool exact})>[];
+        composerPolishAsker = (
+          system,
+          prompt, {
+          model,
+          exact = false,
+          location,
+          tools,
+        }) async {
+          asked.add((exact: exact));
+          if (exact) return 'Fix it.';
+          throw Exception("There's an issue with the selected model");
+        };
+        final content = await polishComposerText(
+          composerPolishText(Delta()..insert('fix it')),
+          model: '@up/big',
+        );
+        expect(content.toList().first.data, 'Fix it.');
+        expect(asked.map((ask) => ask.exact), [false, true]);
+
+        // Once is enough to know the tier is not served.
+        await polishComposerText(
+          composerPolishText(Delta()..insert('fix it')),
+          model: '@up/big',
+        );
+        expect(asked.map((ask) => ask.exact), [false, true, true]);
+      });
+
+      test('a model picked for the app\'s own jobs is asked as it is, and '
+          'not asked again', () async {
+        await ModelProviders.current.setAuxiliaryModel('@up/small');
+        final asked = <({bool exact})>[];
+        composerPolishAsker = (
+          system,
+          prompt, {
+          model,
+          exact = false,
+          location,
+          tools,
+        }) async {
+          asked.add((exact: exact));
+          throw Exception('Out of quota');
+        };
+        await expectLater(
+          polishComposerText(
+            composerPolishText(Delta()..insert('fix it')),
+            model: '@up/big',
+          ),
+          throwsA(isA<ComposerPolishException>()),
+        );
+        expect(asked.map((ask) => ask.exact), [true]);
+      });
+    });
   });
 
   group('the composer', () {
     tearDown(() {
       composerPolishAsker = null;
       ComposerPolishSetting.current = () => true;
+      ComposerEnhanceSetting.current = () => true;
     });
 
     Future<QuillController> pumpComposer(WidgetTester tester) async {
@@ -171,7 +259,7 @@ void main() {
         'it back', (tester) async {
       final reply = Completer<String>();
       String? prompt;
-      composerPolishAsker = (system, asked, {model, exact = false, location}) {
+      composerPolishAsker = (system, asked, {model, exact = false, location, tools}) {
         prompt = asked;
         return reply.future;
       };
@@ -212,7 +300,7 @@ void main() {
 
     testWidgets('typed on meanwhile, the reply is not taken', (tester) async {
       final reply = Completer<String>();
-      composerPolishAsker = (system, asked, {model, exact = false, location}) =>
+      composerPolishAsker = (system, asked, {model, exact = false, location, tools}) =>
           reply.future;
       final controller = await pumpComposer(tester);
       controller.replaceText(0, 0, 'fix it', null);
@@ -229,6 +317,161 @@ void main() {
       ComposerPolishSetting.current = () => false;
       await pumpComposer(tester);
       expect(polishButton(), findsNothing);
+    });
+
+    Finder enhanceButton() => find.byWidgetPredicate(
+      (widget) =>
+          widget is IdeHover &&
+          (widget.message == englishLocalizations.composerEnhanceHint ||
+              widget.message == englishLocalizations.composerEnhancing),
+    );
+
+    testWidgets('Enhance puts the reply in, its tag as it was', (tester) async {
+      final reply = Completer<String>();
+      String? system;
+      ClaudeHaikuTools? seen;
+      composerPolishAsker = (
+        s,
+        asked, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) {
+        system = s;
+        seen = tools;
+        return reply.future;
+      };
+      final controller = await pumpComposer(tester);
+      controller.compose(
+        Delta()
+          ..insert('fix teh bug in ')
+          ..insert({file.type: file.data}),
+        const TextSelection.collapsed(offset: 0),
+        ChangeSource.local,
+      );
+      await tester.pump();
+      await tester.tap(enhanceButton());
+      await tester.pump();
+      // No project: nothing to read, and nothing to promise of it.
+      expect(seen, isNull);
+      expect(system, contains('You cannot look at the project here'));
+      reply.complete(
+        'Fix the bug in ⟦1⟧: correct the typo, then run the tests.',
+      );
+      await tester.pumpAndSettle();
+      final ops = controller.document.toDelta().toList();
+      expect(ops[0].data, 'Fix the bug in ');
+      expect(ops[1].data, {file.type: file.data});
+      expect(ops[2].data, ': correct the typo, then run the tests.\n');
+    });
+
+    testWidgets('Enhance turned off in the settings, no button', (tester) async {
+      ComposerEnhanceSetting.current = () => false;
+      await pumpComposer(tester);
+      expect(enhanceButton(), findsNothing);
+      expect(polishButton(), findsOneWidget);
+    });
+  });
+
+  group('enhanceComposerText', () {
+    tearDown(() => composerPolishAsker = null);
+
+    test('the project is read, and named in the prompt', () async {
+      ClaudeHaikuTools? seen;
+      String? prompt;
+      composerPolishAsker = (
+        system,
+        asked, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) {
+        prompt = asked;
+        seen = tools;
+        return Future.value('Fix it.');
+      };
+      await enhanceComposerText(
+        composerPolishText(Delta()..insert('fix it')),
+        location: r'C:\w\app',
+      );
+      expect(seen?.readable, [r'C:\w\app']);
+      expect(seen?.directory, r'C:\w\app');
+      expect(prompt, contains('<project>\nC:\\w\\app\n</project>'));
+      expect(prompt, contains('<message>\nfix it\n</message>'));
+    });
+
+    test('it went looking and came back without the message: asked again, '
+        'the message alone', () async {
+      final seen = <ClaudeHaikuTools?>[];
+      composerPolishAsker = (
+        system,
+        asked, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) async {
+        seen.add(tools);
+        if (tools != null) throw Exception('Reached maximum number of turns');
+        return 'Fix it.';
+      };
+      final content = await enhanceComposerText(
+        composerPolishText(Delta()..insert('fix it')),
+        location: r'C:\w\app',
+      );
+      expect(content.toList().first.data, 'Fix it.');
+      expect(seen, hasLength(2));
+      expect(seen.first?.directory, r'C:\w\app');
+      expect(seen.last, isNull);
+    });
+
+    test('a project on a host: the message alone, no tools', () async {
+      ClaudeHaikuTools? seen;
+      String? prompt;
+      composerPolishAsker = (
+        system,
+        asked, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) {
+        prompt = asked;
+        seen = tools;
+        return Future.value('Fix it.');
+      };
+      await enhanceComposerText(
+        composerPolishText(Delta()..insert('fix it')),
+        location: 'ssh://box/home/me/app',
+      );
+      expect(seen, isNull);
+      expect(prompt, contains('<project>\n/home/me/app\n</project>'));
+    });
+
+    test('what it found and how to check it: several times the words taken',
+        () async {
+      composerPolishAsker = (system, asked, {model, exact = false, location, tools}) async =>
+          'Fix the typo in lib/main.dart, where the button is built, then run '
+          'flutter test test/chat/composer_polish_test.dart and check that the '
+          'reply is still taken as one change.';
+      final content = await enhanceComposerText(
+        composerPolishText(Delta()..insert('fix it')),
+      );
+      expect(
+        content.toList().map((op) => op.data).join(),
+        contains('lib/main.dart'),
+      );
+    });
+
+    test('a whole file written out: not taken', () async {
+      composerPolishAsker = (system, asked, {model, exact = false, location, tools}) async =>
+          'x' * 3000;
+      await expectLater(
+        enhanceComposerText(composerPolishText(Delta()..insert('fix it'))),
+        throwsA(isA<ComposerPolishException>()),
+      );
     });
   });
 }

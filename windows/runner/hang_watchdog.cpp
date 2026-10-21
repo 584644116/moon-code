@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 
+#include "app_identity.h"
 #include "log_folder.h"
 
 namespace hang_watchdog {
@@ -250,7 +251,7 @@ void WriteReport(HANDLE process, DWORD process_id, DWORD windows_thread,
     return;
   }
 #ifdef FLUTTER_VERSION
-  std::fprintf(out, "BaoCode %s\n", FLUTTER_VERSION);
+  std::fprintf(out, "%ls %s\n", app_identity::Name(), FLUTTER_VERSION);
 #endif
   std::fprintf(out, "Process %lu: %s\n", process_id, reason);
   // In-process dump writing can itself block on the hung process. Keep a

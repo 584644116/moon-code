@@ -436,10 +436,14 @@ class AgentSession {
   ModelInfo get modelInfo => catalog.info(resolvedModel);
 
   /// The model's own window.
-  int get modelWindow {
-    final info = modelInfo;
+  int get modelWindow => windowOf(resolvedModel);
+
+  /// The window [model] has, before anything asks for less. A subagent
+  /// runs on a model of its own, and is sized by that one's.
+  int windowOf(String model) {
     final env = asInt(environment['CLAUDE_CODE_MAX_CONTEXT_TOKENS']);
     if (env != null && env > 0) return env;
+    final info = catalog.info(model);
     if (!info.known) return 200000;
     return longContext
         ? info.contextWindow
@@ -447,14 +451,23 @@ class AgentSession {
   }
 
   /// The window the conversation is compacted at.
-  int get contextWindow {
+  int get contextWindow => compactWindowOf(resolvedModel);
+
+  /// The window a conversation with [model] is compacted at: the one asked
+  /// for, where it is smaller.
+  int compactWindowOf(String model) {
+    final own = windowOf(model);
     final asked = options.autocompact ?? settings.autoCompactWindow;
-    if (asked != null && asked > 0) return asked.clamp(20000, modelWindow);
-    return modelWindow;
+    if (asked != null && asked > 0) return asked.clamp(20000, own);
+    return own;
   }
 
   /// The free room kept before compacting.
-  int get compactBuffer => contextWindow >= 100000 ? 33000 : contextWindow ~/ 5;
+  int get compactBuffer => compactBufferOf(contextWindow);
+
+  /// The free room kept before compacting a window of [window].
+  static int compactBufferOf(int window) =>
+      window >= 100000 ? 33000 : window ~/ 5;
 
   /// The effort in effect: the one asked for, else the settings', else the
   /// model's own.
@@ -747,10 +760,7 @@ class AgentSession {
         'messages': [
           {'role': 'user', 'content': prompt},
         ],
-        if (info.known &&
-            info.canDisableThinking &&
-            info.thinking != ThinkingStyle.none)
-          'thinking': {'type': 'disabled'},
+        if (info.canTurnThinkingOff) 'thinking': {'type': 'disabled'},
       }),
       cancel: cancel,
     )) {

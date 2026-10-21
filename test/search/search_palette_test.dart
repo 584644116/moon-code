@@ -110,6 +110,38 @@ void main() {
     expect(workspace.selected, same(thread));
   }, variant: _mac);
 
+  testWidgets('an archived agent is found by what it says, and listed again', (
+    tester,
+  ) async {
+    final workspace = Workspace.mock();
+    final thread = workspace.threads.firstWhere(
+      (thread) => thread.title == 'Migrate auth middleware to JWT',
+    );
+    workspace.setArchived(thread, true);
+    expect(thread.archived, isTrue);
+    final search = _FakeSearch(
+      thread.id ?? '#${identityHashCode(thread)}',
+      'The refresh token must be rotated on every use.',
+    );
+    await tester.pumpWidget(
+      BaoCodeApp(workspace: workspace, conversations: search),
+    );
+    await tester.pump();
+    await tester.tap(
+      find.descendant(of: find.byType(Sidebar), matching: find.text('Search')),
+    );
+    await tester.pumpAndSettle();
+    await _type(tester, 'rotated');
+    // Not in the sidebar's list, and still found.
+    expect(_rich('refresh token must be rotated'), findsOneWidget);
+    await tester.tap(_rich('refresh token must be rotated'));
+    await tester.pumpAndSettle();
+    expect(workspace.selected, same(thread));
+    // Back in the list it was left out of.
+    expect(thread.archived, isFalse);
+    expect(workspace.showArchived, isFalse);
+  }, variant: _mac);
+
   testWidgets('filters change with ⌘[ and ⌘]; actions run from the list', (
     tester,
   ) async {

@@ -1216,15 +1216,33 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
                 ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)))
             if (_workspace.listsInSidebar(thread) && !thread.untouched) thread,
         ],
+        // Found by what they say even where the sidebar leaves them out:
+        // archived, or in a project it hides.
+        unlisted: [
+          for (final thread in _workspace.threads)
+            if (!thread.untouched &&
+                (thread.archived ||
+                    _workspace.isHidden(thread.project) ||
+                    !_workspace.listsInSidebar(thread)))
+              thread,
+        ],
         conversations: widget.conversations,
         files: files,
         actions: _paletteActions(),
         recentActions: List.of(_recentActions),
         settings: _paletteSettings(),
         filter: filter,
-        onOpenAgent: _agentWindow ? _showInWindow : _openAgent,
+        // Shown again where it was archived or its project hidden: picked
+        // out of what it says, it is one to go back to.
+        onOpenAgent: _agentWindow
+            ? (thread) {
+                _workspace.reveal(thread);
+                _showInWindow(thread);
+              }
+            : _workspace.reveal,
         // A hit in what was said: found in the conversation, once shown.
         onFindInAgent: (thread, query) {
+          _workspace.reveal(thread);
           _agentWindow ? _showInWindow(thread) : _openAgent(thread);
           _findInChat(thread, query);
         },

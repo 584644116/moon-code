@@ -171,6 +171,31 @@ void main() {
       },
     );
 
+    test('the summary is told what must not be lost', () async {
+      h = await Harness.start(files: {'lib/a.dart': 'void a() {}\n'});
+      h.model.script.addAll([
+        Reply.tools([('Read', {'file_path': 'lib/a.dart'})]),
+        Reply(
+          [
+            {'type': 'text', 'text': 'big'},
+          ],
+          usage: {'input_tokens': 199000, 'output_tokens': 1},
+        ),
+        Reply.text('<summary>Big talk.</summary>'),
+        Reply.text('small again'),
+      ]);
+      await h.turn('never change the public API, it is shipped');
+      await h.turn('two');
+      final summarizing = h.model.requests.firstWhere(
+        (r) =>
+            jsonEncode(r.body['system']).contains('summary of a conversation'),
+      );
+      final asked = jsonEncode(summarizing.body['messages']);
+      // The user's own words, and the file the work is in.
+      expect(asked, contains('never change the public API'));
+      expect(asked, contains('lib/a.dart'));
+    });
+
     test('a long conversation is compacted on its own', () async {
       h = await Harness.start();
       h.model.script.addAll([
@@ -192,6 +217,32 @@ void main() {
       expect(
         jsonEncode(h.model.turns.last.body['messages']),
         contains('Big talk.'),
+      );
+    });
+
+    test('a long conversation whose summary fails goes on', () async {
+      h = await Harness.start();
+      h.model.script.addAll([
+        Reply(
+          [
+            {'type': 'text', 'text': 'big'},
+          ],
+          usage: {'input_tokens': 199000, 'output_tokens': 1},
+        ),
+        Reply.failing(const ApiError('overloaded', status: 529)),
+        Reply.text('small again'),
+      ]);
+      await h.turn('one');
+      await h.turn('two');
+      // The turn goes on from what was said lately, not ended by it.
+      expect(h.lastResult['result'], 'small again');
+      final boundary = h.of('system', 'compact_boundary').single;
+      final meta = boundary['compact_metadata'] as Map;
+      expect(meta['trigger'], 'auto');
+      expect(meta['post_tokens'], lessThan(meta['pre_tokens'] as int));
+      expect(
+        jsonEncode(h.model.turns.last.body['messages']),
+        contains('What was said lately is kept below'),
       );
     });
   });

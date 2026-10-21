@@ -47,7 +47,8 @@ import 'kernel/claude_code/turn_stats_stub.dart'
     show turnStatsIn;
 import 'kernel/commit_attribution.dart';
 import 'kernel/prompt_suggestions.dart';
-import 'chat/composer/composer_polish.dart' show ComposerPolishSetting;
+import 'chat/composer/composer_polish.dart'
+    show ComposerEnhanceSetting, ComposerPolishSetting;
 import 'kernel/queued_messages.dart';
 import 'keybindings/keybindings_sync.dart';
 import 'link/link_host.dart';
@@ -62,6 +63,7 @@ import 'models/model_welcome.dart';
 import 'network/network_proxy.dart';
 import 'notifications/attention_host.dart';
 import 'notifications/attention_settings.dart';
+import 'platform/app_identity.dart';
 import 'platform/app_platform.dart';
 import 'platform/data_dir.dart';
 import 'platform/error_log.dart';
@@ -171,11 +173,16 @@ Future<void> main(List<String> arguments) async {
     // Read as each agent starts, and as each message is sent.
     PromptSuggestions.current = () =>
         PromptSuggestions.enabled(files.settings[PromptSuggestions.settingKey]);
-    // The composer's Polish button, shown or not as it changes.
+    // The composer's Polish and Enhance buttons, shown or not as each
+    // changes.
     ComposerPolishSetting.current = () => ComposerPolishSetting.enabled(
       files.settings[ComposerPolishSetting.settingKey],
     );
     ComposerPolishSetting.changes = files.settings;
+    ComposerEnhanceSetting.current = () => ComposerEnhanceSetting.enabled(
+      files.settings[ComposerEnhanceSetting.settingKey],
+    );
+    ComposerEnhanceSetting.changes = files.settings;
     // The turn under way's line of figures, shown or not as it changes.
     LiveTurnStatsSetting.current = () => LiveTurnStatsSetting.enabled(
       files.settings[LiveTurnStatsSetting.settingKey],
@@ -788,7 +795,7 @@ class _BaoCodeAppState extends State<BaoCodeApp> {
   /// A window's app: its own navigator, dialogs, overlay and focus; what
   /// it shows built anew as its folder changes.
   Widget _app(AppWindow window) => MaterialApp(
-    title: 'BaoCode',
+    title: AppIdentity.name,
     debugShowCheckedModeBanner: false,
     theme: buildAppTheme(),
     builder: (context, child) => ValueListenableBuilder<int>(

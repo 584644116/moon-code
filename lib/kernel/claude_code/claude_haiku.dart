@@ -308,8 +308,11 @@ String claudeHaikuAnswer(String output, String stderr, int code) {
       when text.trim().isNotEmpty) {
     return text;
   }
+  // What it said went wrong: "Reached maximum number of turns (16)",
+  // not the hooks' own noise on stderr.
   final reason = switch (result) {
     {'result': final String text} when text.trim().isNotEmpty => text.trim(),
+    {'errors': final List errors} when errors.isNotEmpty => errors.join('; '),
     _ => stderr.trim(),
   };
   throw ClaudeHaikuException(

@@ -61,6 +61,7 @@ class PaletteAction {
 Future<void> showSearchPalette(
   BuildContext context, {
   required List<AgentThread> agents,
+  List<AgentThread> unlisted = const [],
   required ConversationSearch conversations,
   required List<PaletteAction> actions,
   required List<PaletteAction> settings,
@@ -84,6 +85,7 @@ Future<void> showSearchPalette(
         FadeTransition(opacity: animation, child: child),
     pageBuilder: (context, _, _) => SearchPalette(
       agents: agents,
+      unlisted: unlisted,
       conversations: conversations,
       files: files,
       actions: actions,
@@ -107,6 +109,7 @@ class SearchPalette extends StatefulWidget {
   const SearchPalette({
     super.key,
     required this.agents,
+    this.unlisted = const [],
     required this.conversations,
     required this.actions,
     required this.settings,
@@ -122,6 +125,12 @@ class SearchPalette extends StatefulWidget {
 
   /// The agents to find, the most recent first.
   final List<AgentThread> agents;
+
+  /// The agents the sidebar leaves out (archived, or their project's
+  /// hidden) that a hit in what was said found. A conversation is found by
+  /// what it says whether or not the list shows it, so a hit in one is not
+  /// dropped for want of a row.
+  final List<AgentThread> unlisted;
   final ConversationSearch conversations;
 
   /// The current project's files; none without a project.
@@ -257,7 +266,7 @@ class _SearchPaletteState extends State<SearchPalette> {
     // The conversations open in this run, as they are now; then those kept
     // on disk that are not.
     final open = <String, ConversationHit>{};
-    for (final thread in widget.agents) {
+    for (final thread in [...widget.agents, ...widget.unlisted]) {
       final id = thread.id ?? '#${identityHashCode(thread)}';
       if (!thread.isOpen) continue;
       if (findIn(id, sessionText(thread.session), query) case final hit?) {
@@ -460,7 +469,7 @@ class _SearchPaletteState extends State<SearchPalette> {
   List<_Entry> _hitEntries(AppLocalizations l10n) {
     if (_hitsFor != _query.text.trim()) return const [];
     final byId = <String, AgentThread>{
-      for (final thread in widget.agents)
+      for (final thread in [...widget.agents, ...widget.unlisted])
         thread.id ?? '#${identityHashCode(thread)}': thread,
     };
     return [

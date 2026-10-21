@@ -76,7 +76,27 @@ int estimateTokens(Object? value) {
 
   count(value);
   final text = jsonEncode(_withoutData(value));
-  return text.length ~/ 4 + images * 1600;
+  return text.length ~/ 4 + _cjkExtra(text) + images * 1600;
+}
+
+/// What four-characters-to-a-token leaves out of [text], in tokens.
+///
+/// A CJK character is one token and not a quarter of one, so a line of
+/// Chinese costs four times what its length says: a conversation sized by
+/// that alone stays under the window it is compacted at until the API
+/// refuses it. Each one is counted at three quarters of a token over the
+/// quarter its length already gave, which makes it one in all.
+int _cjkExtra(String text) {
+  var cjk = 0;
+  for (final rune in text.runes) {
+    if ((rune >= 0x3400 && rune <= 0x9fff) || // unified ideographs, ext. A
+        (rune >= 0x20000 && rune <= 0x2ebef) || // extensions B to F
+        (rune >= 0x3000 && rune <= 0x303f) || // CJK punctuation
+        (rune >= 0xff00 && rune <= 0xffef)) { // fullwidth forms
+      cjk++;
+    }
+  }
+  return (cjk * 3 + 3) ~/ 4;
 }
 
 Object? _withoutData(Object? value) => switch (value) {

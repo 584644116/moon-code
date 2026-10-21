@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import '../api/message_accumulator.dart';
 import '../api/model_catalog.dart';
@@ -119,6 +120,32 @@ class AgentLoop {
 
   String? get _parent => run.parentToolUseId;
 
+  /// The conversation's compaction, sized by the model it is with: a
+  /// subagent's own conversation is its own, and is compacted too.
+  Compaction _compaction() => Compaction(
+    session,
+    model: model,
+    isMain: isMain,
+    agentId: run.agentId,
+    usage: _lastUsage,
+  );
+
+  /// Goes on from the newest messages, where no summary could be made.
+  /// Returns whether there was anything to go on from.
+  Future<bool> _fallBack(CancelToken cancel, String reason) async {
+    try {
+      await _compaction().fallBack(
+        store,
+        trigger: 'auto',
+        reason: reason,
+        cancel: cancel,
+      );
+      return true;
+    } on Cancelled {
+      return false;
+    }
+  }
+
   /// What was found not to be taken by the model or its provider, and is
   /// not sent again.
   static final Set<String> _refusedThinking = {};
@@ -142,6 +169,10 @@ class AgentLoop {
   int _requests = 0;
   Duration _apiTime = Duration.zero;
 
+  /// The last request's usage: what the context held, as the API counted
+  /// it (a subagent's is its own; the session keeps the main agent's).
+  Map<String, Object?>? _lastUsage;
+
   /// The calls refused, as the result reports them.
   final List<Map<String, Object?>> denials = [];
   String _lastText = '';
@@ -155,9 +186,9 @@ class AgentLoop {
       if (maxTurns != null && _requests >= maxTurns!) {
         return _result('max_turns');
       }
-      if (isMain && !compactedForLength) {
+      if (!compactedForLength) {
         try {
-          await Compaction(session).autoCompactIfNeeded(store, cancel);
+          await _compaction().autoCompactIfNeeded(store, cancel);
         } on Cancelled {
           return _interrupted(during: false);
         }
@@ -168,15 +199,29 @@ class AgentLoop {
       } on Cancelled {
         return _interrupted(during: false);
       } on ApiError catch (error) {
-        if (error.promptTooLong && isMain && !compactedForLength) {
+        if (error.promptTooLong && !compactedForLength) {
           compactedForLength = true;
           try {
-            if (await Compaction(session)
-                .compact(store, trigger: 'auto', cancel: cancel)) {
+            if (await _compaction().compact(
+              store,
+              trigger: 'auto',
+              cancel: cancel,
+            )) {
               continue;
             }
           } on Cancelled {
             return _interrupted(during: false);
+          } on Object catch (summary) {
+            // No summary either: the newest messages are what it goes on
+            // from, rather than a turn ended by a conversation too long.
+            if (await _fallBack(
+              cancel,
+              summary is ApiError && !summary.promptTooLong
+                  ? 'summary_provider'
+                  : 'summary_budget',
+            )) {
+              continue;
+            }
           }
         }
         return _failed(_describe(error));
@@ -262,9 +307,34 @@ class AgentLoop {
 
   int _maxTokens(ModelInfo info) {
     final env = asInt(session.environment['CLAUDE_CODE_MAX_OUTPUT_TOKENS']);
-    final asked = env ?? (info.known ? info.defaultMaxTokens : 32000);
-    final capped = _maxOutput[model];
-    return capped != null && capped < asked ? capped : asked;
+    final asked = env ?? info.outputUnlessAsked;
+    final learned = _maxOutput[model];
+    final capped = learned != null && learned < asked ? learned : asked;
+    return _clampToContext(capped);
+  }
+
+  /// [asked], or less where the window leaves less room for it.
+  ///
+  /// The API refuses a request whose input and output together pass the
+  /// window, and it refuses it before the model is asked, so a turn is lost
+  /// and asked again smaller. A model's own default is its own size, not
+  /// this conversation's, and a long one has less room left than that: what
+  /// is sent is what the window has room for after the input, keeping a
+  /// reserve free for the window's own slack and rounding.
+  int _clampToContext(int asked) {
+    // A subagent's window is its own model's.
+    final window = session.compactWindowOf(model);
+    final input =
+        estimateTokens(store.apiMessages()) +
+        estimateTokens([
+          [
+            for (final text in system) {'text': text},
+          ],
+        ]);
+    final reserve = math.max(4096, (window * 0.01).ceil());
+    final room = window - input - reserve;
+    if (room <= 0) return asked;
+    return asked < room ? asked : room;
   }
 
   Map<String, Object?> _thinking(ModelInfo info, int maxTokens) {
@@ -274,7 +344,7 @@ class AgentLoop {
         : null;
     // None chosen: a known model's own, said (what the API takes for none
     // is higher than some models are best at).
-    final effort = chosen ?? (info.known ? info.defaultEffort : null);
+    final effort = chosen ?? info.effortUnlessAsked;
     final thinkingOn = session.settings.alwaysThinkingEnabled;
     if (!_refusedThinking.contains(model)) {
       switch (info.thinking) {
@@ -338,7 +408,7 @@ class AgentLoop {
     if (effort != null &&
         effort != 'none' &&
         !_refusedEffort.contains(model) &&
-        ((info.known && info.effortLevels.contains(effort)) || alwaysEffort)) {
+        (info.takesEffort(effort) || alwaysEffort)) {
       out['output_config'] = {'effort': effort};
     }
     return out;
@@ -362,11 +432,7 @@ class AgentLoop {
       if (body.containsKey('output_config')) betas.add(_effortBeta);
     }
     // The million-token window of the 4.x models that need asking for it.
-    if (session.longContext &&
-        isMain &&
-        info.known &&
-        info.contextWindow <= 200000 &&
-        info.family == 'sonnet') {
+    if (session.longContext && isMain && info.asksForLongContext) {
       betas.add('context-1m-2025-08-07');
     }
     return betas;
@@ -560,8 +626,9 @@ class AgentLoop {
       rethrow;
     }
     _countUsage(accumulator, started);
+    _lastUsage = {...accumulator.usage};
     if (isMain) {
-      session.lastUsage = {...accumulator.usage};
+      session.lastUsage = _lastUsage;
       session.requested = true;
     }
     for (final block in blocks) {

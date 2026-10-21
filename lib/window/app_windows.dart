@@ -15,6 +15,7 @@ import '../ide/ide_dialog.dart';
 import '../ide/ide_quick_input.dart';
 import '../ide/ide_workspace.dart';
 import '../l10n/l10n.dart';
+import '../platform/app_identity.dart';
 import '../platform/local_paths.dart'
     if (dart.library.io) '../platform/local_paths_io.dart'
     as local;
@@ -151,8 +152,10 @@ class AppWindow {
     (_, null) => l10n.windowWelcomeTitle,
   };
 
-  /// The title the system shows: `folder — BaoCode`.
-  String title(AppLocalizations l10n) => '${label(l10n)} — BaoCode';
+  /// The title the system shows: `folder — BaoCode` (`— BaoCode Lab` for a
+  /// build kept beside it).
+  String title(AppLocalizations l10n) =>
+      '${label(l10n)} — ${AppIdentity.name}';
 
   /// The folder's name; a remote one's with its host, as VS Code shows
   /// one (`app [SSH: dev]`).

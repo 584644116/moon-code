@@ -690,7 +690,8 @@ class RemoteClient {
 
   Future<List<ClaudeProjectSummary>> claudeProjects() async => [
     for (final project in await _call<List>(RemoteProtocol.claudeProjects))
-      ClaudeProjectSummary.fromJson(_map(project)),
+      if (project is Map)
+        ?ClaudeProjectSummary.fromJson(project.cast<String, Object?>()),
   ];
 
   Future<List<Map<String, Object?>>> claudeHistory(String path) async => [

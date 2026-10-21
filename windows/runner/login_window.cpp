@@ -6,6 +6,7 @@
 #include <optional>
 #include <utility>
 
+#include "app_identity.h"
 #include "utils.h"
 
 using Microsoft::WRL::Callback;
@@ -83,7 +84,7 @@ std::wstring TemporaryFolder() {
   wchar_t path[MAX_PATH + 1];
   const DWORD length = ::GetTempPathW(MAX_PATH + 1, path);
   std::wstring folder(path, length);
-  return folder + L"BaoCode-Login";
+  return folder + app_identity::LoginFolder();
 }
 
 }  // namespace

@@ -467,4 +467,47 @@ void main() {
       '…${'x' * 10}',
     );
   });
+
+  group('estimateTokens', () {
+    /// What [text] is said to take, its JSON quotes left out of the count.
+    int tokens(String text) => estimateTokens(text) - '""'.length ~/ 4;
+
+    test('a line of English: a token a word or so', () {
+      // Four characters each, which for Latin text is about right.
+      expect(tokens('x' * 400), 100);
+    });
+
+    test('a line of Chinese: a token a character, not a quarter of one', () {
+      // A CJK character is one token. The same count of characters of
+      // English and of Chinese is nothing like the same cost, which is why
+      // length alone undercounts a Chinese session four times over and lets
+      // it reach the window before it is compacted.
+      final chinese = tokens('这是一段中文' * 100);
+      expect(chinese, closeTo(600, 20));
+      expect(tokens('x' * 600), 150);
+    });
+
+    test('a mix of both: each counted as it is', () {
+      final mixed = tokens('中文abc' * 100);
+      // 200 CJK characters and 300 Latin ones.
+      expect(mixed, closeTo(200 + 75, 20));
+    });
+
+    test('what is not CJK is left as it was', () {
+      // Accented Latin, Cyrillic, Greek, emoji: none of them are the four
+      // ranges counted, and all stay at four characters to a token.
+      for (final text in ['é' * 400, 'Ж' * 400, 'α' * 400, '🙂' * 100]) {
+        expect(tokens(text), lessThanOrEqualTo(estimateTokens(text)));
+      }
+      expect(tokens('é' * 400), 100);
+    });
+
+    test('an image is still about 1,600', () {
+      final one = estimateTokens([
+        {'type': 'image', 'source': {'data': ''}},
+      ]);
+      expect(one, greaterThanOrEqualTo(1600));
+      expect(one, lessThan(1700));
+    });
+  });
 }

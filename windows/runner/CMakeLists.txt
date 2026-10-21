@@ -7,6 +7,7 @@ project(runner LANGUAGES CXX)
 #
 # Any new source files that you add to the application should be added here.
 add_executable(${BINARY_NAME} WIN32
+  "app_identity.cpp"
   "app_windows.cpp"
   "attention.cpp"
   "caption_areas.cpp"
@@ -48,6 +49,12 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_BUILD=${FLUTT
 
 # Disable Windows macros that collide with C++ standard library functions.
 target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
+
+# The build kept beside an installed BaoCode (windows/CMakeLists.txt,
+# BAOCODE_LAB): Runner.rc names it BaoCode Lab.
+if(BAOCODE_LAB)
+  target_compile_definitions(${BINARY_NAME} PRIVATE "BAOCODE_LAB=1")
+endif()
 
 # Add dependency libraries and include directories. Add any application-specific
 # dependencies here.

@@ -39,12 +39,14 @@ class McpTool extends Tool {
 
   Map<String, Object?> get _annotations => asMap(definition['annotations']);
 
+  /// Never on the server's word: `readOnlyHint` is a server's claim about
+  /// its own tool, and its tools are its to change between versions, so
+  /// what it said when it was added says nothing of what it does now.
+  /// Nothing is let through on it either way, but [isConcurrencySafe] runs
+  /// calls at once on the strength of read-only, and a writing one that
+  /// claimed to read would then run beside the others.
   @override
-  bool isReadOnly(Map<String, Object?> input) =>
-      _annotations['readOnlyHint'] == true;
-
-  @override
-  bool isConcurrencySafe(Map<String, Object?> input) => isReadOnly(input);
+  bool isConcurrencySafe(Map<String, Object?> input) => false;
 
   @override
   String? describe(Map<String, Object?> input) =>
@@ -105,6 +107,69 @@ class McpTool extends Tool {
     );
   }
 
+  /// The part of [text] worth keeping, in [max] characters.
+  ///
+  /// What a server answers is shaped by what it is, and where the useful
+  /// part of it is depends on that: a log says most in its last lines, a
+  /// table in its first, prose anywhere it breaks. Cutting all of them at
+  /// the same place leaves a log with its setup and none of its result.
+  static String _cut(String text, int max) {
+    if (text.length <= max) return text;
+    final lines = text.split('\n');
+    switch (_shapeOf(lines)) {
+      case _Shape.log:
+        // Its last lines say what happened; its first say what it was of.
+        final tail = max * 3 ~/ 4;
+        final head = max - tail - 2;
+        return '${text.substring(0, head)}\n…\n'
+            '${text.substring(text.length - tail)}';
+      case _Shape.table:
+        // Its first lines are the header and the rows that read on.
+        return _toLines(lines, max);
+      case _Shape.prose:
+        // At a line's end where one is near, else at a word's.
+        final cut = text.substring(0, max);
+        final line = cut.lastIndexOf('\n');
+        if (line > max ~/ 2) return cut.substring(0, line);
+        final word = cut.lastIndexOf(' ');
+        return word > max ~/ 2 ? cut.substring(0, word) : cut;
+    }
+  }
+
+  /// [lines] from the start, as many as fit [max] characters.
+  static String _toLines(List<String> lines, int max) {
+    final kept = <String>[];
+    var used = 0;
+    for (final line in lines) {
+      if (used + line.length + 1 > max) break;
+      used += line.length + 1;
+      kept.add(line);
+    }
+    return kept.join('\n');
+  }
+
+  /// What [lines] look like: a log, a table, or prose.
+  static _Shape _shapeOf(List<String> lines) {
+    if (lines.length < 8) return _Shape.prose;
+    var stamped = 0;
+    final columns = <int, int>{};
+    for (final line in lines) {
+      if (_stamped.hasMatch(line)) stamped++;
+      final tabs = '\t'.allMatches(line).length;
+      if (tabs > 0) columns[tabs] = (columns[tabs] ?? 0) + 1;
+    }
+    if (stamped * 2 > lines.length) return _Shape.log;
+    final widest = columns.values.fold(0, (a, b) => a > b ? a : b);
+    if (widest * 2 > lines.length) return _Shape.table;
+    return _Shape.prose;
+  }
+
+  /// A line that says when it was written, as logs' do.
+  static final _stamped = RegExp(
+    r'^\s*(\[?\d{4}-\d{2}-\d{2}|\d{2}:\d{2}:\d{2}|\[?(INFO|WARN|WARNING|'
+    r'ERROR|DEBUG|TRACE|FATAL)\]?)',
+  );
+
   /// [blocks] cut to [maxChars] of text in all.
   static List<Map<String, Object?>> _limited(
     List<Map<String, Object?>> blocks,
@@ -125,7 +190,7 @@ class McpTool extends Tool {
       }
       final room = maxChars - used;
       if (room > 0) {
-        out.add({'type': 'text', 'text': text.substring(0, room)});
+        out.add({'type': 'text', 'text': _cut(text, room)});
       }
       out.add({
         'type': 'text',
@@ -139,6 +204,9 @@ class McpTool extends Tool {
     return out;
   }
 }
+
+/// What a tool's answer reads as, for cutting it where it is least missed.
+enum _Shape { log, table, prose }
 
 /// Lists the resources the MCP servers offer.
 class ListMcpResourcesTool extends Tool {
