@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import '../tools/file_state.dart';
 import '../util/ids.dart';
 import '../util/json.dart';
+import 'compression_blocks.dart';
 
 /// The version written on every line, as Claude Code writes its own.
 const agentVersion = 'baocode-agent-1.0';
@@ -68,6 +69,14 @@ class SessionStore {
   /// the API. This conversation's own, restored with it.
   final Set<String> clearedToolResults = {};
 
+  /// Ranges folded into a summary, and the ones restored since: what the
+  /// model is sent in place of the messages, while the file keeps them.
+  final List<CompressionBlock> compressionBlocks = [];
+
+  /// Large tool results sent as a placeholder, their content still in the
+  /// file (see [OffloadedResult]).
+  final Map<String, OffloadedResult> offloadedToolResults = {};
+
   /// The branch the session is on, oldest first: messages, compaction
   /// boundaries and how the goal stood.
   final List<Map<String, Object?>> chain = [];
@@ -124,26 +133,82 @@ class SessionStore {
       entry = parent == null ? null : _byUuid[parent];
     }
     chain.addAll(branch.reversed.where(_kept));
-    _rebuildCleared();
+    _rebuildBoundaries();
   }
 
-  /// Reads [clearedToolResults] off [chain]: what the last full compaction
-  /// left, and the microcompactions since.
-  void _rebuildCleared() {
+  /// Reads the boundaries off [chain]: what the last full compaction left,
+  /// the microcompactions since, the ranges folded, and what was
+  /// offloaded.
+  void _rebuildBoundaries() {
     clearedToolResults.clear();
+    compressionBlocks.clear();
+    offloadedToolResults.clear();
     for (final entry in chain) {
       if (entry['type'] != 'system') continue;
       switch (entry['subtype']) {
         case 'compact_boundary':
           clearedToolResults.clear();
+          compressionBlocks.clear();
+          offloadedToolResults.clear();
         case 'microcompact_boundary':
           for (final id in asList(
             asMap(entry['microcompactMetadata'])['compactedToolIds'],
           )) {
             if (id is String) clearedToolResults.add(id);
           }
+        case 'compression':
+          final block = CompressionBlock.fromEntry(entry);
+          if (block != null) {
+            compressionBlocks.add(block);
+            _normalizeBlocks();
+          }
+        case 'compression_restored':
+          if (asText(entry['block_id']) case final id?) {
+            compressionBlocks.removeWhere((block) => block.id == id);
+          }
+        case 'offload_boundary':
+          final offloaded = OffloadedResult.fromEntry(entry);
+          if (offloaded != null) {
+            offloadedToolResults[offloaded.toolUseId] = offloaded;
+          }
       }
     }
+  }
+
+  /// Drops a block an earlier one covers, and one that half overlaps
+  /// another: only the ranges that can be folded one by one are kept.
+  void _normalizeBlocks() {
+    final index = <String, int>{};
+    for (var i = 0; i < chain.length; i++) {
+      if (chain[i]['uuid'] case final String uuid) index[uuid] = i;
+    }
+    final accepted = <CompressionBlock>[];
+    for (final block in compressionBlocks) {
+      final start = index[block.startUuid];
+      final end = index[block.endUuid];
+      if (start == null || end == null || end < start) continue;
+      var take = true;
+      final covered = <CompressionBlock>[];
+      for (final other in accepted) {
+        final otherStart = index[other.startUuid];
+        final otherEnd = index[other.endUuid];
+        if (otherStart == null || otherEnd == null) continue;
+        final overlaps = start <= otherEnd && otherStart <= end;
+        if (!overlaps) continue;
+        if (start <= otherStart && end >= otherEnd) {
+          covered.add(other);
+          continue;
+        }
+        take = false;
+        break;
+      }
+      if (!take) continue;
+      accepted.removeWhere(covered.contains);
+      accepted.add(block);
+    }
+    compressionBlocks
+      ..clear()
+      ..addAll(accepted);
   }
 
   /// Whether [entry] is part of the conversation (read back), not a line
@@ -180,11 +245,28 @@ class SessionStore {
       switch (full['subtype']) {
         case 'compact_boundary':
           clearedToolResults.clear();
+          compressionBlocks.clear();
+          offloadedToolResults.clear();
         case 'microcompact_boundary':
           for (final id in asList(
             asMap(full['microcompactMetadata'])['compactedToolIds'],
           )) {
             if (id is String) clearedToolResults.add(id);
+          }
+        case 'compression':
+          final block = CompressionBlock.fromEntry(full);
+          if (block != null) {
+            compressionBlocks.add(block);
+            _normalizeBlocks();
+          }
+        case 'compression_restored':
+          if (asText(full['block_id']) case final id?) {
+            compressionBlocks.removeWhere((block) => block.id == id);
+          }
+        case 'offload_boundary':
+          final offloaded = OffloadedResult.fromEntry(full);
+          if (offloaded != null) {
+            offloadedToolResults[offloaded.toolUseId] = offloaded;
           }
       }
     }
@@ -220,7 +302,7 @@ class SessionStore {
     final at = chain.indexWhere((entry) => entry['uuid'] == uuid);
     if (at < 0) return false;
     chain.removeRange(at, chain.length);
-    _rebuildCleared();
+    _rebuildBoundaries();
     return true;
   }
 
@@ -303,10 +385,124 @@ class SessionStore {
     return last('custom-title', 'customTitle') ?? last('ai-title', 'aiTitle');
   }
 
-  /// What the model is sent: the branch since its last compaction, as
-  /// messages the API takes (see [toApiMessages]).
-  List<Map<String, Object?>> apiMessages() =>
-      toApiMessages(chain, cleared: clearedToolResults);
+  /// What the model is sent: the branch since its last compaction, with
+  /// the ranges folded and the large results offloaded, as messages the
+  /// API takes (see [toApiMessages]).
+  List<Map<String, Object?>> apiMessages() => toApiMessages(
+    chain,
+    cleared: clearedToolResults,
+    blocks: compressionBlocks,
+    offloaded: offloadedToolResults,
+  );
+
+  /// The messages, and when [withRefs] the coordinate each visible user
+  /// prompt is known by (`m12`): a stable way for the model to name a
+  /// range, unchanged by folding.
+  ({List<Map<String, Object?>> messages, Map<String, int> refs})
+  apiConversation({bool withRefs = false}) {
+    if (!withRefs) {
+      return (messages: apiMessages(), refs: const <String, int>{});
+    }
+    final at = <String, int>{};
+    for (var i = 0; i < chain.length; i++) {
+      if (chain[i]['uuid'] case final String uuid) at[uuid] = i;
+    }
+    final folded = compressionBlocks.isEmpty
+        ? chain
+        : foldCompressionBlocks(chain, compressionBlocks);
+    final refs = <String, int>{};
+    final tagged = <Map<String, Object?>>[];
+    for (final entry in folded) {
+      final index = at[entry['uuid']];
+      if (!isPrompt(entry) || index == null) {
+        tagged.add(entry);
+        continue;
+      }
+      final ref = 'm$index';
+      refs[ref] = index;
+      tagged.add(_withRef(entry, ref));
+    }
+    return (
+      messages: toApiMessages(
+        tagged,
+        cleared: clearedToolResults,
+        offloaded: offloadedToolResults,
+      ),
+      refs: refs,
+    );
+  }
+}
+
+/// [entry] as it is sent, its user text ending in the marker that names
+/// it for a compression range.
+Map<String, Object?> _withRef(Map<String, Object?> entry, String ref) {
+  final marker = '\n\n<ctx id="$ref"/>';
+  final message = asMap(entry['message']);
+  final content = message['content'];
+  Object tagged;
+  if (content is String) {
+    tagged = '$content$marker';
+  } else {
+    final blocks = <Map<String, Object?>>[
+      for (final raw in asList(content))
+        if (raw is Map) raw.cast<String, Object?>(),
+    ];
+    var found = false;
+    for (var i = blocks.length - 1; i >= 0; i--) {
+      if (blocks[i]['type'] != 'text') continue;
+      blocks[i] = {...blocks[i], 'text': '${blocks[i]['text']}$marker'};
+      found = true;
+      break;
+    }
+    if (!found) blocks.add({'type': 'text', 'text': marker.trimLeft()});
+    tagged = blocks;
+  }
+  return {
+    ...entry,
+    'message': {...message, 'content': tagged},
+  };
+}
+
+/// [chain] with each [block]'s range replaced by one summary message.
+/// Blocks that share or cover each other are already reduced to one by
+/// the store; one whose ends are not in [chain] is left out.
+List<Map<String, Object?>> foldCompressionBlocks(
+  List<Map<String, Object?>> chain,
+  List<CompressionBlock> blocks,
+) {
+  if (blocks.isEmpty) return chain;
+  final at = <String, int>{};
+  for (var i = 0; i < chain.length; i++) {
+    if (chain[i]['uuid'] case final String uuid) at[uuid] = i;
+  }
+  final from = <int, ({int end, CompressionBlock block})>{};
+  for (final block in blocks) {
+    final start = at[block.startUuid];
+    final end = at[block.endUuid];
+    if (start == null || end == null || end < start) continue;
+    from[start] = (end: end, block: block);
+  }
+  final folded = <Map<String, Object?>>[];
+  for (var i = 0; i < chain.length; i++) {
+    final range = from[i];
+    if (range == null) {
+      folded.add(chain[i]);
+      continue;
+    }
+    folded.add({
+      'type': 'user',
+      'uuid': 'compression:${range.block.id}',
+      'isMeta': true,
+      'message': {
+        'role': 'user',
+        'content':
+            '[Earlier conversation, compressed into ${range.block.id}; '
+            'decompress it to read the original.]\n\n${range.block.summary}',
+      },
+    });
+    i = range.end;
+  }
+  return folded;
 }
 
 /// [chain] as the Messages API takes it: from the last compaction on; the
@@ -317,17 +513,20 @@ class SessionStore {
 List<Map<String, Object?>> toApiMessages(
   List<Map<String, Object?>> chain, {
   Set<String> cleared = const {},
+  List<CompressionBlock> blocks = const [],
+  Map<String, OffloadedResult> offloaded = const {},
 }) {
+  final folded = blocks.isEmpty ? chain : foldCompressionBlocks(chain, blocks);
   var start = 0;
-  for (var i = chain.length - 1; i >= 0; i--) {
-    final entry = chain[i];
+  for (var i = folded.length - 1; i >= 0; i--) {
+    final entry = folded[i];
     if (entry['type'] == 'system' && entry['subtype'] == 'compact_boundary') {
       start = i + 1;
       break;
     }
   }
   final messages = <Map<String, Object?>>[];
-  for (final entry in chain.skip(start)) {
+  for (final entry in folded.skip(start)) {
     final type = entry['type'];
     if (type != 'user' && type != 'assistant') continue;
     final message = asMap(entry['message']);
@@ -407,6 +606,21 @@ List<Map<String, Object?>> toApiMessages(
     );
   }
   messages.removeWhere((m) => (m['content'] as List).isEmpty);
+  // A large result offloaded: the call and its result stay, what it held
+  // is a placeholder naming it. A copy, as the file keeps it as it was.
+  if (offloaded.isNotEmpty) {
+    for (final message in messages) {
+      if (message['role'] != 'user') continue;
+      final blocks = message['content'] as List<Map<String, Object?>>;
+      for (var i = 0; i < blocks.length; i++) {
+        final block = blocks[i];
+        if (block['type'] != 'tool_result') continue;
+        final off = offloaded[block['tool_use_id']];
+        if (off == null) continue;
+        blocks[i] = {...block, 'content': off.placeholder};
+      }
+    }
+  }
   // What a microcompaction cleared: the call and its result stay, the
   // result's content does not. A copy, as the file keeps it as it was.
   if (cleared.isNotEmpty) {
@@ -416,7 +630,8 @@ List<Map<String, Object?>> toApiMessages(
       for (var i = 0; i < blocks.length; i++) {
         final block = blocks[i];
         if (block['type'] != 'tool_result' ||
-            !cleared.contains(block['tool_use_id'])) {
+            !cleared.contains(block['tool_use_id']) ||
+            offloaded.containsKey(block['tool_use_id'])) {
           continue;
         }
         blocks[i] = {...block, 'content': '[Old tool result content cleared]'};

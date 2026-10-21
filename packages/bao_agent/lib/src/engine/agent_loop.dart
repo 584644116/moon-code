@@ -258,7 +258,14 @@ class AgentLoop {
   /// prompt, the model's settings.
   ModelRequest buildRequest({List<Map<String, Object?>>? messages}) {
     final info = session.catalog.info(model);
-    final conversation = messages ?? store.apiMessages();
+    final List<Map<String, Object?>> conversation;
+    if (messages != null) {
+      conversation = messages;
+    } else {
+      final view = store.apiConversation(withRefs: true);
+      conversation = view.messages;
+      run.apiRefs = view.refs;
+    }
     _addContext(conversation);
     final cache = !_truthy(session.environment['DISABLE_PROMPT_CACHING']);
     final systemBlocks = [

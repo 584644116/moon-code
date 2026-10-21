@@ -169,6 +169,35 @@ class AgentSettings {
   String? get defaultMode =>
       asText(asMap(merged['permissions'])['defaultMode']);
 
+  /// The `contextManagement` settings: folding ranges, offloading large
+  /// results, and the nudge that says the context has grown.
+  Map<String, Object?> get contextManagement =>
+      asMap(merged['contextManagement']);
+
+  bool get contextManagementEnabled => contextManagement['enabled'] != false;
+
+  bool get contextCompressEnabled => contextManagement['compress'] != false;
+
+  int get contextNudgeTokens => _contextInt('nudgeGrowthTokens', 50000);
+
+  int get contextMinCompressTokens => _contextInt('minCompressTokens', 2000);
+
+  int get contextMaxCompressTokens => _contextInt('maxCompressTokens', 60000);
+
+  int get contextKeepRecentTurns => _contextInt('keepRecentTurns', 2);
+
+  int get contextCcrMinTokens => _contextInt('ccrMinTokens', 8000);
+
+  int get contextCcrPreviewChars => _contextInt('ccrPreviewChars', 300);
+
+  int get contextRetrieveInlineChars =>
+      _contextInt('retrieveInlineChars', 20000);
+
+  int _contextInt(String key, int fallback) {
+    final value = asInt(contextManagement[key]);
+    return value == null || value < 0 ? fallback : value;
+  }
+
   bool get disableAllHooks => merged['disableAllHooks'] == true;
 
   bool? get useAutoModeDuringPlan => asBool(merged['useAutoModeDuringPlan']);

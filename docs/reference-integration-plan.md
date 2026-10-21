@@ -489,9 +489,9 @@ D:\DM\_sdk\flutter\bin\dart analyze packages/bao_agent lib test
 | B1-2 | 危险命令与凭据路径守卫 | 已完成 | 批次 1 | `dangerous_commands_test.dart`、`permissions_units_test.dart` 全通过 |
 | B1-3 | 非交互审批超时 | 已完成 | 批次 1 | `permissions_test.dart --plain-name "times out"` 通过 |
 | B1-4 | 恢复会话已读状态 | 已完成 | 批次 1 | `resume_read_state_test.dart` 4 条全通过 |
-| B2-1 | CompressionBlock 存储与重建 | 未开始 | — | — |
-| B2-2 | 请求视图、refs、前缀缓存 | 未开始 | — | — |
-| B2-3 | ContextCompression 核心 | 未开始 | — | — |
+| B2-1 | CompressionBlock 存储与重建 | 已完成 | 批次 2 | `session_compression_test.dart` 全通过 |
+| B2-2 | 请求视图、refs、前缀缓存 | 已完成 | 批次 2 | 同上（稳定 refs、重复视图一致、无块时逐项相等） |
+| B2-3 | ContextCompression 核心 | 已完成 | 批次 2 | `context_compression_test.dart` 6 条全通过 |
 | B3-1 | 隐藏工具与 toolbox | 未开始 | — | — |
 | B3-2 | `compress` | 未开始 | — | — |
 | B3-3 | `decompress` / `search_context` / `acp_status` | 未开始 | — | — |

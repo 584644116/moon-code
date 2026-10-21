@@ -58,6 +58,10 @@ class AgentRun {
   /// report reads the main run's (see [AgentSession.lastUsage]).
   Map<String, Object?>? lastUsage;
 
+  /// The coordinate each visible user prompt had in the last request
+  /// (`m12`), by which the model names a range to compress.
+  Map<String, int> apiRefs = {};
+
   /// Whether this run's model ever answered a request.
   bool requested = false;
 
