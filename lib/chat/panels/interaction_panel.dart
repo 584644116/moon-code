@@ -50,6 +50,8 @@ class _Step {
     this.header = '',
     this.multiple = false,
     this.detail,
+    this.risk,
+    this.reversible,
   });
 
   final String prompt;
@@ -59,6 +61,10 @@ class _Step {
 
   /// Above the options, e.g. the command to run or the plan.
   final Widget? detail;
+
+  /// What the call is about, for an approval.
+  final ApprovalRisk? risk;
+  final bool? reversible;
 }
 
 class _InteractionPanelState extends State<InteractionPanel>
@@ -132,17 +138,26 @@ class _InteractionPanelState extends State<InteractionPanel>
           ],
         ),
     ],
-    ApprovalRequest(:final reason, :final preview, :final alwaysAllowLabel) => [
-      _Step(
-        prompt: reason ?? '',
-        detail: _ApprovalPreview(preview),
-        rows: [
-          _Row(l10n.interactionAllowOnce),
-          if (alwaysAllowLabel != null) _Row(alwaysAllowLabel),
-          _Row(l10n.interactionDeny, textHint: l10n.interactionDenyHint),
-        ],
-      ),
-    ],
+    ApprovalRequest(
+      :final reason,
+      :final preview,
+      :final alwaysAllowLabel,
+      :final risk,
+      :final reversible,
+    ) =>
+      [
+        _Step(
+          prompt: reason ?? '',
+          detail: _ApprovalPreview(preview),
+          risk: risk,
+          reversible: reversible,
+          rows: [
+            _Row(l10n.interactionAllowOnce),
+            if (alwaysAllowLabel != null) _Row(alwaysAllowLabel),
+            _Row(l10n.interactionDeny, textHint: l10n.interactionDenyHint),
+          ],
+        ),
+      ],
   };
 
   InteractionAnswer _answer({required bool dismissed}) {
@@ -489,6 +504,11 @@ class _InteractionPanelState extends State<InteractionPanel>
                     padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
                     child: detail,
                   ),
+                if (step.risk case final risk?)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                    child: _RiskChip(risk, reversible: step.reversible),
+                  ),
                 if (step.prompt.isNotEmpty || step.header.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(4, 2, 4, 8),
@@ -604,6 +624,57 @@ class _HeaderChip extends StatelessWidget {
           color: themeColors['badge.foreground'],
           fontSize: 11,
           fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
+class _RiskChip extends StatelessWidget {
+  const _RiskChip(this.risk, {this.reversible});
+
+  final ApprovalRisk risk;
+  final bool? reversible;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final (label, color) = switch (risk) {
+      ApprovalRisk.read => (l10n.interactionRiskRead, AppColors.textMuted),
+      ApprovalRisk.write => (l10n.interactionRiskWrite, AppColors.accent),
+      ApprovalRisk.destructive => (
+        l10n.interactionRiskDestructive,
+        themeColors['errorForeground'],
+      ),
+      ApprovalRisk.network => (
+        l10n.interactionRiskNetwork,
+        themeColors['list.warningForeground'],
+      ),
+      ApprovalRisk.credential => (
+        l10n.interactionRiskCredential,
+        themeColors['errorForeground'],
+      ),
+    };
+    final suffix = switch (reversible) {
+      true => ' · ${l10n.interactionReversible}',
+      false => ' · ${l10n.interactionIrreversible}',
+      null => '',
+    };
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          '$label$suffix',
+          style: TextStyle(
+            color: color,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );

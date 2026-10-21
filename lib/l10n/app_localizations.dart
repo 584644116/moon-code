@@ -5126,6 +5126,48 @@ abstract class AppLocalizations {
   /// **'Tell the agent what to do instead'**
   String get interactionDenyHint;
 
+  /// No description provided for @interactionRiskRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Read only'**
+  String get interactionRiskRead;
+
+  /// No description provided for @interactionRiskWrite.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes files'**
+  String get interactionRiskWrite;
+
+  /// No description provided for @interactionRiskDestructive.
+  ///
+  /// In en, this message translates to:
+  /// **'Destructive'**
+  String get interactionRiskDestructive;
+
+  /// No description provided for @interactionRiskNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the network'**
+  String get interactionRiskNetwork;
+
+  /// No description provided for @interactionRiskCredential.
+  ///
+  /// In en, this message translates to:
+  /// **'Touches credentials'**
+  String get interactionRiskCredential;
+
+  /// No description provided for @interactionReversible.
+  ///
+  /// In en, this message translates to:
+  /// **'Reversible'**
+  String get interactionReversible;
+
+  /// No description provided for @interactionIrreversible.
+  ///
+  /// In en, this message translates to:
+  /// **'Not reversible'**
+  String get interactionIrreversible;
+
   /// No description provided for @interactionStepOf.
   ///
   /// In en, this message translates to:

@@ -1,6 +1,9 @@
+import 'package:bao_agent/bao_agent.dart' show ApprovalRisk;
 import 'package:flutter/widgets.dart';
 
 import '../chat/chat_models.dart';
+
+export 'package:bao_agent/bao_agent.dart' show ApprovalRisk;
 
 /// One entry of a kernel's choice, e.g. a model or a mode.
 class KernelOption {
@@ -532,6 +535,9 @@ class ApprovalRequest extends InteractionRequest {
     this.reason,
     this.preview,
     this.alwaysAllowLabel,
+    this.risk,
+    this.reversible,
+    this.source,
   });
 
   final String toolName;
@@ -543,6 +549,15 @@ class ApprovalRequest extends InteractionRequest {
   /// What "always allow" would allow, when the kernel offers it (e.g.
   /// "Auto-accept edits"); null for no such option.
   final String? alwaysAllowLabel;
+
+  /// What the call is about, for the card and the audit log.
+  final ApprovalRisk? risk;
+
+  /// Whether the change can be undone; null when the kernel cannot say.
+  final bool? reversible;
+
+  /// Where the tool comes from: `kernel`, `mcp` or `sdk`.
+  final String? source;
 }
 
 sealed class InteractionAnswer {

@@ -1928,6 +1928,13 @@
   "interactionAllowOnce": "Allow once",
   "interactionDeny": "Deny",
   "interactionDenyHint": "Tell the agent what to do instead",
+  "interactionRiskRead": "Read only",
+  "interactionRiskWrite": "Changes files",
+  "interactionRiskDestructive": "Destructive",
+  "interactionRiskNetwork": "Uses the network",
+  "interactionRiskCredential": "Touches credentials",
+  "interactionReversible": "Reversible",
+  "interactionIrreversible": "Not reversible",
   "interactionStepOf": "{step} / {total}",
   "@interactionStepOf": {
     "placeholders": {

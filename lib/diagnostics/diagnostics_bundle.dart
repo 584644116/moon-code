@@ -115,14 +115,12 @@ DiagnosticsBundle packDiagnosticsSync(
     } on FileSystemException {
       continue;
     }
-    if (!log.isDump && home != null) {
-      bytes = utf8.encode(
-        redactHome(
-          utf8.decode(bytes, allowMalformed: true),
-          home,
-          windows: windows,
-        ),
-      );
+    if (!log.isDump) {
+      var text = utf8.decode(bytes, allowMalformed: true);
+      if (home != null) {
+        text = redactHome(text, home, windows: windows);
+      }
+      bytes = utf8.encode(scrubSecrets(text));
     }
     final member = codec.encode(tarEntry(log.name, bytes, modified));
     if (out.length + member.length + end.length > maxBytes) {
@@ -154,6 +152,57 @@ String redactHome(String text, String home, {bool windows = false}) {
     caseSensitive: !windows,
   );
   return text.replaceAll(pattern, '~');
+}
+
+/// [text] with credentials written over: keys, bearer tokens, cookies and
+/// refresh tokens a log may have kept. Their shape says what they are, so
+/// a diagnostics upload does not carry a working secret.
+String scrubSecrets(String text) {
+  var out = text;
+  out = out.replaceAll(
+    RegExp(
+      r'\b(?:sk-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{8,}|'
+      r'github_pat_[A-Za-z0-9_]{8,}|AKIA[0-9A-Z]{16})\b',
+    ),
+    '***',
+  );
+  out = out.replaceAllMapped(
+    RegExp(
+      r'''(authorization["']?\s*[:=]\s*)(bearer\s+)?[^\s,;"']+''',
+      caseSensitive: false,
+    ),
+    (match) => '${match[1]}${match[2] ?? ''}***',
+  );
+  out = out.replaceAllMapped(
+    RegExp(
+      r'''((?:x-api-key|api[-_]?key|apikey)["']?\s*[:=]\s*["']?)[^"'\s,;}]+''',
+      caseSensitive: false,
+    ),
+    (match) => '${match[1]}***',
+  );
+  out = out.replaceAllMapped(
+    RegExp(
+      r'''((?:cookie|set-cookie)["']?\s*:\s*)[^\r\n]+''',
+      caseSensitive: false,
+    ),
+    (match) => '${match[1]}***',
+  );
+  out = out.replaceAllMapped(
+    RegExp(
+      r'''((?:refresh_token|new_api_refresh|access_token|id_token)'''
+      r'''["']?\s*[:=]\s*["']?)[^"'\s,;}]+''',
+      caseSensitive: false,
+    ),
+    (match) => '${match[1]}***',
+  );
+  out = out.replaceAll(
+    RegExp(
+      r'-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?'
+      r'-----END [A-Z ]*PRIVATE KEY-----',
+    ),
+    '-----BEGIN PRIVATE KEY-----***-----END PRIVATE KEY-----',
+  );
+  return out;
 }
 
 /// [bytes] as a file of a tar (`ustar`): its header, then its content to

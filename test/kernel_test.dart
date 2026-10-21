@@ -1606,6 +1606,29 @@ void main() {
       expect(transcript.pendingInteraction, isNull);
       expect(cli.responses.last['behavior'], 'allow');
       expect(cli.responses.last['updatedInput'], command);
+      // A browser script that reaches the page's state is asked about even
+      // here; one that only reads the document is not.
+      ask('r-browser-read', 'mcp__baocode__browser_evaluate', {
+        'tabId': 1,
+        'expression': 'document.title',
+      });
+      await pumpEventQueue();
+      expect(transcript.pendingInteraction, isNull);
+      expect(cli.responses.last['behavior'], 'allow');
+      ask('r-browser-cookie', 'mcp__baocode__browser_evaluate', {
+        'tabId': 1,
+        'expression': 'document.cookie',
+      });
+      await pumpEventQueue();
+      final browser = transcript.pendingInteraction as ApprovalRequest;
+      expect(browser.risk, ApprovalRisk.credential);
+      expect(browser.reversible, isFalse);
+      kernel.answer(
+        'r-browser-cookie',
+        const ApprovalAnswer(ApprovalDecision.allowOnce),
+      );
+      await pumpEventQueue();
+      expect(cli.responses.last['behavior'], 'allow');
       // Protected paths may be classifier-approved in Accept edits; full
       // access allows them without prompting, including inside compound Bash.
       const protectedCommand = {

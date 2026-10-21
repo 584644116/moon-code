@@ -2980,6 +2980,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get interactionDenyHint => 'Tell the agent what to do instead';
 
   @override
+  String get interactionRiskRead => 'Read only';
+
+  @override
+  String get interactionRiskWrite => 'Changes files';
+
+  @override
+  String get interactionRiskDestructive => 'Destructive';
+
+  @override
+  String get interactionRiskNetwork => 'Uses the network';
+
+  @override
+  String get interactionRiskCredential => 'Touches credentials';
+
+  @override
+  String get interactionReversible => 'Reversible';
+
+  @override
+  String get interactionIrreversible => 'Not reversible';
+
+  @override
   String interactionStepOf(int step, int total) {
     return '$step / $total';
   }

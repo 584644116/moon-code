@@ -169,6 +169,9 @@ class AgentSettings {
   String? get defaultMode =>
       asText(asMap(merged['permissions'])['defaultMode']);
 
+  /// Whether each approval is written to the local audit log.
+  bool get approvalAuditEnabled => merged['approvalAuditEnabled'] != false;
+
   /// The `contextManagement` settings: folding ranges, offloading large
   /// results, and the nudge that says the context has grown.
   Map<String, Object?> get contextManagement =>

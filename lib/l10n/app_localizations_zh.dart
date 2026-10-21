@@ -2879,6 +2879,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get interactionDenyHint => '告诉智能体改做什么';
 
   @override
+  String get interactionRiskRead => '只读';
+
+  @override
+  String get interactionRiskWrite => '修改文件';
+
+  @override
+  String get interactionRiskDestructive => '破坏性操作';
+
+  @override
+  String get interactionRiskNetwork => '访问网络';
+
+  @override
+  String get interactionRiskCredential => '涉及凭据';
+
+  @override
+  String get interactionReversible => '可撤销';
+
+  @override
+  String get interactionIrreversible => '不可撤销';
+
+  @override
   String interactionStepOf(int step, int total) {
     return '$step / $total';
   }

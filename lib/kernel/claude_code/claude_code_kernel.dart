@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:bao_agent/bao_agent.dart' show approvalRiskFor;
 import 'package:bao_remote/claude.dart' show ClaudeHistoryPage;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -1589,6 +1590,7 @@ class ClaudeCodeKernel
     if (_approval == 'bypassPermissions' &&
         (_work != 'plan' || !_classifies) &&
         tool != 'AskUserQuestion' &&
+        !_needsConfirmation(tool, input) &&
         !_askedInFullAccess(request)) {
       _control!.respond(requestId, {
         'behavior': 'allow',
@@ -1604,6 +1606,7 @@ class ClaudeCodeKernel
     if (_approval == 'auto' &&
         !_classifies &&
         tool != 'AskUserQuestion' &&
+        !_needsConfirmation(tool, input) &&
         !_askedInFullAccess(request)) {
       final verdict = await (_classifier ?? _askClassifier)(
         _askedText,
@@ -1662,6 +1665,7 @@ class ClaudeCodeKernel
           ],
         );
       default:
+        final risk = approvalRiskFor(tool, input);
         interaction = ApprovalRequest(
           id: requestId,
           title: _approvalTitle(tool, request),
@@ -1669,6 +1673,9 @@ class ClaudeCodeKernel
           reason: _clean(request['decision_reason'] as String?),
           preview: _preview(tool, input),
           alwaysAllowLabel: _describeRules(suggestions),
+          risk: risk.risk,
+          reversible: risk.reversible,
+          source: risk.source,
         );
     }
     _permissions[requestId] = _Permission(input, suggestions, questions);
@@ -1958,6 +1965,9 @@ class ClaudeCodeKernel
         toolName: 'mcp__$server',
         reason: message.isEmpty ? null : message,
         preview: TextPreview(url),
+        risk: ApprovalRisk.network,
+        reversible: true,
+        source: 'mcp',
       );
     } else {
       fields = elicitationFields(request['requested_schema']);
@@ -3282,6 +3292,29 @@ class ClaudeCodeKernel
   /// manual approval (also inside compound commands), explicit ask rules,
   /// and tools that require user interaction. Protected-path checks that
   /// the classifier may approve do not require a prompt in full access.
+  /// A browser call that can read a signed-in page or change what it sends:
+  /// asked about even where the mode would allow it without a word.
+  static bool _needsConfirmation(String tool, Map<String, Object?> input) {
+    if (tool == 'mcp__baocode__browser_evaluate') {
+      final expression = '${input['expression'] ?? ''}';
+      return RegExp(
+        r'document\.cookie|localStorage|sessionStorage|indexedDB|'
+        r'navigator\.credentials|fetch\s*\(|XMLHttpRequest',
+        caseSensitive: false,
+      ).hasMatch(expression);
+    }
+    if (tool == 'mcp__baocode__browser_intercept') {
+      return const {
+        'block',
+        'mock',
+        'request',
+        'response',
+        'delay',
+      }.contains('${input['action'] ?? ''}');
+    }
+    return false;
+  }
+
   static bool _askedInFullAccess(Map<String, Object?> request) =>
       request['classifier_approvable'] == false ||
       (request['decision_reason_type'] == 'safetyCheck' &&

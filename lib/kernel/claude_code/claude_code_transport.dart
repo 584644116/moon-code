@@ -193,10 +193,18 @@ class ClaudeLaunch {
           for (final model in models) {'model': model},
         ],
       },
-    if (readable.isNotEmpty)
-      'permissions': {
+    // The app's own browser tools can read a signed-in page and change
+    // what it sends or shows. They are allowed as a server, but these are
+    // asked about one call at a time (an ask rule is weighed first).
+    'permissions': {
+      if (readable.isNotEmpty)
         'allow': [for (final folder in readable) readRule(folder)],
-      },
+      'ask': const [
+        'mcp__baocode__browser_evaluate',
+        'mcp__baocode__browser_intercept',
+        'mcp__baocode__browser_watch',
+      ],
+    },
     if ({
           ...?env,
           if (directories.isNotEmpty) ...additionalDirectoriesEnvironment,

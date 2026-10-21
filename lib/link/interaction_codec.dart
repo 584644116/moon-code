@@ -34,6 +34,9 @@ abstract final class InteractionCodec {
           'tool': request.toolName,
           'reason': ?request.reason,
           'always': ?request.alwaysAllowLabel,
+          'risk': ?request.risk?.name,
+          'reversible': ?request.reversible,
+          'source': ?request.source,
           if (request.preview case final preview?)
             'preview': switch (preview) {
               CommandPreview(:final command, :final description) => {

@@ -6,6 +6,7 @@ import '../api/model_catalog.dart';
 import '../api/model_client.dart';
 import '../config/settings.dart';
 import '../hooks/hooks.dart';
+import '../permissions/approval_risk.dart';
 import '../permissions/decision.dart';
 import '../prompts/system_prompt.dart';
 import '../prompts/task_prompts.dart';
@@ -14,6 +15,7 @@ import '../util/cancel.dart';
 import '../util/ids.dart';
 import '../util/json.dart';
 import 'agent_run.dart';
+import 'approval_audit.dart';
 import 'compaction.dart';
 import 'compression_blocks.dart';
 import 'repeat_guard.dart';
@@ -1323,6 +1325,11 @@ class AgentLoop {
         }
       }
     }
+    final audit = ApprovalAudit(session);
+    final started = DateTime.now();
+    audit.asked(tool.name, input, reason: ask.message);
+    final risk = approvalRiskFor(tool.name, input);
+    Duration elapsed() => DateTime.now().difference(started);
     final Map<String, Object?> response;
     try {
       response = await context.cancel.guard(
@@ -1341,6 +1348,9 @@ class AgentLoop {
             'classifier_approvable': ask.classifierApprovable,
             'requires_user_interaction': userOnly,
             'blocked_path': ?ask.blockedPath,
+            'risk': risk.risk.name,
+            if (risk.reversible != null) 'reversible': risk.reversible,
+            'source': risk.source,
             if (!isMain) 'agent_id': run.agentId,
           },
           // A question to the user is the turn's point: it waits as long
@@ -1350,20 +1360,24 @@ class AgentLoop {
         ),
       );
     } on HostRequestTimeout catch (error) {
+      audit.decided(tool.name, 'denied', reason: 'timeout', elapsed: elapsed());
       return PermissionDeny(
         '${error.toString()}, so this call was not made. The user can '
         'answer it by asking again.',
         reasonType: 'timeout',
       );
     } on Cancelled {
+      audit.decided(tool.name, 'cancelled', elapsed: elapsed());
       rethrow;
     } on Object catch (error) {
+      audit.decided(tool.name, 'denied', reason: 'error', elapsed: elapsed());
       return PermissionDeny(
         'Permission could not be asked for: $error',
         reasonType: 'other',
       );
     }
     if (response['behavior'] == 'allow') {
+      audit.decided(tool.name, 'allowed', elapsed: elapsed());
       _applyUpdates(asList(response['updatedPermissions']));
       return PermissionAllow(
         updatedInput: switch (response['updatedInput']) {
@@ -1375,6 +1389,7 @@ class AgentLoop {
       );
     }
     final message = asText(response['message']);
+    audit.decided(tool.name, 'denied', reason: message, elapsed: elapsed());
     return PermissionDeny(
       message ??
           'The user said no to this call, so it was not made (an edit, say, '
