@@ -499,10 +499,10 @@ D:\DM\_sdk\flutter\bin\dart analyze packages/bao_agent lib test
 | B3-5 | CCR 与 `retrieve_tool_result` | 已完成 | 批次 3 | `context_tools_test.dart`「a large result is offloaded…」 |
 | B3-6 | 子会话父链只读回退 | 已完成 | 批次 3 | `context_tools_test.dart`「a subagent searches its caller's context…」 |
 | B3-7 | UI 隐藏与压缩提示 | 已完成 | 批次 3 | `test/kernel_test.dart --plain-name "context tools are hidden"` 通过 |
-| B4-1 | 自动压缩阈值 | 未开始 | — | — |
-| B4-2 | 保留最近助手轮次 | 未开始 | — | — |
-| B4-3 | microcompaction 轮次与保护 | 未开始 | — | — |
-| B4-4 | 收尾验证与报告 | 未开始 | — | — |
+| B4-1 | 自动压缩阈值 | 已完成 | 批次 4 | `compaction_rounds_test.dart` 阈值表；`controls_test.dart` 仅基线失败 |
+| B4-2 | 保留最近助手轮次 | 已完成 | 批次 4 | `compaction_rounds_test.dart` 保留与预算两条；`commands_test.dart --plain-name "compact"` 通过 |
+| B4-3 | microcompaction 轮次与保护 | 已完成 | 批次 4 | `compaction_rounds_test.dart` 分组与保护；`controls_test.dart --plain-name "old tool results"` 通过 |
+| B4-4 | 收尾验证与报告 | 已完成 | 批次 4 | `edges_test.dart --plain-name "compaction"` 仅基线失败；`request_test.dart` 全通过 |
 
 ---
 

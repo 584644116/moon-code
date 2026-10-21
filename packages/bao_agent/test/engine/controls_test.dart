@@ -637,6 +637,7 @@ void main() {
         call('Read', {'file_path': p.join(cwd, 'big2.txt')}, 120000),
         call('Grep', {'pattern': 'needle', 'path': cwd}, 130000),
         call('Grep', {'pattern': 'needle', 'path': cwd}, 140000),
+        call('Grep', {'pattern': 'needle', 'path': cwd}, 150000),
         call('Glob', {'pattern': '*.txt', 'path': cwd}, 175000),
         Reply.text('done'),
       ]);
@@ -651,11 +652,12 @@ void main() {
         ),
         isEmpty,
       );
-      // What is sent has the placeholder, not what the files held.
+      // What is sent has the placeholder for the oldest group, and the
+      // last five groups as they were.
       final sent = sentIn(h.model.turns.last);
       expect(sent, contains('Old tool result content cleared'));
       expect(sent, isNot(contains('BIG1-')));
-      expect(sent, isNot(contains('BIG2-')));
+      expect(sent, contains('BIG2-'));
       // The file keeps what was said; only the request left it out.
       final kept = File(h.sessionFile).readAsStringSync();
       expect(kept, contains('BIG1-'));

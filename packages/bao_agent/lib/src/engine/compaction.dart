@@ -66,31 +66,53 @@ class Compaction {
     final usage = run.lastUsage;
     if (usage == null) return estimateTokens(messages);
     int count(String key) => asInt(usage[key]) ?? 0;
-    final reported =
+    final sent =
         count('input_tokens') +
         count('cache_read_input_tokens') +
-        count('cache_creation_input_tokens') +
-        count('output_tokens');
+        count('cache_creation_input_tokens');
+    // A provider that reported no input at all says nothing about what the
+    // conversation holds; the estimate is the only baseline there is.
+    if (sent <= 0) return estimateTokens(messages);
     final lastAnswer = messages.lastIndexWhere((m) => m['role'] == 'assistant');
     final since = lastAnswer < 0 ? messages : messages.sublist(lastAnswer + 1);
-    return reported + estimateTokens(since);
+    return sent + count('output_tokens') + estimateTokens(since);
   }
 
   /// The window this conversation is sized by.
   int get contextWindow => session.compactWindowOf(model);
 
-  /// The tokens the context holds before it is compacted.
-  int get threshold =>
-      contextWindow - AgentSession.compactBufferOf(contextWindow);
+  /// The tokens the context holds before it is compacted: the window less
+  /// room for the model's answer (at most 21K) and 13K more for what a
+  /// request adds, and never less than half the window.
+  int get threshold => thresholdOf(
+    contextWindow,
+    maxOutput: session.catalog.info(model).maxOutput,
+  );
+
+  /// The compaction threshold of a [window], keeping room for an answer of
+  /// [maxOutput] tokens. With no answer size known, the session's buffer
+  /// is kept instead.
+  static int thresholdOf(int window, {int maxOutput = 0}) {
+    final reserve = maxOutput > 0
+        ? math.min(maxOutput, _answerReserve) + _requestReserve
+        : AgentSession.compactBufferOf(window);
+    return math.max((window * 0.5).round(), window - reserve);
+  }
+
+  /// The most of a window a model's answer is given.
+  static const _answerReserve = 21000;
+
+  /// What a request adds besides the answer itself.
+  static const _requestReserve = 13000;
 
   /// How many auto compactions in a row may make no summary before the
   /// conversation is no longer put to the model for one: a provider that
   /// cannot answer would otherwise be asked again every turn.
   static const maxConsecutiveFailures = 3;
 
-  /// The newest messages whose tool results are never cleared: what is
-  /// being worked on now.
-  static const _microKeepMessages = 4;
+  /// The newest tool-result groups whose results are never cleared: what
+  /// is being worked on now.
+  static const _microKeepGroups = 5;
 
   /// What a microcompaction must save to be worth a boundary in the file.
   int get _microMinSaved => math.max(2000, contextWindow ~/ 50);
@@ -108,6 +130,43 @@ class Compaction {
     'Write',
   };
 
+  /// The results a call returned, grouped by the call: an assistant message
+  /// that called tools starts a group, and the user messages after it hold
+  /// what those calls returned. Oldest first; a call and its results are
+  /// never separated.
+  static List<List<Map<String, Object?>>> _toolResultGroups(
+    List<Map<String, Object?>> messages,
+  ) {
+    final groups = <List<Map<String, Object?>>>[];
+    var current = <Map<String, Object?>>[];
+    for (final message in messages) {
+      if (message['role'] == 'assistant' &&
+          asList(message['content'])
+              .any((block) => asMap(block)['type'] == 'tool_use')) {
+        if (current.isNotEmpty) groups.add(current);
+        current = [];
+        continue;
+      }
+      if (message['role'] != 'user') continue;
+      if (asList(message['content'])
+          .any((block) => asMap(block)['type'] == 'tool_result')) {
+        current.add(message);
+      }
+    }
+    if (current.isNotEmpty) groups.add(current);
+    return groups;
+  }
+
+  /// Whether a result holds an image or a document: what a later look most
+  /// needs, and what clearing would lose.
+  static bool _hasMedia(Object? content) {
+    for (final raw in asList(content)) {
+      final type = asMap(raw)['type'];
+      if (type == 'image' || type == 'document') return true;
+    }
+    return false;
+  }
+
   /// Clears the content of old tool results from what is sent to the API,
   /// as the CLI's microcompaction does: the calls, their results and the
   /// file stay as they were, and the model can read a file again for what
@@ -119,7 +178,8 @@ class Compaction {
   bool microcompact() {
     final store = run.store;
     final messages = store.apiMessages();
-    if (messages.length <= _microKeepMessages) return false;
+    final groups = _toolResultGroups(messages);
+    if (groups.length <= _microKeepGroups) return false;
     final names = <String, String>{};
     for (final message in messages) {
       if (message['role'] != 'assistant') continue;
@@ -130,22 +190,29 @@ class Compaction {
         }
       }
     }
-    final cutoff = messages.length - _microKeepMessages;
     final ids = <String>[];
     var saved = 0;
-    for (var i = 0; i < cutoff; i++) {
-      final message = messages[i];
-      if (message['role'] != 'user') continue;
-      for (final block in asList(message['content'])) {
-        final result = asMap(block);
-        if (result['type'] != 'tool_result') continue;
-        final id = result['tool_use_id'];
-        if (id is! String || store.clearedToolResults.contains(id)) continue;
-        if (!_clearableTools.contains(names[id])) continue;
-        final tokens = estimateTokens(result['content']);
-        if (tokens < 50) continue;
-        saved += tokens - 16;
-        ids.add(id);
+    final clearGroups = groups.length - _microKeepGroups;
+    for (var group = 0; group < clearGroups; group++) {
+      for (final message in groups[group]) {
+        for (final block in asList(message['content'])) {
+          final result = asMap(block);
+          if (result['type'] != 'tool_result') continue;
+          final id = result['tool_use_id'];
+          if (id is! String) continue;
+          if (store.clearedToolResults.contains(id)) continue;
+          // A result kept out of the context already is not cleared again:
+          // its whole content is still there to retrieve.
+          if (store.offloadedToolResults.containsKey(id)) continue;
+          // Failures and media are what a later look most needs.
+          if (result['is_error'] == true) continue;
+          if (_hasMedia(result['content'])) continue;
+          if (!_clearableTools.contains(names[id])) continue;
+          final tokens = estimateTokens(result['content']);
+          if (tokens < 50) continue;
+          saved += tokens - 16;
+          ids.add(id);
+        }
       }
     }
     if (ids.isEmpty || saved < _microMinSaved) return false;
@@ -280,23 +347,15 @@ class Compaction {
   ) {
     // Where the user last spoke, not where a call's results were handed
     // back: a window cut at those would start with what the API refuses.
-    bool begins(int at) {
-      if (messages[at]['role'] != 'user') return false;
-      final content = messages[at]['content'];
-      if (content is String) return content.trim().isNotEmpty;
-      return asList(content)
-          .any((block) => asMap(block)['type'] != 'tool_result');
-    }
-
     var from = messages.length - 1;
-    while (from >= 0 && !begins(from)) {
+    while (from >= 0 && !_begins(messages[from])) {
       from--;
     }
     if (from < 0) return const [];
     var used = estimateTokens(messages.sublist(from));
     while (from > 0) {
       var earlier = from - 1;
-      while (earlier >= 0 && !begins(earlier)) {
+      while (earlier >= 0 && !_begins(messages[earlier])) {
         earlier--;
       }
       if (earlier < 0) break;
@@ -309,6 +368,62 @@ class Compaction {
       for (final message in messages.sublist(from))
         {'type': message['role'], 'message': message},
     ]);
+  }
+
+  /// Where the user spoke, not where a call's results were handed back: a
+  /// message a window or a kept round may begin with.
+  static bool _begins(Map<String, Object?> message) {
+    if (message['role'] != 'user') return false;
+    final content = message['content'];
+    if (content is String) {
+      final text = content.trimLeft();
+      return text.isNotEmpty && !text.startsWith('<command-message>');
+    }
+    final blocks = asList(content);
+    for (final block in blocks) {
+      final text = asMap(block);
+      if (text['type'] != 'text') continue;
+      if ('${text['text'] ?? ''}'.trimLeft().startsWith('<command-message>')) {
+        return false;
+      }
+      break;
+    }
+    return blocks.any((block) => asMap(block)['type'] != 'tool_result');
+  }
+
+  /// The newest exchange, from the last prompt to the end, within [budget]:
+  /// what is kept verbatim after a summary.
+  ///
+  /// A call stays with its results. When the exchange is too long its
+  /// oldest messages go, one whole call with its results at a time; what
+  /// was said last is kept whatever it costs.
+  List<Map<String, Object?>> _recentRound(
+    List<Map<String, Object?>> messages,
+    int budget,
+  ) {
+    var from = messages.length - 1;
+    while (from >= 0 && !_begins(messages[from])) {
+      from--;
+    }
+    if (from < 0) return const [];
+    while (estimateTokens(messages.sublist(from)) > budget) {
+      final next = _afterUnit(messages, from);
+      if (next >= messages.length) break;
+      from = next;
+    }
+    return messages.sublist(from);
+  }
+
+  /// Where the message at [from] ends: a prompt is its own unit; a call
+  /// carries the results that came back after it.
+  static int _afterUnit(List<Map<String, Object?>> messages, int from) {
+    var next = from + 1;
+    while (next < messages.length &&
+        messages[next]['role'] != 'assistant' &&
+        !_begins(messages[next])) {
+      next++;
+    }
+    return next;
   }
 
   /// What the conversation goes on from where it could not be summed up.
@@ -413,6 +528,12 @@ class Compaction {
       _status(null);
       return false;
     }
+    // What was said last stays as it was said: a summary loses the words
+    // the work is going on from.
+    final retained = _recentRound(
+      messages,
+      math.min(20000, contextWindow ~/ 10),
+    );
     final boundary = store.append({
       'type': 'system',
       'subtype': 'compact_boundary',
@@ -421,18 +542,24 @@ class Compaction {
       'level': 'info',
       'parentUuid': null,
       'logicalParentUuid': store.leaf,
-      'compactMetadata': {'trigger': trigger, 'preTokens': before},
+      'compactMetadata': {
+        'trigger': trigger,
+        'preTokens': before,
+        'retainedMessages': retained.length,
+      },
     });
     final started = await _sessionStartAfterCompact(cancel);
     final text = [
       compactedSummary(summary, transcriptPath: store.file),
+      if (retained.isNotEmpty)
+        'The most recent exchange is kept below, as it was said.',
       ..._carriedOver(),
       ..._restoredFiles(),
       if (started.isNotEmpty)
         '<system-reminder>\nA SessionStart hook adds: '
             '${started.join('\n\n')}\n</system-reminder>',
     ].join('\n\n');
-    final after = estimateTokens(text);
+    final after = estimateTokens(text) + estimateTokens(retained);
     _emitBoundary(boundary, trigger: trigger, before: before, after: after);
     final entry = store.append({
       'type': 'user',
@@ -441,6 +568,17 @@ class Compaction {
       'isVisibleInTranscriptOnly': true,
     });
     _emitSummary(entry);
+    // The exchange kept verbatim goes after the summary, marked as not the
+    // user's own words twice over.
+    for (final message in retained) {
+      store.append({
+        'type': '${message['role']}',
+        'message': message,
+        'isMeta': true,
+        'isRetainedTurn': true,
+        if (!isMain) ...{'agentId': ?agentId, 'isSidechain': true},
+      });
+    }
     // What the next request reports is this run's context now.
     run.lastUsage = null;
     run.compactFailures = 0;

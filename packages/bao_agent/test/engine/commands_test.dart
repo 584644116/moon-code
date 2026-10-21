@@ -161,7 +161,8 @@ void main() {
         await h.turn('and now?');
         final next = h.model.turns.last.body['messages'] as List;
         expect(jsonEncode(next.first), contains('We talked about apples.'));
-        expect(jsonEncode(next), isNot(contains('first answer')));
+        // The exchange it goes on from is kept as it was said.
+        expect(jsonEncode(next), contains('first answer'));
         final lines = kept();
         expect(
           lines.where((l) => l['subtype'] == 'compact_boundary'),
@@ -174,7 +175,9 @@ void main() {
     test('the summary is told what must not be lost', () async {
       h = await Harness.start(files: {'lib/a.dart': 'void a() {}\n'});
       h.model.script.addAll([
-        Reply.tools([('Read', {'file_path': 'lib/a.dart'})]),
+        Reply.tools([
+          ('Read', {'file_path': 'lib/a.dart'}),
+        ]),
         Reply(
           [
             {'type': 'text', 'text': 'big'},
