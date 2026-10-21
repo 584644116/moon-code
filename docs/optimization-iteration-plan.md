@@ -389,12 +389,15 @@
 | P0-2 大工具结果先留全文 | 部分完成 | `2df662f`：CCR 开启时 Bash 上限 30000 → 1000000，先交给 offload；占位符带首尾预览。独立的 `tool-results/` 文件化 spill 未做 |
 | P0-3 重复工具调用提醒 | 已完成 | `2df662f`：`RepeatGuard`，3/5/8 次，新用户消息清零，建议性 |
 | P0-5 工具级超时 | 已完成（机制） | `2df662f`：`Tool.timeout` + `callWithTimeout`；WebFetch 90 秒。MCP 工具尚未声明预算 |
-| P0-4 空回答恢复 | 未开始 | — |
-| P0-6 审批风险与审计 | 未开始 | — |
-| P0-7 浏览器敏感工具确认 | 未开始 | — |
-| P1 / P2 | 未开始 | — |
+| P0-4 空回答恢复 | 已完成 | `7963137`：空回答重试 2 次，`refusal` / `max_tokens` 不重试，仍空则告警；`emptyResponse` 单独归类，最多重试 2 次 |
+| P1-1 按模型压缩策略 | 已完成 | `7963137`：`compactRatio` / `headroomTokens`（可按模型覆盖）、`overflowRetries` 可配；`threshold` 与 `contextUsage()` 同源 |
+| P1-2 工具结果字符级剪枝 | 已完成 | `363c522`：microcompaction 先剪枝（保留首 4096 + 尾 1024），省得够才只剪，否则回退整体清理；恢复会话后仍生效 |
+| P0-6 审批风险与审计 | 已完成 | `203a3f7`：`ApprovalRisk` / 可逆性 / 来源，面板标签，`approvals/<session>.jsonl` 审计；只展示与审计，不改判定 |
+| P0-7 浏览器敏感工具确认 | 已完成 | `203a3f7`：`browser_evaluate` 命中 cookie/存储/网络脚本即询问，`browser_intercept` 询问；全访问下也不自动放行 |
+| P1-6 诊断包秘密清洗 | 已完成 | `203a3f7`：`scrubSecrets` 覆盖 `sk-` / Bearer / api key / cookie / refresh token / 私钥；非 dump 文件先脱敏再打包 |
+| 其余 P1 / P2 | 未开始 | — |
 
-> 验证：`compaction_rounds_test`、`context_usage_test`、`context_tools_test`、`session_compression_test`、`repeat_guard_test`、`tool_timeout_test` 共 32 条通过；`controls_test` 仅剩既有的 Windows 路径失败；`dart analyze packages/bao_agent/lib` 无问题。
+> 验证：`compaction_rounds_test`、`context_usage_test`、`context_tools_test`、`session_compression_test`、`repeat_guard_test`、`tool_timeout_test` 共 32 条通过；`empty_answer_test`、`api_error_kind_test`、`request_test` 13 条通过；`approval_risk_test`、`approval_audit_test` 7 条通过；`test/chat/approval_risk_test.dart` 2 条、`scrub_test.dart` 4 条、`kernel_test.dart` 全访问用例通过；`controls_test` 仅剩既有的 Windows 路径失败；`dart analyze packages/bao_agent/lib` 与 `dart analyze lib/diagnostics` 无问题。
 
 ### 批次 5：上下文用量 + 重复提醒 + 工具超时（无协议风险）
 
