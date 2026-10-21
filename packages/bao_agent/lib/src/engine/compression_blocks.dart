@@ -13,6 +13,7 @@ class CompressionBlock {
     required this.endUuid,
     required this.summary,
     required this.createdAt,
+    this.messages = 0,
     this.tokensBefore = 0,
     this.tokensAfter = 0,
   });
@@ -22,6 +23,9 @@ class CompressionBlock {
   final String endUuid;
   final String summary;
   final DateTime createdAt;
+
+  /// How many chain entries the range held.
+  final int messages;
 
   /// What the range held, and what the summary holds, in estimated tokens.
   final int tokensBefore;
@@ -43,6 +47,7 @@ class CompressionBlock {
     'start_uuid': startUuid,
     'end_uuid': endUuid,
     'summary': summary,
+    'messages': messages,
     'tokens_before': tokensBefore,
     'tokens_after': tokensAfter,
     'created_at': createdAt.toUtc().toIso8601String(),
@@ -72,6 +77,7 @@ class CompressionBlock {
             asText(entry['created_at']) ?? asText(entry['timestamp']) ?? '',
           ) ??
           DateTime.fromMillisecondsSinceEpoch(0),
+      messages: asInt(entry['messages']) ?? 0,
       tokensBefore: asInt(entry['tokens_before']) ?? 0,
       tokensAfter: asInt(entry['tokens_after']) ?? 0,
     );

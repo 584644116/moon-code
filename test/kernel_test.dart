@@ -940,6 +940,100 @@ void main() {
       expect((transcript.itemAt(0) as NoticeItem).text, 'Something else');
     });
 
+    test('context tools are hidden; what they did is a notice', () {
+      List<String> run(bool replaying) {
+        final transcript = Transcript();
+        var seq = 0;
+        final translator = ClaudeTranslator(
+          emit: transcript.apply,
+          nextSeq: () => ++seq,
+        )..replaying = replaying;
+        for (final message in [
+          {
+            'type': 'assistant',
+            'message': {
+              'id': 'msg-1',
+              'role': 'assistant',
+              'content': [
+                {'type': 'text', 'text': 'Folding the old part.'},
+                {
+                  'type': 'tool_use',
+                  'id': 't1',
+                  'name': 'compress',
+                  'input': {'start_ref': 'm0'},
+                },
+              ],
+            },
+          },
+          {
+            'type': 'user',
+            'message': {
+              'role': 'user',
+              'content': [
+                {
+                  'type': 'tool_result',
+                  'tool_use_id': 't1',
+                  'content': 'Folded 4 messages into c1.',
+                },
+              ],
+            },
+            'tool_use_result': {'block_id': 'c1', 'messages': 4, 'saved': 1200},
+          },
+          {
+            'type': 'assistant',
+            'message': {
+              'id': 'msg-2',
+              'role': 'assistant',
+              'content': [
+                {
+                  'type': 'tool_use',
+                  'id': 't2',
+                  'name': 'decompress',
+                  'input': {'block_id': 'c1'},
+                },
+              ],
+            },
+          },
+          {
+            'type': 'user',
+            'message': {
+              'role': 'user',
+              'content': [
+                {
+                  'type': 'tool_result',
+                  'tool_use_id': 't2',
+                  'content': 'Restored 4 messages from c1.',
+                },
+              ],
+            },
+            'tool_use_result': {'block_id': 'c1', 'messages': 4},
+          },
+          {
+            'type': 'assistant',
+            'message': {
+              'id': 'msg-3',
+              'role': 'assistant',
+              'content': [
+                {'type': 'text', 'text': 'Done.'},
+              ],
+            },
+          },
+        ]) {
+          translator.translate(message);
+        }
+        return shown(transcript);
+      }
+
+      const expected = [
+        'text: Folding the old part.',
+        'notice info: Context compressed: 4 messages folded, ~1.2k tokens saved.',
+        'notice info: Context restored: 4 messages are back.',
+        'text: Done.',
+      ];
+      expect(run(false), expected);
+      expect(run(true), expected);
+    });
+
     test('replaying the kept session shows what streaming showed', () async {
       List<String> run(Iterable<Map<String, Object?>> messages, bool replay) {
         final transcript = Transcript();

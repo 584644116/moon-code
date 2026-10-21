@@ -211,6 +211,7 @@ Nor for work that fits none of the kinds above.
       toolUseId: context.toolUseId,
       resumed: resumeId != null,
       parentReads: context.run.readFiles,
+      parentRun: context.run,
     );
     final task = session.tasks.registerAgent(
       description: description,
@@ -339,6 +340,7 @@ class _Job {
     required this.toolUseId,
     required this.resumed,
     required this.parentReads,
+    required this.parentRun,
   });
 
   final AgentSession session;
@@ -350,6 +352,7 @@ class _Job {
   final String toolUseId;
   final bool resumed;
   final ReadFileState parentReads;
+  final AgentRun parentRun;
   AgentRun? run;
 
   SessionStore _store() {
@@ -399,6 +402,7 @@ class _Job {
       agentType: agent.name,
       modeOverride: agent.permissionMode,
       readFiles: parentReads.copy(),
+      parentRun: parentRun,
     );
     run.onToolUse = (tool) {
       task

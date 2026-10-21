@@ -634,7 +634,12 @@ List<Map<String, Object?>> toApiMessages(
             offloaded.containsKey(block['tool_use_id'])) {
           continue;
         }
-        blocks[i] = {...block, 'content': '[Old tool result content cleared]'};
+        blocks[i] = {
+          ...block,
+          'content':
+              '[Old tool result content cleared. Use retrieve_tool_result '
+              'with tool_use_id "${block['tool_use_id']}" to read it again.]',
+        };
       }
     }
   }

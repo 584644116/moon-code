@@ -257,10 +257,13 @@ class ContextCompression {
       endUuid: '${store.chain[range.end - 1]['uuid']}',
       summary: text,
       createdAt: DateTime.now().toUtc(),
+      messages: range.end - range.start,
       tokensBefore: before,
       tokensAfter: after,
     );
     store.append(block.entry(logicalParentUuid: store.leaf));
+    // The last request's count included what is folded now.
+    run.lastUsage = null;
     return block;
   }
 
@@ -292,6 +295,8 @@ class ContextCompression {
       'logicalParentUuid': store.leaf,
       'block_id': active.id,
     });
+    // The context is larger than the last request's count says.
+    run.lastUsage = null;
     return active;
   }
 
@@ -327,7 +332,22 @@ class ContextCompression {
   }
 
   /// The whole text of the result of [toolUseId], as the file keeps it.
+  /// A subagent finds one in its caller's context too, read-only.
   String? toolResultContent(String toolUseId) {
+    final seen = <SessionStore>{};
+    AgentRun? at = run;
+    var depth = 0;
+    while (at != null && depth <= 8) {
+      if (!seen.add(at.store)) break;
+      final content = _toolResultIn(at.store, toolUseId);
+      if (content != null) return content;
+      at = at.parentRun;
+      depth++;
+    }
+    return null;
+  }
+
+  static String? _toolResultIn(SessionStore store, String toolUseId) {
     for (final entry in store.chain) {
       if (entry['type'] != 'user') continue;
       for (final raw in asList(asMap(entry['message'])['content'])) {
@@ -356,13 +376,42 @@ class ContextCompression {
     return text.join('\n');
   }
 
-  /// Finds [query] in what the model's context still holds. A hit in a
-  /// folded range names the block; one in the open names the prompt
-  /// before it.
-  List<ContextHit> search(
+  /// Finds [query] in what the model's context still holds, and, for a
+  /// subagent, in its caller's, read-only. A hit in a folded range names
+  /// the block; one in the open names the prompt before it.
+  List<ContextHit> search(String query, {int limit = 20}) {
+    final hits = _searchSelf(query, limit: limit, source: 'self');
+    if (hits.length >= limit) return hits;
+    final seen = <SessionStore>{store};
+    AgentRun? parent = run.parentRun;
+    var depth = 1;
+    while (hits.length < limit && parent != null && depth <= 8) {
+      if (!seen.add(parent.store)) break;
+      final other = ContextCompression(session, parent, model: model);
+      for (final hit in other._searchSelf(
+        query,
+        limit: limit - hits.length,
+        source: 'parent',
+      )) {
+        hits.add(
+          ContextHit(
+            snippet: hit.snippet,
+            ref: hit.ref == null ? null : 'p$depth:${hit.ref}',
+            block: hit.block,
+            source: 'parent',
+          ),
+        );
+      }
+      parent = parent.parentRun;
+      depth++;
+    }
+    return hits;
+  }
+
+  List<ContextHit> _searchSelf(
     String query, {
-    int limit = 20,
-    String source = 'self',
+    required int limit,
+    required String source,
   }) {
     final needle = query.trim().toLowerCase();
     if (needle.length < 2) {

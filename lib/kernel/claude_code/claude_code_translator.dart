@@ -9,6 +9,16 @@ import 'claude_goal.dart';
 import 'claude_sdk_tools.dart';
 import 'turn_stats.dart';
 
+/// The agent's own context tools, called and answered: the chat shows what
+/// they did as a notice, not as a tool call.
+const _contextTools = {
+  'compress',
+  'decompress',
+  'search_context',
+  'acp_status',
+  'retrieve_tool_result',
+};
+
 /// Translates Claude Code's conversation messages (stream-json output, or
 /// the lines of a kept session) into [KernelEvent]s: text, thoughts, tool
 /// calls and their results, subagents, tasks, todos and runtime notices.
@@ -900,6 +910,8 @@ class ClaudeTranslator {
       known?.startedAt,
     );
     _tools[id] = tool;
+    // Its result is read for a notice; it is not a step of the work.
+    if (_contextTools.contains(name)) return;
     if (tool.parent == null && _isPlanCall(name, input)) {
       return _planCall(id, name, input);
     }
@@ -1223,6 +1235,35 @@ class ClaudeTranslator {
       tool.name == 'Bash' ||
       _planCalls.containsKey(tool.id);
 
+  /// A context tool's result, said in one line: the user learns the
+  /// context was folded or brought back, without a tool card for it.
+  void _contextResult(_Tool tool, bool error, Map<String, Object?>? result) {
+    if (error) return;
+    final messages = _int(result?['messages']);
+    switch (tool.name) {
+      case 'compress':
+        final saved = _int(result?['saved']) ?? 0;
+        final count = messages == null
+            ? 'Earlier messages'
+            : '$messages messages';
+        _put(
+          tool.id,
+          NoticeItem(
+            NoticeKind.info,
+            'Context compressed: $count folded, ~${_tokens(saved)} tokens saved.',
+          ),
+          parent: tool.parent,
+        );
+      case 'decompress':
+        final count = messages == null ? 'The messages' : '$messages messages';
+        _put(
+          tool.id,
+          NoticeItem(NoticeKind.info, 'Context restored: $count are back.'),
+          parent: tool.parent,
+        );
+    }
+  }
+
   void _toolResultOf(
     String id,
     _Tool tool,
@@ -1232,6 +1273,10 @@ class ClaudeTranslator {
     final error = block['is_error'] == true;
     final text = _resultText(block['content']);
     final structured = result is Map ? result.cast<String, Object?>() : null;
+    if (_contextTools.contains(tool.name)) {
+      _contextResult(tool, error, structured);
+      return;
+    }
     final outcome =
         _denied.contains(id) ||
             (tool.name == 'AskUserQuestion' && text.contains(unattendedAnswer))

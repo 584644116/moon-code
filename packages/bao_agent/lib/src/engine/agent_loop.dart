@@ -15,6 +15,7 @@ import '../util/ids.dart';
 import '../util/json.dart';
 import 'agent_run.dart';
 import 'compaction.dart';
+import 'compression_blocks.dart';
 import 'session.dart';
 import 'session_store.dart';
 import 'transcript.dart';
@@ -286,6 +287,7 @@ class AgentLoop {
       };
     }
     if (cache) _markCache(conversation);
+    if (messages == null) _nudgeIfGrown(conversation);
     final maxTokens = _maxTokens(info);
     final body = <String, Object?>{
       'model': model,
@@ -478,6 +480,38 @@ class AgentLoop {
         final List<Object?> blocks => [for (final b in blocks) asMap(b)],
         _ => const [],
       };
+
+  /// Tells the model, once its context has grown by a good deal, that it
+  /// can fold what it no longer needs. It is added to this request only:
+  /// the conversation keeps no line of it.
+  void _nudgeIfGrown(List<Map<String, Object?>> conversation) {
+    final settings = session.settings;
+    if (!settings.contextManagementEnabled ||
+        !settings.contextCompressEnabled ||
+        settings.contextNudgeTokens <= 0 ||
+        conversation.isEmpty) {
+      return;
+    }
+    final tokens = estimateTokens(conversation);
+    // A fold made the context smaller: measure the next growth from there.
+    if (tokens < run.lastNudgeTokens) run.lastNudgeTokens = tokens;
+    if (tokens - run.lastNudgeTokens < settings.contextNudgeTokens) return;
+    run.lastNudgeTokens = tokens;
+    conversation.add({
+      'role': 'user',
+      'content': [
+        {
+          'type': 'text',
+          'text':
+              '<system-reminder>\nThe conversation holds about $tokens '
+              'tokens. If earlier turns are no longer needed, fold a range '
+              'with compress (the m… refs mark the user messages); '
+              'search_context finds words in folded ranges, and acp_status '
+              'shows what is folded.\n</system-reminder>',
+        },
+      ],
+    });
+  }
 
   /// Marks where the cache ends: the last message, and the user's message
   /// before it (so the next turn reads what this one wrote).
@@ -840,6 +874,7 @@ class AgentLoop {
       'toolUseResult': ?output.result,
       if (!isMain) ...{'agentId': run.agentId, 'isSidechain': true},
     });
+    _offloadIfLarge(call, output);
     if (emitResult) {
       session.emit({
         'type': 'user',
@@ -864,6 +899,45 @@ class AgentLoop {
         if (followUp['isMeta'] == true) 'isMeta': true,
       });
     }
+  }
+
+  /// A result too large to keep in the context is sent as a placeholder
+  /// from now on; the file keeps it, and retrieve_tool_result reads it.
+  /// The event for this call has the whole of it: the user sees what the
+  /// tool returned.
+  void _offloadIfLarge(_Call call, ToolOutput output) {
+    final settings = session.settings;
+    if (!settings.contextManagementEnabled ||
+        settings.contextCcrMinTokens <= 0) {
+      return;
+    }
+    if (contextToolNames.contains(call.name)) return;
+    if (!_textOnly(output.content)) return;
+    final text = output.text;
+    final tokens = estimateTokens(text);
+    if (tokens < settings.contextCcrMinTokens) return;
+    final take = math.min(text.length, settings.contextCcrPreviewChars);
+    final preview = take <= 0 ? '' : text.substring(0, take);
+    store.append(
+      OffloadedResult(
+        toolUseId: call.id,
+        tokens: tokens,
+        preview: preview,
+      ).entry(logicalParentUuid: store.leaf),
+    );
+    // The last request's count included what is now a placeholder: the
+    // next one is smaller, and measuring from the old count would compact
+    // for room that was already made.
+    run.lastUsage = null;
+  }
+
+  /// Whether a result is words: an image or a document is sent as it is.
+  static bool _textOnly(Object? content) {
+    if (content is String) return true;
+    for (final raw in asList(content)) {
+      if (asMap(raw)['type'] != 'text') return false;
+    }
+    return true;
   }
 
   // --- Tool calls -------------------------------------------------------------------
@@ -927,6 +1001,7 @@ class AgentLoop {
       run: run,
       toolUseId: call.id,
       cancel: CancelToken(cancel),
+      model: model,
     );
     ToolOutput output;
     var stop = false;

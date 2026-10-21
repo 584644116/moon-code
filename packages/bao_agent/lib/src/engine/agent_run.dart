@@ -20,6 +20,7 @@ class AgentRun {
     this.modeOverride,
     ReadFileState? readFiles,
     SessionStore? store,
+    this.parentRun,
   }) : cwd = cwd ?? session.cwd,
        readFiles = readFiles ?? ReadFileState() {
     if (store != null) this.store = store;
@@ -32,6 +33,10 @@ class AgentRun {
 
   /// The call of the Agent tool that started it.
   final String? parentToolUseId;
+
+  /// The run that started it: a subagent may search its caller's context,
+  /// read-only, when what it needs was folded there.
+  final AgentRun? parentRun;
 
   /// The kind of subagent (`Explore`, `general-purpose`…).
   final String? agentType;
@@ -61,6 +66,9 @@ class AgentRun {
   /// The coordinate each visible user prompt had in the last request
   /// (`m12`), by which the model names a range to compress.
   Map<String, int> apiRefs = {};
+
+  /// The conversation's size when the model was last told it had grown.
+  int lastNudgeTokens = 0;
 
   /// Whether this run's model ever answered a request.
   bool requested = false;

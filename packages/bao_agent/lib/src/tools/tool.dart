@@ -58,6 +58,7 @@ class ToolContext {
     required this.run,
     required this.toolUseId,
     required this.cancel,
+    required this.model,
   });
 
   final AgentSession session;
@@ -65,9 +66,22 @@ class ToolContext {
   final String toolUseId;
   final CancelToken cancel;
 
+  /// The model this run is asking now (a subagent's may differ).
+  final String model;
+
   /// The folder relative paths are taken from.
   String get cwd => run.cwd;
 }
+
+/// The tools that manage the agent's own context: the model calls them,
+/// the agent runs them, and the chat does not show their calls or results.
+const contextToolNames = {
+  'compress',
+  'decompress',
+  'search_context',
+  'acp_status',
+  'retrieve_tool_result',
+};
 
 /// A tool the model may call.
 abstract class Tool {
@@ -78,6 +92,10 @@ abstract class Tool {
 
   /// Other names it answers to (an older one).
   List<String> get aliases => const [];
+
+  /// Whether it is the agent's own context machinery: offered to the
+  /// model, but not shown as a call in the chat.
+  bool get hidden => false;
 
   /// What the model is told of it.
   String get description;

@@ -1,6 +1,7 @@
 import '../config/extensions.dart';
 import '../tools/agent_tool.dart';
 import '../tools/bash_tool.dart';
+import '../tools/context_tools.dart';
 import '../tools/edit_tools.dart';
 import '../tools/mcp_tools.dart';
 import '../tools/read_tool.dart';
@@ -41,6 +42,11 @@ class Toolbox {
     const EnterPlanModeTool(),
     const ListMcpResourcesTool(),
     const ReadMcpResourceTool(),
+    const CompressTool(),
+    const DecompressTool(),
+    const SearchContextTool(),
+    const AcpStatusTool(),
+    const RetrieveToolResultTool(),
   ];
 
   /// The MCP servers' tools, as connected now.

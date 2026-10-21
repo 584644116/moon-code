@@ -492,13 +492,13 @@ D:\DM\_sdk\flutter\bin\dart analyze packages/bao_agent lib test
 | B2-1 | CompressionBlock 存储与重建 | 已完成 | 批次 2 | `session_compression_test.dart` 全通过 |
 | B2-2 | 请求视图、refs、前缀缓存 | 已完成 | 批次 2 | 同上（稳定 refs、重复视图一致、无块时逐项相等） |
 | B2-3 | ContextCompression 核心 | 已完成 | 批次 2 | `context_compression_test.dart` 6 条全通过 |
-| B3-1 | 隐藏工具与 toolbox | 未开始 | — | — |
-| B3-2 | `compress` | 未开始 | — | — |
-| B3-3 | `decompress` / `search_context` / `acp_status` | 未开始 | — | — |
-| B3-4 | 增长提醒 | 未开始 | — | — |
-| B3-5 | CCR 与 `retrieve_tool_result` | 未开始 | — | — |
-| B3-6 | 子会话父链只读回退 | 未开始 | — | — |
-| B3-7 | UI 隐藏与压缩提示 | 未开始 | — | — |
+| B3-1 | 隐藏工具与 toolbox | 已完成 | 批次 3 | `context_tools_test.dart`「offered only when context management is on」 |
+| B3-2 | `compress` | 已完成 | 批次 3 | `context_tools_test.dart`「compress folds a range…」 |
+| B3-3 | `decompress` / `search_context` / `acp_status` | 已完成 | 批次 3 | `context_tools_test.dart` 同两条与「search_context finds folded words…」 |
+| B3-4 | 增长提醒 | 已完成 | 批次 3 | `context_tools_test.dart`「a grown context is nudged once…」 |
+| B3-5 | CCR 与 `retrieve_tool_result` | 已完成 | 批次 3 | `context_tools_test.dart`「a large result is offloaded…」 |
+| B3-6 | 子会话父链只读回退 | 已完成 | 批次 3 | `context_tools_test.dart`「a subagent searches its caller's context…」 |
+| B3-7 | UI 隐藏与压缩提示 | 已完成 | 批次 3 | `test/kernel_test.dart --plain-name "context tools are hidden"` 通过 |
 | B4-1 | 自动压缩阈值 | 未开始 | — | — |
 | B4-2 | 保留最近助手轮次 | 未开始 | — | — |
 | B4-3 | microcompaction 轮次与保护 | 未开始 | — | — |

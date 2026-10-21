@@ -603,7 +603,14 @@ void main() {
           .join('\n');
       final big2 = [for (var i = 0; i < 300; i++) 'BIG2-$i ${'y' * 90}']
           .join('\n');
-      h = await Harness.start(files: {'big1.txt': big1, 'big2.txt': big2});
+      // This is about microcompaction, not about offloading a large
+      // result: keep the results in the context for it to clear.
+      h = await Harness.start(
+        files: {'big1.txt': big1, 'big2.txt': big2},
+        settings: {
+          'contextManagement': {'ccrMinTokens': 0},
+        },
+      );
       final cwd = h.cwd;
       var calls = 0;
       Map<String, Object?> usage(int input) => {
