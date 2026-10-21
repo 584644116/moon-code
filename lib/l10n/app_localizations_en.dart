@@ -2636,6 +2636,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatLoadingHistory => 'Loading conversation…';
 
   @override
+  String get chatExportSession => 'Export session…';
+
+  @override
   String get activityCompacting => 'Compacting conversation';
 
   @override

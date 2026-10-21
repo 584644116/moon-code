@@ -28,6 +28,7 @@ import 'chat/composer/file_drop.dart';
 import 'chat/composer/file_mentions.dart';
 import 'chat/open_editor.dart';
 import 'chat/panels/interaction_panel.dart';
+import 'chat/session_export_action.dart';
 import 'chat/side_panel/file_open.dart';
 import 'chat/side_panel/side_panel_controller.dart';
 import 'chat/side_panel/side_panel_view.dart';
@@ -3918,6 +3919,17 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
     alone: true,
   );
 
+  /// Packs [thread]'s session — its transcript, its subagents' and the
+  /// files kept beside it — as a ZIP, asking where to save it.
+  Future<void> _exportSession(AgentThread thread) async {
+    final id = thread.id;
+    if (id == null) return;
+    await exportSessionWithPanel(
+      sessionId: id,
+      title: thread.localizedTitle(context.l10n),
+    );
+  }
+
   /// The chat of [pane] (by default the current agent), at [place] among
   /// the others.
   ///
@@ -3984,6 +3996,17 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
         if (windowTools) const SizedBox(width: 8),
       ],
       if (windowTools) ...[
+        if (WindowControls.canPickFiles &&
+            thread.project.host == null &&
+            thread.id != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: SidebarIconButton(
+              icon: Codicons.chatExport,
+              tooltip: context.l10n.chatExportSession,
+              onTap: () => unawaited(_exportSession(thread)),
+            ),
+          ),
         if (terminals != null && terminals.root != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2),

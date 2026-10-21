@@ -23,6 +23,7 @@ import 'chat_keys.dart';
 import 'chat_models.dart';
 import 'chat_session.dart';
 import 'open_editor.dart';
+import 'session_export_action.dart';
 import 'chat_width.dart';
 import 'composer/composer.dart';
 import 'composer/composer_embeds.dart';
@@ -307,6 +308,7 @@ class _ChatScreenState extends State<ChatScreen>
   @override
   void initState() {
     super.initState();
+    _session.onExport = _exportSession;
     _session.attach();
     _session.addListener(_checkStarting);
     _planShown = _session.plan?.seq;
@@ -341,8 +343,15 @@ class _ChatScreenState extends State<ChatScreen>
       layer.dispose();
     }
     _session.detach();
+    if (_session.onExport == _exportSession) _session.onExport = null;
     if (widget.session == null) _session.dispose();
     super.dispose();
+  }
+
+  Future<void> _exportSession() async {
+    final id = _session.sessionId;
+    if (id == null) return;
+    await exportSessionWithPanel(sessionId: id, title: widget.title);
   }
 
   void _toggleContextPanel() {

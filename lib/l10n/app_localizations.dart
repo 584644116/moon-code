@@ -4610,6 +4610,12 @@ abstract class AppLocalizations {
   /// **'Loading conversation…'**
   String get chatLoadingHistory;
 
+  /// Tooltip of the button that saves the conversation, its subagents and files as a ZIP.
+  ///
+  /// In en, this message translates to:
+  /// **'Export session…'**
+  String get chatExportSession;
+
   /// No description provided for @activityCompacting.
   ///
   /// In en, this message translates to:

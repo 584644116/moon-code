@@ -955,6 +955,10 @@ class ChatSession extends ChangeNotifier implements ChatFeed {
     return [editor?.note ?? OpenEditor.closedNote];
   }
 
+  /// What `/export`, sent on its own, runs: the screen's way of asking
+  /// where to save the session. Unset, `/export` is sent as anything else.
+  Future<void> Function()? onExport;
+
   /// Sends [message]; [now], taken up at once, the turn running stopped
   /// for it (rather than queued behind it). With a plan awaiting (see
   /// [awaitingPlan]), it says what should change in it.
@@ -966,7 +970,16 @@ class ChatSession extends ChangeNotifier implements ChatFeed {
     bool now = false,
     OpenEditor? Function()? editor,
   }) {
-    if (message.isEmpty || !canSend) return;
+    if (message.isEmpty) return;
+    // Export works while the agent is busy, so before [canSend].
+    if (onExport case final export?
+        when message.text.trim() == '/export' &&
+            message.mentions.isEmpty &&
+            message.images.isEmpty) {
+      unawaited(export());
+      return;
+    }
+    if (!canSend) return;
     final turn = KernelTurn(
       id: newTurnId(),
       // Pastes too long to send, kept in files the agent reads; a remote
