@@ -16,6 +16,11 @@ export 'src/engine/engine.dart'
     show AgentEngine, BuiltInCommand, builtInCommands, engineVersion;
 export 'src/engine/isolate.dart' show AgentIsolate;
 export 'src/engine/session.dart' show EngineOptions, MissingCredentials;
+export 'src/engine/session_reference.dart'
+    show
+        readSessionReference,
+        sessionReferenceChars,
+        sessionReferenceSources;
 export 'src/engine/session_store.dart' show agentVersion;
 export 'src/hooks/hooks.dart' show extractJson;
 export 'src/permissions/approval_risk.dart'
