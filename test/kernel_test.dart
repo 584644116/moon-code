@@ -512,6 +512,61 @@ void main() {
       expect(toolVerb(ToolKind.message), 'Said');
     });
 
+    test('present hands the files over as a card', () {
+      final transcript = Transcript();
+      var seq = 0;
+      final translator = ClaudeTranslator(
+        emit: transcript.apply,
+        nextSeq: () => ++seq,
+      )..turnId = '11111111-1111-4111-8111-111111111111';
+      translator
+        ..translate({
+          'type': 'assistant',
+          'parent_tool_use_id': null,
+          'message': {
+            'id': 'msg-present',
+            'role': 'assistant',
+            'content': [
+              {
+                'type': 'tool_use',
+                'id': 'p1',
+                'name': 'Present',
+                'input': {
+                  'summary': 'Release notes',
+                  'files': [
+                    {'path': 'notes.md', 'note': 'The summary'},
+                    {'path': 'page.html'},
+                  ],
+                },
+              },
+            ],
+          },
+        })
+        ..translate({
+          'type': 'user',
+          'parent_tool_use_id': null,
+          'message': {
+            'role': 'user',
+            'content': [
+              {
+                'type': 'tool_result',
+                'tool_use_id': 'p1',
+                'content': 'Presented 2 files to the user.',
+              },
+            ],
+          },
+        });
+      final items = [
+        for (var i = 0; i < transcript.length; i++) transcript.itemAt(i),
+      ].whereType<ToolCallItem>();
+      final item = items.single;
+      expect(item.kind, ToolKind.deliver);
+      expect(item.target, 'Release notes');
+      expect(item.results, ['notes.md', 'page.html']);
+      expect(item.status, ToolStatus.succeeded);
+      expect(toolVerb(ToolKind.deliver), 'Presented');
+    });
+
     test('a notebook edit shows its cell changed, line by line', () {
       final transcript = Transcript();
       var seq = 0;

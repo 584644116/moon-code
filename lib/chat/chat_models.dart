@@ -184,6 +184,9 @@ enum ToolKind {
 
   /// Pictures an image model made (see lib/images): shown as they come.
   image,
+
+  /// Files handed to the user (the Present tool): what the work produced.
+  deliver,
   other,
 }
 
@@ -687,6 +690,7 @@ class FileChange {
     this.binary = false,
     this.tracked = true,
     this.conflict = false,
+    this.turnId,
   });
 
   final String path;
@@ -704,6 +708,9 @@ class FileChange {
   /// It changed again since the agent left it, and Undo could not carry
   /// that over.
   final bool conflict;
+
+  /// The turn that changed it last, where known: what "this turn" groups.
+  final String? turnId;
 
   String get fileName => path.split('/').last;
   String get directory {

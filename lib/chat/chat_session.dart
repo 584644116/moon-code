@@ -791,17 +791,38 @@ class ChatSession extends ChangeNotifier implements ChatFeed {
     if (_activeReview case final review?) return review.changes;
     return _cached(#fileChanges, () {
       final byPath = <String, FileChange>{};
-      for (final (seq: _, :change, turnId: _) in _pendingEdits) {
+      for (final (seq: _, :change, :turnId) in _pendingEdits) {
         final path = _absolute(change.path);
         final before = byPath[path];
         byPath[path] = FileChange(
           path: path,
           added: (before?.added ?? 0) + change.added,
           removed: (before?.removed ?? 0) + change.removed,
+          turnId: turnId,
         );
       }
       return byPath.values.toList();
     });
+  }
+
+  /// The pending files the last turn changed: "this turn", apart from what
+  /// earlier turns left.
+  List<FileChange> get turnChanges {
+    final turn = _transcript.activeTurn ?? _transcript.lastTurnId;
+    if (turn == null) return const [];
+    final byPath = <String, FileChange>{};
+    for (final (seq: _, :change, :turnId) in _pendingEdits) {
+      if (turnId != turn) continue;
+      final path = _absolute(change.path);
+      final before = byPath[path];
+      byPath[path] = FileChange(
+        path: path,
+        added: (before?.added ?? 0) + change.added,
+        removed: (before?.removed ?? 0) + change.removed,
+        turnId: turn,
+      );
+    }
+    return byPath.values.toList();
   }
 
   /// The files the agent read or changed (or was given: a picture a tool

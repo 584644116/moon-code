@@ -4,6 +4,7 @@ import '../tools/bash_tool.dart';
 import '../tools/context_tools.dart';
 import '../tools/edit_tools.dart';
 import '../tools/mcp_tools.dart';
+import '../tools/present_tool.dart';
 import '../tools/read_tool.dart';
 import '../tools/search_tools.dart';
 import '../tools/session_tools.dart';
@@ -34,6 +35,7 @@ class Toolbox {
     NotebookEditTool(),
     _webFetch,
     const TodoWriteTool(),
+    const PresentTool(),
     const WebSearchTool(),
     const TaskOutputTool(),
     const TaskStopTool(),
@@ -89,6 +91,7 @@ class Toolbox {
     'AskUserQuestion',
     'EnterPlanMode',
     'ExitPlanMode',
+    'Present',
     'TaskStop',
   };
 

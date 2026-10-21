@@ -266,6 +266,8 @@ bool isQuickStep(ChatItem item) => switch (item) {
 bool standsOutOfWork(ChatItem item) => switch (item) {
   ToolCallItem(kind: ToolKind.image, :final status, :final images) =>
     status == ToolStatus.succeeded && images.isNotEmpty,
+  ToolCallItem(kind: ToolKind.deliver, :final status) =>
+    status == ToolStatus.succeeded,
   _ => false,
 };
 

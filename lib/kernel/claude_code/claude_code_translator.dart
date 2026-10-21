@@ -1140,6 +1140,20 @@ class ClaudeTranslator {
         target: _string(input['query']) ?? '',
         status: status,
       ),
+      'Present' || 'present' => ToolCallItem(
+        kind: ToolKind.deliver,
+        target: switch (_string(input['summary'])?.trim()) {
+          final summary? when summary.isNotEmpty => summary,
+          _ => '${_list(input['files']).length} files',
+        },
+        results: [
+          for (final file in _list(input['files']))
+            if (_string(_map(file)['path']) case final path?)
+              if (path.trim().isNotEmpty) path.trim(),
+        ],
+        status: status,
+        output: outcome == _Outcome.done ? null : output,
+      ),
       'TodoWrite' ||
       'TaskCreate' ||
       'TaskUpdate' ||

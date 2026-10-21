@@ -2350,6 +2350,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolProposedGoal => 'Proposed a goal';
 
   @override
+  String get toolPresenting => 'Presenting';
+
+  @override
+  String get toolPresented => 'Presented';
+
+  @override
   String get goalAdopt => 'Set as goal';
 
   @override
@@ -2780,6 +2786,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String stripRunningElapsed(int seconds) {
     return 'Running · ${seconds}s';
+  }
+
+  @override
+  String stripThisTurn(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files this turn',
+      one: '1 file this turn',
+    );
+    return '$_temp0';
   }
 
   @override

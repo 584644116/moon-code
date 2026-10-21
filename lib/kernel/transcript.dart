@@ -48,6 +48,10 @@ class Transcript {
 
   String? activeTurn;
 
+  /// The turn begun last, under way or ended: what "this turn" means after
+  /// it ends.
+  String? lastTurnId;
+
   /// When the turn under way began, as it was told.
   DateTime? turnStartedAt;
 
@@ -127,6 +131,7 @@ class Transcript {
       case TurnStarted(:final turnId, :final unprompted):
         if (_endedTurns.contains(turnId)) return false;
         activeTurn = turnId;
+        lastTurnId = turnId;
         turnStartedAt = DateTime.now();
         _activeUnprompted = unprompted;
         output = null;

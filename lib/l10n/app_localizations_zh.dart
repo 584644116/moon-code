@@ -2276,6 +2276,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolProposedGoal => '提议目标';
 
   @override
+  String get toolPresenting => '正在交付';
+
+  @override
+  String get toolPresented => '交付';
+
+  @override
   String get goalAdopt => '设为目标';
 
   @override
@@ -2687,6 +2693,11 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String stripRunningElapsed(int seconds) {
     return '运行中 · $seconds秒';
+  }
+
+  @override
+  String stripThisTurn(num count) {
+    return '本轮 $count 个文件';
   }
 
   @override

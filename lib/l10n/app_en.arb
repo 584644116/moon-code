@@ -1312,6 +1312,8 @@
   "imageDefaultSet": "Set as default image model",
   "toolProposingGoal": "Proposing a goal",
   "toolProposedGoal": "Proposed a goal",
+  "toolPresenting": "Presenting",
+  "toolPresented": "Presented",
   "goalAdopt": "Set as goal",
   "@goalAdopt": {
     "description": "Button on a goal the agent proposed: sets it as the session's goal."
@@ -1733,6 +1735,10 @@
         "type": "int"
       }
     }
+  },
+  "stripThisTurn": "{count, plural, =1{1 file this turn} other{{count} files this turn}}",
+  "@stripThisTurn": {
+    "description": "Groups the files the last turn changed, above those earlier turns left."
   },
   "stripFilesChanged": "{count, plural, =1{1 file changed} other{{count} files changed}}",
   "@stripFilesChanged": {

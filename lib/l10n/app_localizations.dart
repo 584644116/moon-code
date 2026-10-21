@@ -4244,6 +4244,18 @@ abstract class AppLocalizations {
   /// **'Proposed a goal'**
   String get toolProposedGoal;
 
+  /// No description provided for @toolPresenting.
+  ///
+  /// In en, this message translates to:
+  /// **'Presenting'**
+  String get toolPresenting;
+
+  /// No description provided for @toolPresented.
+  ///
+  /// In en, this message translates to:
+  /// **'Presented'**
+  String get toolPresented;
+
   /// Button on a goal the agent proposed: sets it as the session's goal.
   ///
   /// In en, this message translates to:
@@ -4837,6 +4849,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Running · {seconds}s'**
   String stripRunningElapsed(int seconds);
+
+  /// Groups the files the last turn changed, above those earlier turns left.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file this turn} other{{count} files this turn}}'**
+  String stripThisTurn(num count);
 
   /// No description provided for @stripFilesChanged.
   ///

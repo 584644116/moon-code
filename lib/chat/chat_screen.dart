@@ -543,6 +543,7 @@ class _ChatScreenState extends State<ChatScreen>
     return ActivityStrip(
       tasks: tasks,
       changes: changes,
+      turnChanges: _session.turnChanges,
       root: _session.root ?? '.',
       paths: _session.paths,
       onKeep: _session.keepAllChanges,

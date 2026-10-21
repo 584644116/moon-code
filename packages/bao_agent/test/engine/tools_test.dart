@@ -174,6 +174,30 @@ void main() {
       expect(result['oldTodos'], isEmpty);
       expect(result['newTodos'], todos);
     });
+
+    test('Present hands over eight files at most, once each', () async {
+      h = await Harness.start();
+      h.model.script.addAll([
+        Reply.tool('Present', {
+          'summary': 'Release notes',
+          'files': [
+            for (var i = 0; i < 8; i++)
+              {
+                'path': i == 7 ? 'f0.txt' : 'f$i.txt',
+                'note': i == 0 ? 'The summary' : '',
+              },
+          ],
+        }),
+        Reply.text('ok'),
+      ]);
+      await h.turn('present');
+      final result = h.toolResults.single['tool_use_result'] as Map;
+      final files = result['files'] as List;
+      expect(files, hasLength(7));
+      expect((files.first as Map)['path'], 'f0.txt');
+      expect((files.first as Map)['note'], 'The summary');
+      expect((files.last as Map)['path'], 'f6.txt');
+    });
   });
 
   group('web', () {

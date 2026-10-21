@@ -107,6 +107,11 @@ class ToolCallRow extends StatelessWidget {
           colorFilter: ColorFilter.mode(_amber, BlendMode.srcIn),
         ),
         ToolKind.goal => Icon(Icons.flag_outlined, size: 15, color: _amber),
+        ToolKind.deliver => Icon(
+          Icons.inventory_2_outlined,
+          size: 15,
+          color: _amber,
+        ),
         _ => null,
       },
       trailingGap: 0,
@@ -251,6 +256,7 @@ String toolVerb(
           ? s.toolQuestionSkipped
           : s.toolAsked,
     ToolKind.goal => running ? s.toolProposingGoal : s.toolProposedGoal,
+    ToolKind.deliver => running ? s.toolPresenting : s.toolPresented,
     ToolKind.image =>
       running
           ? s.toolGeneratingImage

@@ -24,6 +24,7 @@ class ActivityStrip extends StatefulWidget {
     super.key,
     required this.tasks,
     required this.changes,
+    this.turnChanges = const [],
     required this.onKeep,
     this.root = '.',
     this.paths,
@@ -39,6 +40,10 @@ class ActivityStrip extends StatefulWidget {
 
   final List<KernelTask> tasks;
   final List<FileChange> changes;
+
+  /// Those of [changes] the last turn made: shown apart when earlier turns
+  /// left some too.
+  final List<FileChange> turnChanges;
 
   /// The project's directory, which [changes]' paths are in.
   final String root;
@@ -85,6 +90,7 @@ class _ActivityStripState extends State<ActivityStrip> {
   static const _maxUnfoldedTasks = 3;
 
   bool _filesExpanded = false;
+  bool _turnExpanded = false;
   bool _tasksExpanded = false;
   Timer? _ticker;
 
@@ -175,6 +181,26 @@ class _ActivityStripState extends State<ActivityStrip> {
                 ],
               ),
             ),
+          if (widget.turnChanges.isNotEmpty &&
+              widget.turnChanges.length < changes.length) ...[
+            _TurnHeader(
+              changes: widget.turnChanges,
+              expanded: _turnExpanded,
+              onToggle: () => setState(() => _turnExpanded = !_turnExpanded),
+            ),
+            if (_turnExpanded)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: ChangeTree(
+                  root: widget.root,
+                  paths: widget.paths,
+                  changes: widget.turnChanges,
+                  onOpen: widget.onOpenFile,
+                  onKeep: widget.onKeepFiles,
+                  onUndo: widget.onUndoFiles,
+                ),
+              ),
+          ],
           if (changes.isNotEmpty) ...[
             _FilesHeader(
               changes: changes,
@@ -415,6 +441,69 @@ class _TasksHeader extends StatelessWidget {
             softWrap: false,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(color: AppColors.text, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// What the turn just run changed, folded over the whole not kept yet.
+class _TurnHeader extends StatelessWidget {
+  const _TurnHeader({
+    required this.changes,
+    required this.expanded,
+    required this.onToggle,
+  });
+
+  final List<FileChange> changes;
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final added = changes.fold(0, (sum, change) => sum + change.added);
+    final removed = changes.fold(0, (sum, change) => sum + change.removed);
+    return _StripRow(
+      onTap: onToggle,
+      children: [
+        AnimatedRotation(
+          turns: expanded ? 0.25 : 0,
+          duration: const Duration(milliseconds: 150),
+          child: Icon(
+            Icons.chevron_right_rounded,
+            size: 16,
+            color: AppColors.textMuted,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            context.l10n.stripThisTurn(changes.length),
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: AppColors.text, fontSize: 12),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '+$added',
+          style: TextStyle(
+            color: themeColors['chat.linesAddedForeground'],
+            fontFamily: AppFonts.mono,
+            fontFamilyFallback: AppFonts.monoFallbacks,
+            fontSize: 11.5,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          '-$removed',
+          style: TextStyle(
+            color: themeColors['chat.linesRemovedForeground'],
+            fontFamily: AppFonts.mono,
+            fontFamilyFallback: AppFonts.monoFallbacks,
+            fontSize: 11.5,
           ),
         ),
       ],
