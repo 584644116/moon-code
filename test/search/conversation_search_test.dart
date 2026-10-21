@@ -51,6 +51,7 @@ void main() {
       user('caveat only in a note', meta: true),
     ]);
     session('s2', [user('Unrelated question about CSS grids')]);
+    session('s3', [user('用中文说：登录页面')]);
 
     final search = ClaudeConversationSearch(configDir: temp.path);
     final hits = await search.search('ROTATION');
@@ -66,6 +67,9 @@ void main() {
     expect(await search.search('caveat'), isEmpty);
     expect(await search.search('/clear'), isEmpty);
     expect((await search.search('css')).single.sessionId, 's2');
+    expect((await search.search('登录')).single.sessionId, 's3');
+    // Part of a word: the index cannot narrow it, so it is scanned.
+    expect((await search.search('rids')).single.sessionId, 's2');
 
     // A file written since is read again; one removed, forgotten.
     session('s2', [user('Now about flexbox')]);

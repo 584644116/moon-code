@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 
 import '../kernel/claude_code/claude_environment.dart';
 import 'conversation_search.dart';
+import 'session_index.dart';
 
 /// Searches the sessions Claude Code keeps (`<config>/projects/*/*.jsonl`):
 /// what the user and Claude said in each, read once and kept in memory
@@ -17,6 +18,11 @@ class ClaudeConversationSearch implements ConversationSearch {
   final String? configDir;
 
   final Map<String, _Kept> _kept = {};
+
+  /// Which kept conversations hold which words, to start a search from
+  /// fewer of them; a query it cannot narrow is scanned as before.
+  final SessionIndex _index = SessionIndex();
+
   Future<void>? _preparing;
 
   @override
@@ -33,7 +39,11 @@ class ClaudeConversationSearch implements ConversationSearch {
         key: (size: value.size, modified: value.modified),
     };
     final read = await Isolate.run(() => _readChanged(root, known));
-    _kept.removeWhere((path, _) => !read.present.contains(path));
+    for (final path in _kept.keys.toList()) {
+      if (read.present.contains(path)) continue;
+      _kept.remove(path);
+      _index.remove(_idOf(path));
+    }
     for (final session in read.changed) {
       _kept[session.path] = _Kept(
         session.size,
@@ -41,7 +51,14 @@ class ClaudeConversationSearch implements ConversationSearch {
         session.text,
         session.text.toLowerCase(),
       );
+      _index.set(_idOf(session.path), session.text);
     }
+  }
+
+  /// The id a session's file is named by.
+  static String _idOf(String path) {
+    final name = p.basename(path);
+    return name.substring(0, name.length - '.jsonl'.length);
   }
 
   @override
@@ -51,10 +68,11 @@ class ClaudeConversationSearch implements ConversationSearch {
     if (needle.isEmpty) return const [];
     final sessions = _kept.entries.toList()
       ..sort((a, b) => b.value.modified.compareTo(a.value.modified));
+    final candidates = _index.candidates(needle);
     final hits = <ConversationHit>[];
     for (final MapEntry(key: path, value: kept) in sessions) {
-      final name = p.basename(path);
-      final id = name.substring(0, name.length - '.jsonl'.length);
+      final id = _idOf(path);
+      if (candidates != null && !candidates.contains(id)) continue;
       final hit = findIn(id, kept.text, needle, lower: kept.lower);
       if (hit == null) continue;
       hits.add(hit);
