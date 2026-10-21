@@ -87,6 +87,22 @@ class CompressionBlock {
 /// A large tool result kept out of the model's context, its content still
 /// in the session's file: the model sees a placeholder and can ask for the
 /// whole of it or a part.
+/// A tool result too long to send whole: its start, its end, and how much
+/// was left out. The file keeps the whole of it.
+String pruneToolResult(
+  String text, {
+  int threshold = 8192,
+  int head = 4096,
+  int tail = 1024,
+}) {
+  final runes = text.runes.toList();
+  if (runes.length <= threshold) return text;
+  final omitted = runes.length - head - tail;
+  return '${String.fromCharCodes(runes.take(head))}\n\n'
+      '... [$omitted characters omitted] ...\n\n'
+      '${String.fromCharCodes(runes.skip(runes.length - tail))}';
+}
+
 class OffloadedResult {
   const OffloadedResult({
     required this.toolUseId,

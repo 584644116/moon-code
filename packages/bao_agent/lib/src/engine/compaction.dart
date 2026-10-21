@@ -7,6 +7,7 @@ import '../prompts/task_prompts.dart';
 import '../util/cancel.dart';
 import '../util/json.dart';
 import 'agent_run.dart';
+import 'compression_blocks.dart';
 import 'session.dart';
 import 'session_store.dart';
 import 'transcript.dart';
@@ -175,14 +176,14 @@ class Compaction {
     return false;
   }
 
-  /// Clears the content of old tool results from what is sent to the API,
-  /// as the CLI's microcompaction does: the calls, their results and the
-  /// file stay as they were, and the model can read a file again for what
-  /// it needs. Returns whether anything was cleared.
+  /// Cuts the middle out of old, long tool results, then clears what old
+  /// calls returned, as the CLI's microcompaction does: the calls, their
+  /// results and the file stay as they were, and the model can read a file
+  /// again for what it needs. Returns whether anything was changed.
   ///
-  /// A boundary is written so that a resumed conversation clears the same
-  /// results again, and the usage is taken by estimate from here on: the
-  /// last request's count included what is no longer sent.
+  /// A boundary is written so that a resumed conversation applies the same
+  /// cuts and clears again, and the usage is taken by estimate from here on:
+  /// the last request's count included what is no longer sent.
   bool microcompact() {
     final store = run.store;
     final messages = store.apiMessages();
@@ -198,9 +199,43 @@ class Compaction {
         }
       }
     }
-    final ids = <String>[];
-    var saved = 0;
     final clearGroups = groups.length - _microKeepGroups;
+    final pruned = <String>[];
+    var saved = 0;
+    // First, cut the middle out of what is too long to send whole. It
+    // keeps the start and the end, where a failure is usually read.
+    for (var group = 0; group < clearGroups; group++) {
+      for (final message in groups[group]) {
+        for (final block in asList(message['content'])) {
+          final result = asMap(block);
+          if (result['type'] != 'tool_result') continue;
+          final id = result['tool_use_id'];
+          if (id is! String) continue;
+          if (store.prunedToolResults.contains(id) ||
+              store.clearedToolResults.contains(id) ||
+              store.offloadedToolResults.containsKey(id)) {
+            continue;
+          }
+          if (result['is_error'] == true) continue;
+          if (_hasMedia(result['content'])) continue;
+          if (!_clearableTools.contains(names[id])) continue;
+          final content = result['content'];
+          if (content is! String) continue;
+          final short = pruneToolResult(content);
+          if (identical(short, content)) continue;
+          final save = estimateTokens(content) - estimateTokens(short);
+          if (save <= 0) continue;
+          pruned.add(id);
+          saved += save;
+        }
+      }
+    }
+    // Enough room made without losing a whole result: stop here.
+    if (pruned.isNotEmpty && saved >= _microMinSaved) {
+      _commitMicrocompaction(store, pruned, const [], saved);
+      return true;
+    }
+    final ids = <String>[];
     for (var group = 0; group < clearGroups; group++) {
       for (final message in groups[group]) {
         for (final block in asList(message['content'])) {
@@ -224,8 +259,20 @@ class Compaction {
       }
     }
     if (ids.isEmpty || saved < _microMinSaved) return false;
+    // Cutting was not enough on its own: clear the old results as before.
+    _commitMicrocompaction(store, const [], ids, saved);
+    return true;
+  }
+
+  void _commitMicrocompaction(
+    SessionStore store,
+    List<String> pruned,
+    List<String> cleared,
+    int saved,
+  ) {
     final before = usedTokens();
-    store.clearedToolResults.addAll(ids);
+    store.prunedToolResults.addAll(pruned);
+    store.clearedToolResults.addAll(cleared);
     run.lastUsage = null;
     store.append({
       'type': 'system',
@@ -239,10 +286,10 @@ class Compaction {
         'trigger': 'auto',
         'preTokens': before,
         'tokensSaved': saved,
-        'compactedToolIds': ids,
+        if (pruned.isNotEmpty) 'prunedToolIds': pruned,
+        'compactedToolIds': cleared,
       },
     });
-    return true;
   }
 
   /// Compacts if the conversation has filled the context.

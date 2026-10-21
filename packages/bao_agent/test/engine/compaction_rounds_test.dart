@@ -186,17 +186,52 @@ void main() {
 
       final done = Compaction(h.engine.session, run).microcompact();
       expect(done, isTrue);
-      // Only the first group went: the failure, the image and the offloaded
-      // result stay, and the last five groups were never candidates.
-      expect(store.clearedToolResults, {'t0'});
+      // The first group's long result was cut to its ends; the failure,
+      // the image and the offloaded result stay, and the last five groups
+      // were never candidates.
+      expect(store.prunedToolResults, {'t0'});
+      expect(store.clearedToolResults, isEmpty);
+      final sent = jsonEncode(store.apiMessages());
+      expect(sent, contains('characters omitted'));
+      expect(sent, isNot(contains('x' * 60000)));
       final boundary = store.chain.lastWhere(
         (entry) => entry['subtype'] == 'microcompact_boundary',
       );
       final metadata = (boundary['microcompactMetadata'] as Map)
           .cast<String, Object?>();
-      expect(metadata['compactedToolIds'], ['t0']);
+      expect(metadata['prunedToolIds'], ['t0']);
+      expect(metadata['compactedToolIds'], isEmpty);
     },
   );
+
+  test('microcompaction still clears a group too short to cut', () async {
+    final h = await Harness.start(settings: {'autoCompactWindow': 20000});
+    addTearDown(h.dispose);
+    h.engine.session.store = SessionStore(sessionId: 's1', cwd: h.cwd);
+    final run = h.engine.session.mainRun;
+    final store = run.store;
+    _user(store, 'go');
+    for (var i = 0; i < 9; i++) {
+      _assistant(store, {
+        'type': 'tool_use',
+        'id': 't$i',
+        'name': 'Grep',
+        'input': {'pattern': 'needle'},
+      });
+      _result(store, 't$i', 'x' * 5000);
+    }
+    final done = Compaction(h.engine.session, run).microcompact();
+    expect(done, isTrue);
+    expect(store.prunedToolResults, isEmpty);
+    expect(store.clearedToolResults, {'t0', 't1', 't2', 't3'});
+    final boundary = store.chain.lastWhere(
+      (entry) => entry['subtype'] == 'microcompact_boundary',
+    );
+    final metadata = (boundary['microcompactMetadata'] as Map)
+        .cast<String, Object?>();
+    expect(metadata['compactedToolIds'], ['t0', 't1', 't2', 't3']);
+    expect(metadata['prunedToolIds'], isNull);
+  });
 }
 
 void _user(SessionStore store, String text) => store.append({

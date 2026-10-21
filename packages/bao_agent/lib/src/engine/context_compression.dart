@@ -212,6 +212,7 @@ class ContextCompression {
     return toApiMessages(
       slice,
       cleared: store.clearedToolResults,
+      pruned: store.prunedToolResults,
       blocks: inside,
       offloaded: store.offloadedToolResults,
     );

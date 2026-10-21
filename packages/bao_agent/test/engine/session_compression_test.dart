@@ -218,6 +218,54 @@ void main() {
     expect(store.offloadedToolResults['t1']!.tokens, 9000);
   });
 
+  test('a pruned result is cut again when the conversation is resumed', () {
+    final store = storeOf([
+      user('u1', 'read it'),
+      {
+        'type': 'assistant',
+        'uuid': 'a1',
+        'message': {
+          'role': 'assistant',
+          'content': [
+            {
+              'type': 'tool_use',
+              'id': 't1',
+              'name': 'Read',
+              'input': {'file_path': 'a.txt'},
+            },
+          ],
+        },
+      },
+      {
+        'type': 'user',
+        'uuid': 'r1',
+        'message': {
+          'role': 'user',
+          'content': [
+            {
+              'type': 'tool_result',
+              'tool_use_id': 't1',
+              'content': 'HEAD${'x' * 20000}TAIL',
+            },
+          ],
+        },
+      },
+      {
+        'type': 'system',
+        'subtype': 'microcompact_boundary',
+        'microcompactMetadata': {
+          'prunedToolIds': ['t1'],
+          'compactedToolIds': [],
+        },
+      },
+    ]);
+    final text = jsonEncode(store.apiMessages());
+    expect(text, contains('characters omitted'));
+    expect(text, contains('HEAD'));
+    expect(text, contains('TAIL'));
+    expect(text, isNot(contains('x' * 20000)));
+  });
+
   test('a result both cleared and offloaded keeps the offload hint', () {
     final store = storeOf([
       user('u1', 'run it'),

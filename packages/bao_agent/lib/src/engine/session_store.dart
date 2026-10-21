@@ -69,6 +69,10 @@ class SessionStore {
   /// the API. This conversation's own, restored with it.
   final Set<String> clearedToolResults = {};
 
+  /// The calls whose results were cut to their start and end by a
+  /// microcompaction: the file keeps the whole of them.
+  final Set<String> prunedToolResults = {};
+
   /// Ranges folded into a summary, and the ones restored since: what the
   /// model is sent in place of the messages, while the file keeps them.
   final List<CompressionBlock> compressionBlocks = [];
@@ -141,6 +145,7 @@ class SessionStore {
   /// offloaded.
   void _rebuildBoundaries() {
     clearedToolResults.clear();
+    prunedToolResults.clear();
     compressionBlocks.clear();
     offloadedToolResults.clear();
     for (final entry in chain) {
@@ -148,13 +153,16 @@ class SessionStore {
       switch (entry['subtype']) {
         case 'compact_boundary':
           clearedToolResults.clear();
+          prunedToolResults.clear();
           compressionBlocks.clear();
           offloadedToolResults.clear();
         case 'microcompact_boundary':
-          for (final id in asList(
-            asMap(entry['microcompactMetadata'])['compactedToolIds'],
-          )) {
+          final metadata = asMap(entry['microcompactMetadata']);
+          for (final id in asList(metadata['compactedToolIds'])) {
             if (id is String) clearedToolResults.add(id);
+          }
+          for (final id in asList(metadata['prunedToolIds'])) {
+            if (id is String) prunedToolResults.add(id);
           }
         case 'compression':
           final block = CompressionBlock.fromEntry(entry);
@@ -245,13 +253,16 @@ class SessionStore {
       switch (full['subtype']) {
         case 'compact_boundary':
           clearedToolResults.clear();
+          prunedToolResults.clear();
           compressionBlocks.clear();
           offloadedToolResults.clear();
         case 'microcompact_boundary':
-          for (final id in asList(
-            asMap(full['microcompactMetadata'])['compactedToolIds'],
-          )) {
+          final metadata = asMap(full['microcompactMetadata']);
+          for (final id in asList(metadata['compactedToolIds'])) {
             if (id is String) clearedToolResults.add(id);
+          }
+          for (final id in asList(metadata['prunedToolIds'])) {
+            if (id is String) prunedToolResults.add(id);
           }
         case 'compression':
           final block = CompressionBlock.fromEntry(full);
@@ -391,6 +402,7 @@ class SessionStore {
   List<Map<String, Object?>> apiMessages() => toApiMessages(
     chain,
     cleared: clearedToolResults,
+    pruned: prunedToolResults,
     blocks: compressionBlocks,
     offloaded: offloadedToolResults,
   );
@@ -426,6 +438,7 @@ class SessionStore {
       messages: toApiMessages(
         tagged,
         cleared: clearedToolResults,
+        pruned: prunedToolResults,
         offloaded: offloadedToolResults,
       ),
       refs: refs,
@@ -513,6 +526,7 @@ List<Map<String, Object?>> foldCompressionBlocks(
 List<Map<String, Object?>> toApiMessages(
   List<Map<String, Object?>> chain, {
   Set<String> cleared = const {},
+  Set<String> pruned = const {},
   List<CompressionBlock> blocks = const [],
   Map<String, OffloadedResult> offloaded = const {},
 }) {
@@ -618,6 +632,25 @@ List<Map<String, Object?>> toApiMessages(
         final off = offloaded[block['tool_use_id']];
         if (off == null) continue;
         blocks[i] = {...block, 'content': off.placeholder};
+      }
+    }
+  }
+  // What a microcompaction cut down: the call and its result stay, the
+  // middle of the result does not. A copy, as the file keeps it whole.
+  if (pruned.isNotEmpty) {
+    for (final message in messages) {
+      if (message['role'] != 'user') continue;
+      final blocks = message['content'] as List<Map<String, Object?>>;
+      for (var i = 0; i < blocks.length; i++) {
+        final block = blocks[i];
+        if (block['type'] != 'tool_result' ||
+            !pruned.contains(block['tool_use_id']) ||
+            offloaded.containsKey(block['tool_use_id'])) {
+          continue;
+        }
+        if (block['content'] case final String text) {
+          blocks[i] = {...block, 'content': pruneToolResult(text)};
+        }
       }
     }
   }
