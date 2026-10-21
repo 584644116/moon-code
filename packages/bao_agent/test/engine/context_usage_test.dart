@@ -26,4 +26,24 @@ void main() {
       ),
     );
   });
+
+  test('a compaction ratio from settings reaches the panel', () async {
+    final h = await Harness.start(
+      settings: {
+        'autoCompactWindow': 32000,
+        'contextManagement': {'compactRatio': 0.8},
+      },
+    );
+    addTearDown(h.dispose);
+    h.model.script.add(Reply.text('ok'));
+    await h.turn('hi');
+    final context = await h.request('get_context_usage');
+    final buffer =
+        (context['categories'] as List).cast<Map>().firstWhere(
+              (category) => category['kind'] == 'buffer',
+            )['tokens']
+            as int;
+    // 32K, 80%: compaction starts at 25.6K, leaving 6.4K.
+    expect(buffer, 6400);
+  });
 }

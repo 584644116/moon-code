@@ -141,13 +141,18 @@ class AnthropicClient implements ModelClient {
       } on ApiError catch (error) {
         // A request made on the side gives up on an overload at once: the
         // model is busy, and nothing waits on the summary or the title.
-        if (!_retryable(error, request) || attempt >= maxRetries) rethrow;
+        // An answer with nothing in it is worth asking for twice more, not
+        // the whole budget: the provider will keep saying nothing.
+        final limit = error.kind == ApiFailureKind.emptyResponse
+            ? math.min(maxRetries, 2)
+            : maxRetries;
+        if (!_retryable(error, request) || attempt >= limit) rethrow;
         attempt++;
         final delay = _delay(attempt, error.retryAfter);
         onRetry?.call(
           RetryInfo(
             attempt: attempt,
-            maxRetries: maxRetries,
+            maxRetries: limit,
             delay: delay,
             status: error.status,
             message: error.message,
@@ -231,12 +236,21 @@ class AnthropicClient implements ModelClient {
               ),
             ),
           );
+      var sawContent = false;
       try {
         await for (final event in events) {
           final json = event.json;
           if (json == null) continue;
           final type = json['type'] ?? event.event;
           if (type == 'ping') continue;
+          if (type == 'content_block_start') {
+            final block = json['content_block'];
+            if (block is! Map ||
+                (block['type'] != 'thinking' &&
+                    block['type'] != 'redacted_thinking')) {
+              sawContent = true;
+            }
+          }
           if (type == 'error') {
             final error = json['error'];
             final kind = error is Map ? '${error['type']}' : 'error';
@@ -269,9 +283,13 @@ class AnthropicClient implements ModelClient {
         if (cancel.isCancelled) throw Cancelled(cancel.reason);
         throw ApiError('The connection broke: $error', retryable: true);
       }
-      // Ended without `message_stop`: cut off.
+      // Ended without `message_stop`: cut off, or nothing was ever said.
       if (cancel.isCancelled) throw Cancelled(cancel.reason);
-      throw const ApiError('The answer ended early', retryable: true);
+      throw ApiError(
+        sawContent ? 'The answer ended early' : 'The model returned no answer',
+        retryable: true,
+        emptyResponse: !sawContent,
+      );
     } finally {
       unawaited(aborted);
       client.close(force: true);

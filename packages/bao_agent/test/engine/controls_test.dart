@@ -260,6 +260,36 @@ void main() {
       expect(sentIn(h.model.turns.last), contains('Earlier talk.'));
     });
 
+    test('a prompt too long may compact twice when asked to', () async {
+      h = await Harness.start(
+        settings: {
+          'contextManagement': {'overflowRetries': 2},
+        },
+      );
+      h.model.script.addAll([
+        Reply.text('first'),
+        Reply.failing(
+          const ApiError(
+            'prompt is too long: 210000 tokens > 200000 maximum',
+            status: 400,
+          ),
+        ),
+        Reply.text('<summary>One.</summary>'),
+        Reply.failing(
+          const ApiError(
+            'prompt is too long: 210000 tokens > 200000 maximum',
+            status: 400,
+          ),
+        ),
+        Reply.text('<summary>Two.</summary>'),
+        Reply.text('answered'),
+      ]);
+      await h.turn('one');
+      await h.turn('two');
+      expect(h.lastResult['result'], 'answered');
+      expect(h.of('system', 'compact_boundary'), hasLength(2));
+    });
+
     test('a summary the model refuses: the newest messages kept', () async {
       h = await Harness.start();
       h.model.script.addAll([

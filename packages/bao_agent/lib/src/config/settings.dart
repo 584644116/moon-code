@@ -193,6 +193,33 @@ class AgentSettings {
   int get contextRetrieveInlineChars =>
       _contextInt('retrieveInlineChars', 20000);
 
+  /// How much of the window compaction may fill, before it is too full.
+  /// 0.5 unless `contextManagement.compactRatio`, or the model's own entry
+  /// in `contextManagement.compactModels`, says otherwise.
+  double contextCompactRatio(String model) {
+    final own = asMap(asMap(contextManagement['compactModels'])[model]);
+    final value = own['ratio'] ?? contextManagement['compactRatio'];
+    return switch (value) {
+      final num n when n > 0 && n < 1 => n.toDouble(),
+      _ => 0.5,
+    };
+  }
+
+  /// The room compaction keeps free, when more than the answer and request
+  /// reserves already leave: `contextManagement.compactHeadroomTokens`, or
+  /// the model's own.
+  int? contextCompactHeadroom(String model) {
+    final own = asMap(asMap(contextManagement['compactModels'])[model]);
+    final value =
+        asInt(own['headroomTokens']) ??
+        asInt(contextManagement['compactHeadroomTokens']);
+    return value == null || value <= 0 ? null : value;
+  }
+
+  /// How many times a prompt too long may compact and ask again in a turn.
+  int get contextOverflowRetries =>
+      _contextInt('overflowRetries', 1).clamp(0, 3);
+
   int _contextInt(String key, int fallback) {
     final value = asInt(contextManagement[key]);
     return value == null || value < 0 ? fallback : value;

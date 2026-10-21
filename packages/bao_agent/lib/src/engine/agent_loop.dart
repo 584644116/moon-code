@@ -175,17 +175,20 @@ class AgentLoop {
   /// The same call, over and over: said once at 3, 5 and 8 in a row.
   final RepeatGuard _repeats = RepeatGuard();
 
+  /// Empty answers asked for again in this turn.
+  int _emptyAnswers = 0;
+
   /// Runs the agent until it ends its turn.
   Future<LoopResult> runTurn(CancelToken cancel) async {
     _repeats.reset();
     var stopHookActive = false;
-    var compactedForLength = false;
+    var overflowRetries = 0;
     while (true) {
       if (cancel.isCancelled) return _interrupted(during: false);
       if (maxTurns != null && _requests >= maxTurns!) {
         return _result('max_turns');
       }
-      if (!compactedForLength) {
+      if (overflowRetries == 0) {
         try {
           await _compaction().autoCompactIfNeeded(cancel);
         } on Cancelled {
@@ -198,8 +201,9 @@ class AgentLoop {
       } on Cancelled {
         return _interrupted(during: false);
       } on ApiError catch (error) {
-        if (error.promptTooLong && !compactedForLength) {
-          compactedForLength = true;
+        if (error.promptTooLong &&
+            overflowRetries < session.settings.contextOverflowRetries) {
+          overflowRetries++;
           try {
             if (await _compaction().compact(trigger: 'auto', cancel: cancel)) {
               continue;
@@ -223,13 +227,33 @@ class AgentLoop {
       } on MissingCredentials {
         return _failed(MissingCredentials.message);
       }
-      compactedForLength = false;
+      overflowRetries = 0;
       final calls = [
         for (final block in answer.blocks)
           if (block['type'] == 'tool_use')
             _Call('${block['id']}', '${block['name']}', asMap(block['input'])),
       ];
       if (calls.isEmpty) {
+        final saidSomething = answer.blocks.any(
+          (block) =>
+              block['type'] == 'tool_use' ||
+              (block['type'] == 'text' &&
+                  '${block['text'] ?? ''}'.trim().isNotEmpty),
+        );
+        // Nothing at all is worth asking for twice more; a refusal is not.
+        if (!saidSomething &&
+            answer.stopReason != 'refusal' &&
+            answer.stopReason != 'max_tokens' &&
+            _emptyAnswers < 2) {
+          _emptyAnswers++;
+          continue;
+        }
+        if (!saidSomething) {
+          session.emitSystem('informational', {
+            'level': 'warning',
+            'content': 'The model returned no answer.',
+          });
+        }
         if (answer.stopReason == 'max_tokens') {
           session.emitSystem('informational', {
             'level': 'warning',

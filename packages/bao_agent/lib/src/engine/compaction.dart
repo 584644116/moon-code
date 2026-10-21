@@ -88,16 +88,25 @@ class Compaction {
   int get threshold => thresholdOf(
     contextWindow,
     maxOutput: session.catalog.info(model).maxOutput,
+    ratio: session.settings.contextCompactRatio(model),
+    headroom: session.settings.contextCompactHeadroom(model),
   );
 
   /// The compaction threshold of a [window], keeping room for an answer of
   /// [maxOutput] tokens. With no answer size known, the session's buffer
-  /// is kept instead.
-  static int thresholdOf(int window, {int maxOutput = 0}) {
-    final reserve = maxOutput > 0
+  /// is kept instead. [ratio] is how much of the window may fill; [headroom]
+  /// keeps more free than the answer and request already do.
+  static int thresholdOf(
+    int window, {
+    int maxOutput = 0,
+    double ratio = 0.5,
+    int? headroom,
+  }) {
+    final answer = maxOutput > 0
         ? math.min(maxOutput, _answerReserve) + _requestReserve
         : AgentSession.compactBufferOf(window);
-    return math.max((window * 0.5).round(), window - reserve);
+    final reserve = headroom == null ? answer : math.max(answer, headroom);
+    return math.max((window * ratio).round(), window - reserve);
   }
 
   /// The room this conversation keeps free before it is compacted: what the
@@ -105,8 +114,20 @@ class Compaction {
   int get reserve => (contextWindow - threshold).clamp(0, contextWindow);
 
   /// The reserve of a [window], for a caller that has only the window.
-  static int reserveOf(int window, {int maxOutput = 0}) =>
-      (window - thresholdOf(window, maxOutput: maxOutput)).clamp(0, window);
+  static int reserveOf(
+    int window, {
+    int maxOutput = 0,
+    double ratio = 0.5,
+    int? headroom,
+  }) =>
+      (window -
+              thresholdOf(
+                window,
+                maxOutput: maxOutput,
+                ratio: ratio,
+                headroom: headroom,
+              ))
+          .clamp(0, window);
 
   /// The most of a window a model's answer is given.
   static const _answerReserve = 21000;

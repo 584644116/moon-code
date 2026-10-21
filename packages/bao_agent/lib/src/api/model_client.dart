@@ -68,6 +68,9 @@ enum ApiFailureKind {
   /// The request was cancelled.
   cancelled,
 
+  /// The model answered with nothing at all.
+  emptyResponse,
+
   /// None of the above.
   unknown,
 }
@@ -98,6 +101,7 @@ class ApiError implements Exception {
     this.retryable = false,
     this.retryAfter,
     this.requestId,
+    this.emptyResponse = false,
   });
 
   final String message;
@@ -109,6 +113,9 @@ class ApiError implements Exception {
   final bool retryable;
   final Duration? retryAfter;
   final String? requestId;
+
+  /// The stream ended with no text or tool call at all.
+  final bool emptyResponse;
 
   /// Whether the request is too long for the model's context.
   bool get promptTooLong =>
@@ -129,6 +136,7 @@ class ApiError implements Exception {
   /// done about it. A context overflow is not a request to fix and retry;
   /// an overload is not a key to check.
   ApiFailureKind get kind {
+    if (emptyResponse) return ApiFailureKind.emptyResponse;
     if (promptTooLong) return ApiFailureKind.contextTooLong;
     if (authentication) return ApiFailureKind.authentication;
     if (status == 429 || type == 'rate_limit_error') {
@@ -178,6 +186,8 @@ class ApiError implements Exception {
       'The connection\'s certificate could not be verified: check the proxy '
           'or the CA settings.',
     ApiFailureKind.cancelled => 'The request was cancelled.',
+    ApiFailureKind.emptyResponse =>
+      'The model returned no answer: try again, or ask it to go on.',
     ApiFailureKind.unknown => '',
   };
 

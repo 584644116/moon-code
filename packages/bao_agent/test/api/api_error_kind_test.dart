@@ -53,6 +53,10 @@ void main() {
       ApiFailureKind.tls,
     );
     expect(const ApiError('odd', status: 418).kind, ApiFailureKind.unknown);
+    expect(
+      const ApiError('nothing', emptyResponse: true).kind,
+      ApiFailureKind.emptyResponse,
+    );
   });
 
   test('the action says what can be done, and context is its own answer', () {

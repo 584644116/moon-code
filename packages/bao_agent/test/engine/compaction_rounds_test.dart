@@ -32,6 +32,18 @@ void main() {
     expect(Compaction.reserveOf(128000), 33000);
     expect(Compaction.reserveOf(32000), 6400);
     expect(Compaction.reserveOf(32000, maxOutput: 8000), 16000);
+    // A model's own ratio fills more (or less) of a small window.
+    expect(Compaction.thresholdOf(32000, maxOutput: 8000, ratio: 0.8), 25600);
+    expect(Compaction.reserveOf(32000, maxOutput: 8000, ratio: 0.8), 6400);
+    // An explicit headroom keeps at least that much free.
+    expect(
+      Compaction.thresholdOf(200000, maxOutput: 64000, headroom: 65536),
+      134464,
+    );
+    expect(
+      Compaction.reserveOf(200000, maxOutput: 64000, headroom: 65536),
+      65536,
+    );
   });
 
   test(
