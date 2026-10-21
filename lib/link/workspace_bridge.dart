@@ -766,6 +766,7 @@ class _Follow {
     final choices = _choices();
     final changes = [for (final change in session.fileChanges) _change(change)];
     final tasks = _tasks();
+    final context = _contextOf(session);
     final earlier = window == null
         ? null
         : _from > 0 || session.hasEarlierHistory || session.loadingEarlier;
@@ -776,6 +777,7 @@ class _Follow {
       [for (final choice in choices) choice.toJson()],
       changes,
       [for (final task in tasks) task.toJson()],
+      context?.toJson(),
     ]);
     if (!full &&
         start == count &&
@@ -803,7 +805,27 @@ class _Follow {
       choices: choices,
       changes: changes,
       tasks: tasks,
+      context: context,
       earlier: earlier,
+    );
+  }
+
+  /// How full [session]'s context is, and where it compacts: the window
+  /// less what the kernel keeps back for compacting.
+  LinkContextUsage? _contextOf(ChatSession session) {
+    final usage = session.context;
+    if (usage == null) return null;
+    var buffer = 0;
+    for (final segment in usage.segments) {
+      if (segment.kind == ContextKind.buffer) buffer += segment.tokens;
+    }
+    return LinkContextUsage(
+      window: usage.window,
+      used: usage.used,
+      limit: buffer > 0 && usage.window > buffer
+          ? usage.window - buffer
+          : null,
+      compacted: session.wasCompacted,
     );
   }
 

@@ -73,6 +73,36 @@ void main() {
     }
   });
 
+  test('a session update tells how full the context is', () {
+    const update = LinkSessionUpdate(
+      session: 's',
+      start: 0,
+      items: [],
+      count: 0,
+      context: LinkContextUsage(
+        window: 200000,
+        used: 120000,
+        limit: 180000,
+        compacted: true,
+      ),
+    );
+    final read = LinkSessionUpdate.fromJson(update.toJson());
+    expect(read.context!.window, 200000);
+    expect(read.context!.used, 120000);
+    expect(read.context!.limit, 180000);
+    expect(read.context!.compacted, isTrue);
+    // An older desktop need not say.
+    expect(
+      LinkSessionUpdate(
+        session: 's',
+        start: 0,
+        items: const [],
+        count: 0,
+      ).toJson().containsKey('context'),
+      isFalse,
+    );
+  });
+
   group('SecureChannel', () {
     test(
       'both ends learn the other\'s key, and messages go both ways',

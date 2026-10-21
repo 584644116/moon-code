@@ -429,6 +429,18 @@ class ChatSession extends ChangeNotifier implements ChatFeed {
     _ => null,
   };
 
+  /// Whether the conversation has been compacted at least once.
+  bool get wasCompacted {
+    for (var i = _transcript.length - 1; i >= 0; i--) {
+      if (_transcript.itemAt(i) case NoticeItem(
+        kind: NoticeKind.compaction,
+      )) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /// Cost and account limits; null when the kernel does not report them.
   UsageStats? get stats => switch (_kernel) {
     final ReportsUsage kernel =>

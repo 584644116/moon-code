@@ -97,6 +97,8 @@
 
 **会话增量**：`open` 时先返回整个会话，之后只发从第一个变化的条目开始的部分（`start` + 之后的条目）。判断“变没变”时，先看是不是同一个对象；对象不同再比较 JSON。条目的 JSON 格式见 `lib/link/chat_codec.dart`；手机端 `lib/link/chat_codec.dart` 是同一份文件，只改了头部注释。工具输出、命令输出超过 64KB 的部分会截掉。
 
+**上下文用量**：`open` 应答和每个 `session` 增量可以带 `context`：`{"window": 上下文窗口, "used": 已用 token, "limit": 开始压缩的 token 数, "compacted": 是否已压缩过}`。`limit` 和 `compacted` 可能没有或为 false（旧版桌面端完全不发 `context`），手机端按没有处理；它只是展示，不改变压缩行为。
+
 **分页（`window`，手机可选）**：`open` 可以带 `window`（整数 N）：`{"session", "window": N}`。带了之后桌面端只跟踪这个会话的最后 N 条，`session` 事件和 `open` 应答里的 `start`、`count` 都从手机拿到的第一条算起（第 0 条是手机的第一条，不是会话的第一条），`count` 是手机现在有的条数。应答和每个增量里多一个 `earlier`（bool）：手机的第一条之前是否还有更早的。不带 `window` 的 `open` 和以前完全一样：整个（桌面端已加载的）会话，`start` 从会话第一条算起，也没有 `earlier` 字段。
 
 `earlier` 请求：`{"session", "count"?}`（`count` 默认 50）→ `{"items": [...], "earlier": bool}`。`items` 是手机第一条之前的最多 `count` 条，从旧到新排；桌面端内存里没有更早的时，会先从历史记录里读（可能要一会儿，请求会等到读完）。`earlier` 同样表示再往前是否还有。会话要是用 `window` 打开的才能用，否则返回错误；没有 `open` 过的会话也返回错误。

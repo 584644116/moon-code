@@ -126,6 +126,13 @@ void main() {
             as Map<String, Object?>,
       );
 
+  test('the phone is told how full the context is', () async {
+    final opened = await open();
+    expect(opened.context, isNotNull);
+    expect(opened.context!.window, greaterThan(0));
+    expect(opened.context!.used, greaterThanOrEqualTo(0));
+  });
+
   List<String> texts(List<Object?> items) => [
     for (final json in items)
       switch (ChatCodec.decode(json)) {

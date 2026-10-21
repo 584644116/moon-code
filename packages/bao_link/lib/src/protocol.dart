@@ -515,6 +515,7 @@ class LinkSessionUpdate {
     this.choices = const [],
     this.changes = const [],
     this.tasks = const [],
+    this.context,
     this.earlier,
   });
 
@@ -541,6 +542,10 @@ class LinkSessionUpdate {
           for (final task in (json['tasks'] as List?) ?? const [])
             LinkTask.fromJson(_map(task)),
         ],
+        context: switch (json['context']) {
+          final Map<String, Object?> map => LinkContextUsage.fromJson(map),
+          _ => null,
+        },
         earlier: json['earlier'] as bool?,
       );
 
@@ -567,6 +572,9 @@ class LinkSessionUpdate {
   /// output).
   final List<LinkTask> tasks;
 
+  /// How full the context is, when the desktop knows.
+  final LinkContextUsage? context;
+
   /// Whether there is more before the first item, for a session followed
   /// with a window; null if not (the desktop does not page, or it is not
   /// asked to).
@@ -582,7 +590,46 @@ class LinkSessionUpdate {
     'choices': [for (final choice in choices) choice.toJson()],
     'changes': changes,
     if (tasks.isNotEmpty) 'tasks': [for (final task in tasks) task.toJson()],
+    'context': ?context?.toJson(),
     'earlier': ?earlier,
+  };
+}
+
+/// How much of the model's window a conversation fills, and where
+/// compaction starts; whether it has been compacted.
+class LinkContextUsage {
+  const LinkContextUsage({
+    required this.window,
+    required this.used,
+    this.limit,
+    this.compacted = false,
+  });
+
+  factory LinkContextUsage.fromJson(Map<String, Object?> json) =>
+      LinkContextUsage(
+        window: json['window'] as int? ?? 0,
+        used: json['used'] as int? ?? 0,
+        limit: json['limit'] as int?,
+        compacted: json['compacted'] as bool? ?? false,
+      );
+
+  /// The model's context window.
+  final int window;
+
+  /// What the conversation fills of it.
+  final int used;
+
+  /// Where compaction starts, where the desktop knows.
+  final int? limit;
+
+  /// Whether the conversation has been compacted at least once.
+  final bool compacted;
+
+  Map<String, Object?> toJson() => {
+    'window': window,
+    'used': used,
+    'limit': ?limit,
+    'compacted': compacted,
   };
 }
 
