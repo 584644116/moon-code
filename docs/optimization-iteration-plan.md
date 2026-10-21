@@ -2,7 +2,7 @@
 
 > 本文把 2026-10-21 的多角色分析、`docs/reference-integration-plan.md` 中已完成的批次 1–4，以及对 `deepseek-harness`（下称 dsh）的机制核对合并成一份可执行的路线图。
 >
-> `reference-integration-plan.md` 继续保留为批次 1–4 的施工记录和状态表；**后续迭代以本文为准**。
+> `reference-integration-plan.md` 继续保留为批次 1–4 的施工记录和状态表；**后续迭代以本文为准**。上批 18 个完成项、已存在能力与 18 项放弃裁决已合并到附录 A，本文不依赖阅读原文件也能判断起点。
 >
 > 编写日期：2026-10-21
 >
@@ -456,3 +456,64 @@
 ## 11. 一句话执行建议
 
 **先做批次 5（P0-1 / P0-3 / P0-5），再做批次 6（P0-2 / P1-2），然后批次 8（P0-6 / P0-7 / P1-6）；批次 7 取决于空回答与图片错误样本，批次 9–10 按产品节奏推进，P2 不排期。**
+
+---
+
+## 附录 A：上批方案（批次 1–4）的完成清单
+
+> 下表是 `docs/reference-integration-plan.md` 状态表的合并摘要。详细改动、测试断言与回滚方式仍在原文件；本表用于证明本方案的起点。
+
+| 编号 | 完成内容 | 验证 |
+| --- | --- | --- |
+| B1-1 | API 失败分类与 errand 重试策略 | `api_error_kind_test.dart`、`anthropic_client_test.dart` 全通过 |
+| B1-2 | 危险命令与凭据路径守卫扩展（只询问，不拒绝） | `dangerous_commands_test.dart`、`permissions_units_test.dart` 全通过 |
+| B1-3 | 非交互审批超时（默认 600 秒，可关，交互式不超时） | `permissions_test.dart --plain-name "times out"` 通过 |
+| B1-4 | 恢复会话的已读状态（mtime 未变则允许编辑） | `resume_read_state_test.dart` 4 条全通过 |
+| B2-1 | `CompressionBlock` 存储与重建 | `session_compression_test.dart` 全通过 |
+| B2-2 | 请求视图、稳定 `mN` refs、前缀缓存友好 | `session_compression_test.dart`（稳定 refs、重复视图一致、无块时逐项相等） |
+| B2-3 | `ContextCompression` 核心服务 | `context_compression_test.dart` 6 条全通过 |
+| B3-1 | 隐藏工具标记与 toolbox 接入 | `context_tools_test.dart`「offered only when context management is on」 |
+| B3-2 | `compress` 工具 | `context_tools_test.dart`「compress folds a range…」 |
+| B3-3 | `decompress` / `search_context` / `acp_status` | `context_tools_test.dart` 对应三条 |
+| B3-4 | 上下文增长提醒 | `context_tools_test.dart`「a grown context is nudged once…」 |
+| B3-5 | 大工具结果 CCR 卸载与 `retrieve_tool_result` | `context_tools_test.dart`「a large result is offloaded…」 |
+| B3-6 | 子会话沿父链只读回退 | `context_tools_test.dart`「a subagent searches its caller's context…」 |
+| B3-7 | UI 隐藏上下文工具并提示压缩事件 | `test/kernel_test.dart --plain-name "context tools are hidden"` |
+| B4-1 | 自动压缩阈值使用输出预留与 provider usage | `compaction_rounds_test.dart` 阈值表；`controls_test.dart` 仅基线失败 |
+| B4-2 | 全压缩后保留最近助手轮次原文 | `compaction_rounds_test.dart` 保留与预算两条；`commands_test.dart --plain-name "compact"` |
+| B4-3 | microcompaction 按助手轮次保留并保护错误/媒体 | `compaction_rounds_test.dart` 分组与保护；`controls_test.dart --plain-name "old tool results"` |
+| B4-4 | 收尾验证与报告 | `edges_test.dart --plain-name "compaction"` 仅基线失败；`request_test.dart` 全通过 |
+
+### A.1 上批已确认“已存在、无需改”的能力
+
+- 子代理独立上下文与 sidechain 文件、子代理卡片 200 步上限（`agent_tool.dart`、`session_store.dart`、`claude_code_translator.dart`）。
+- 会话摘要头/尾 64KB 读取、历史会话头/尾扫描（`packages/bao_remote/lib/src/claude/`）。
+- `reload_plugins` / `reload_extensions`、`end_session`、`stop_task`、`get_settings`、`mcp_status` / `mcp_toggle` / `mcp_reconnect` / `mcp_authenticate`（`engine.dart`）。
+- 429/5xx/网络重试、`Retry-After`、最多 10 次、`stream_restart`（`api/anthropic_client.dart`）。
+- CLAUDE.md 记忆层级、`@path` 导入、条件规则、realpath 去重（`config/memory.dart`、`engine/context.dart`）。
+- `rewind_files`、checkpoint、rewind 重放（`engine/checkpoints.dart`、`engine.dart`）。
+
+### A.2 上批放弃项（本方案不重新开启）
+
+| 编号 | 放弃项 | 原因摘要 |
+| --- | --- | --- |
+| A-1 | billion-context 作为 Dart 库或 sidecar | Node/TS 运行时，无法嵌入；sidecar 与代理/设置冲突；附加署名条款影响大 |
+| A-2 | 复制 claudecodeui 代码 | AGPL-3.0-or-later，不能进入 GPL-3.0 仓库 |
+| A-3 | 复制 claude-code-best 代码 | 无 LICENSE、逆向工程；只作协议事实参考 |
+| A-4 | `mcp_set_servers` 中途整表替换 | 需完整映射、OAuth 状态与回滚；重启会话即可 |
+| A-5 | ZCode 的 RiskLevel/capability 与模式矩阵 | 会改变 Claude Code 的模式契约；只采纳守卫（本方案 P0-6 只加展示，不改判定） |
+| A-6 | ZCode 的重试退避参数 | 会改变现有等待与限流行为；保留现有曲线 |
+| A-7 | ZCode 的“已提交输出后不再重试” | 会破坏 `stream_restart` 与 UI accumulator 契约 |
+| A-8 | ZCode 的 prompt-too-long 两级重选 | 现有 `_summarize()` 已丢最旧 1/5、最多 4 次；收益边际 |
+| A-9 | rapid-refill breaker | 根因是超大工具结果；B3-5 的 CCR 已缓解 |
+| A-10 | microcompaction 空闲 60 分钟触发 | 每次请求前已检查；空闲不产生请求 |
+| A-11 | 摘要流失败后回退非流式 | 需新增非流式路径；现有重试已覆盖大多数失败 |
+| A-12 | ZCode 的自动记忆/Dream/recall | 与现有 CLAUDE.md 记忆层级冲突 |
+| A-13 | CloudCLI 后台 stdin 30 分钟保活 | 进程传输已有自己的保活策略 |
+| A-14 | 待审批请求跨应用重启重放 | 属于 UI 状态持久化，不在本范围 |
+| A-15 | `readPage` 尾部快速路径 | 现有整页读取 + head/tail 摘要缓存已足够 |
+| A-16 | `generate_session_title` / `side_question` / `set_max_thinking_tokens` | 标题已有 `quickQuery`；其余会扩张协议面 |
+| A-17 | CCB 的 1MB 分块读取 transcript | 头/尾 64KB + 必要时整读已足够 |
+| A-18 | 把上下文工具暴露给用户手动调用 | 设计要求“模型调用、宿主执行、UI 隐藏” |
+
+> 本方案新增的不采纳项（dsh 的插件树、事件日志重写、token-meter 回放、终端工具、Windows ACL 沙箱、无上限重试）见 §6.6，与 A-1..A-18 不冲突。
