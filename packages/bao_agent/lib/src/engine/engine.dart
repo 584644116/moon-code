@@ -185,6 +185,7 @@ class AgentEngine {
         persist: options.persist,
       );
       session.checkpoints.load(session.store.extras);
+      session.store.seedReadState(session.mainRun.readFiles);
       _titled = session.store.title != null;
       _restoreGoal();
     } else {
@@ -272,11 +273,14 @@ class AgentEngine {
     }
   }
 
-  /// Sends the host a request, and waits for its answer.
+  /// Sends the host a request, and waits for its answer. With a [timeout],
+  /// a host that does not answer is told the request is moot and the wait
+  /// ends with [HostRequestTimeout].
   Future<Map<String, Object?>> _hostRequest(
     String subtype,
-    Map<String, Object?> fields,
-  ) {
+    Map<String, Object?> fields, {
+    Duration? timeout,
+  }) {
     if (_closed) return Future.error(const Cancelled('closed'));
     final id = randomId(16);
     final done = Completer<Map<String, Object?>>();
@@ -286,6 +290,15 @@ class AgentEngine {
       'request_id': id,
       'request': {'subtype': subtype, ...fields},
     });
+    if (timeout != null) {
+      final timer = Timer(timeout, () {
+        final pending = _pending.remove(id);
+        if (pending == null || pending.isCompleted) return;
+        _send({'type': 'control_cancel_request', 'request_id': id});
+        pending.completeError(HostRequestTimeout(subtype, timeout));
+      });
+      done.future.whenComplete(timer.cancel).ignore();
+    }
     return done.future;
   }
 
@@ -378,6 +391,29 @@ class AgentEngine {
         return {'cancelled': true};
       case 'rewind_conversation':
         return _rewindConversation(request);
+      case 'seed_read_state':
+        final raw = asString(request['path']);
+        if (raw == null || raw.isEmpty) {
+          throw StateError('seed_read_state needs a path');
+        }
+        final path = p.normalize(
+          p.isAbsolute(raw) ? raw : p.join(session.cwd, raw),
+        );
+        final mtime = asInt(request['mtime']);
+        final DateTime modified;
+        if (mtime != null) {
+          // The host gives milliseconds; the file's own time is finer. A
+          // time a little after the one it names is the same moment, not
+          // a change.
+          modified = DateTime.fromMillisecondsSinceEpoch(mtime)
+              .add(const Duration(milliseconds: 2));
+        } else if (File(path).existsSync()) {
+          modified = File(path).lastModifiedSync();
+        } else {
+          modified = DateTime.fromMillisecondsSinceEpoch(0);
+        }
+        session.mainRun.readFiles.seed(path, modified);
+        return const {};
       case 'rewind_files':
         final messageId = asString(request['user_message_id']) ?? '';
         final changed = session.checkpoints.rewind(

@@ -211,6 +211,40 @@ void main() {
     expect(api.headers, hasLength(3));
   });
 
+  test('an errand gives up on an overload at once', () async {
+    api.troubles.add(
+      const HttpTrouble(
+        529,
+        type: 'overloaded_error',
+        headers: {'retry-after-ms': '1'},
+      ),
+    );
+    final retries = <RetryInfo>[];
+    final error = await client()
+        .stream(request.copyWith(errand: true), onRetry: retries.add)
+        .drain<void>()
+        .then<ApiError?>((_) => null, onError: (Object e) => e as ApiError);
+    expect(error!.status, 529);
+    expect(retries, isEmpty);
+    expect(api.headers, hasLength(1));
+  });
+
+  test('an errand retries a rate limit, but only once', () async {
+    api.troubles.addAll([
+      const HttpTrouble(429, headers: {'retry-after-ms': '1'}),
+      const HttpTrouble(429, headers: {'retry-after-ms': '1'}),
+    ]);
+    final retries = <RetryInfo>[];
+    final error = await client()
+        .stream(request.copyWith(errand: true), onRetry: retries.add)
+        .drain<void>()
+        .then<ApiError?>((_) => null, onError: (Object e) => e as ApiError);
+    expect(error!.status, 429);
+    expect(retries, hasLength(1));
+    expect(retries.single.maxRetries, 1);
+    expect(api.headers, hasLength(2));
+  });
+
   test('a server not there: retryable', () async {
     final error = await client(base: 'http://127.0.0.1:1', maxRetries: 0)
         .stream(request)

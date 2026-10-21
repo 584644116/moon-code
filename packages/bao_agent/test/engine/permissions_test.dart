@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -44,6 +45,42 @@ void main() {
       expect(h.of('system', 'permission_denied'), hasLength(1));
       expect(h.lastResult['permission_denials'], hasLength(1));
     });
+
+    test(
+      'a question no one answers times out, and the call is not made',
+      () async {
+        h = await Harness.start(
+          files: {'a.txt': 'one\n'},
+          settings: {
+            'permissions': {'approvalTimeoutSeconds': 1},
+          },
+        );
+        h.model.script.addAll([
+          Reply.tool('Read', {'file_path': p.join(h.cwd, 'a.txt')}),
+          Reply.tool('Edit', {
+            'file_path': p.join(h.cwd, 'a.txt'),
+            'old_string': 'one',
+            'new_string': 'two',
+          }),
+          Reply.text('ok'),
+        ]);
+        // Nobody answers: the host holds the request open.
+        final answer = Completer<Map<String, Object?>>();
+        h.onPermission = (_) => answer.future;
+        await h.turn('edit it');
+        expect(h.file('a.txt'), 'one\n');
+        final result = h.toolResults.last;
+        expect(result['is_error'], isTrue);
+        expect('${result['content']}', contains('No answer to can_use_tool'));
+        expect(h.of('system', 'permission_denied'), hasLength(1));
+        expect(
+          h.sent.where((m) => m['type'] == 'control_cancel_request'),
+          hasLength(1),
+        );
+        // The late answer is ignored: the call was not made.
+        answer.complete({'behavior': 'allow', 'updatedInput': const {}});
+      },
+    );
 
     test(
       'allowed from now on: the rule is saved and not asked again',

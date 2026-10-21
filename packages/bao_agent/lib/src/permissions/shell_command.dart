@@ -681,22 +681,48 @@ bool _readOnlyGit(List<String> args) {
 }
 
 /// Whether [words] is a command that destroys what cannot be got back
-/// wholesale (`rm -rf /`, `rm -rf ~`): asked about in every mode.
+/// wholesale (`rm -rf /`, `git reset --hard`, `find -delete`): asked about
+/// in every mode, and never approved by the auto classifier.
 bool isDangerousWords(List<String> words, {required String home}) {
   if (words.isEmpty) return false;
+  words = _unwrap(words);
+  if (words.isEmpty) return false;
   final program = words.first.split('/').last;
+  final args = words.sublist(1);
   if (program == 'sudo' || program == 'doas') return true;
   if (program == 'mkfs' || program.startsWith('mkfs.') || program == 'dd') {
     return words.any((w) => w.startsWith('of=/dev/') || program != 'dd');
   }
-  if (program != 'rm') return false;
-  final flags = words.where((w) => w.startsWith('-')).join();
+  if (program == 'rm') return _removesEverything(args, home);
+  if (program == 'git') return _gitDestroys(args);
+  if (program == 'find') return args.contains('-delete');
+  if (program == 'rsync') {
+    return args.any((w) => w == '--delete' || w.startsWith('--delete-'));
+  }
+  if (program == 'del' || program == 'erase') {
+    return args.any((w) => w.toLowerCase() == '/s');
+  }
+  if (program == 'rd' || program == 'rmdir') {
+    return args.any((w) => w.toLowerCase() == '/s');
+  }
+  if (program == 'robocopy') {
+    return args.any((w) => w.toLowerCase() == '/mir');
+  }
+  if (program.toLowerCase() == 'remove-item') {
+    return args.any((w) => w.toLowerCase() == '-recurse');
+  }
+  return false;
+}
+
+/// Whether `rm` [args] would remove a home, a root or everything.
+bool _removesEverything(List<String> args, String home) {
+  final flags = args.where((w) => w.startsWith('-')).join();
   final recursive =
       flags.contains('r') ||
       flags.contains('R') ||
-      words.contains('--recursive');
+      args.contains('--recursive');
   if (!recursive) return false;
-  for (final target in words.skip(1).where((w) => !w.startsWith('-'))) {
+  for (final target in args.where((w) => !w.startsWith('-'))) {
     final t = target.replaceAll(RegExp(r'/+$'), '');
     if (t.isEmpty ||
         t == '/' ||
@@ -713,6 +739,80 @@ bool isDangerousWords(List<String> words, {required String home}) {
     }
   }
   return false;
+}
+
+/// Whether a `git` call rewrites or throws away work that cannot be got
+/// back: a hard reset, a clean, a forced push or checkout, a forced
+/// branch delete. `--force-with-lease` is left alone: it refuses when the
+/// remote moved.
+bool _gitDestroys(List<String> args) {
+  if (args.isEmpty) return false;
+  final sub = args.first;
+  final rest = args.sublist(1);
+  final flags = rest.map((w) => w.toLowerCase()).toSet();
+  switch (sub) {
+    case 'reset':
+      return rest.contains('--hard');
+    case 'clean':
+      return rest.any(
+        (w) =>
+            w == '--force' ||
+            (w.startsWith('-') && !w.startsWith('--') && w.contains('f')),
+      );
+    case 'push':
+      return rest.contains('--force') || rest.contains('-f');
+    case 'checkout':
+      return rest.contains('--force') || rest.contains('-f');
+    case 'branch':
+      return rest.contains('-D') ||
+          (flags.contains('--delete') && flags.contains('--force'));
+  }
+  return false;
+}
+
+/// [words] with wrappers taken off (`env`, `nohup`, `time`, `command`,
+/// `builtin`, `exec`), so what they run is weighed as if it were alone.
+List<String> _unwrap(List<String> words) {
+  var result = words;
+  for (var guard = 0; guard < 8; guard++) {
+    if (result.isEmpty) return result;
+    final program = result.first.split('/').last;
+    if (!const {
+      'env',
+      'nohup',
+      'time',
+      'command',
+      'builtin',
+      'exec',
+    }.contains(program)) {
+      return result;
+    }
+    var i = 1;
+    while (i < result.length && result[i].startsWith('-')) {
+      final option = result[i];
+      i++;
+      // Options whose value is the word after them.
+      if (const {
+            '-u',
+            '--unset',
+            '-C',
+            '--chdir',
+            '-S',
+            '--split-string',
+          }.contains(option) &&
+          i < result.length) {
+        i++;
+      }
+    }
+    // `env NAME=value command`: assignments after the wrapper.
+    while (i < result.length &&
+        RegExp(r'^[A-Za-z_][A-Za-z0-9_]*=').hasMatch(result[i])) {
+      i++;
+    }
+    if (i >= result.length) return const [];
+    result = result.sublist(i);
+  }
+  return result;
 }
 
 /// Programs that only make, move or remove files: allowed in accept-edits

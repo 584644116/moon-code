@@ -162,8 +162,8 @@
 - **边界**：不改 `can_use_tool` 请求/响应字段；不改变交互式工具（`AskUserQuestion` 等）的无限等待；超时按“拒绝”处理并在工具结果里说明原因。
 - **依赖/风险**：中。用户离开 10 分钟会被拒绝；可配置、0 关闭、交互式不超时。
 - **验收**：
-  - Harness 测试：`onPermission` 返回永不完成的 Future，设置 `approvalTimeoutSeconds: 1`，断言工具被拒绝、`sent` 中出现 `control_cancel_request`、kernel 侧 pending 被移除。
-  - 交互式工具在同样设置下不会超时。
+  - `packages/bao_agent/test/engine/permissions_test.dart` 的 “a question no one answers times out…”：`onPermission` 返回永不完成的 Future，设置 `approvalTimeoutSeconds: 1`，断言工具被拒绝、`sent` 中出现 `control_cancel_request`、结果是错误且文件未变。
+  - 交互式工具在同样设置下不会超时（实现上以 `requires_user_interaction` 为条件，无超时）。
 
 ### B1-4 恢复会话的已读状态
 
@@ -448,8 +448,8 @@ D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/api/api_error_kind_t
 D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/units/dangerous_commands_test.dart
 D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/units/permissions_units_test.dart
 D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/engine/resume_read_state_test.dart
+D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/engine/permissions_test.dart --plain-name "times out"
 D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/engine/controls_test.dart
-D:\DM\_sdk\flutter\bin\flutter test test/kernel_test.dart --plain-name "approval timeout"
 
 # 批次 2/3
 D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/engine/session_compression_test.dart
@@ -485,10 +485,10 @@ D:\DM\_sdk\flutter\bin\dart analyze packages/bao_agent lib test
 
 | 编号 | 项目 | 状态 | 提交 | 验证 |
 | --- | --- | --- | --- | --- |
-| B1-1 | API 失败分类与 errand 重试 | 未开始 | — | — |
-| B1-2 | 危险命令与凭据路径守卫 | 未开始 | — | — |
-| B1-3 | 非交互审批超时 | 未开始 | — | — |
-| B1-4 | 恢复会话已读状态 | 未开始 | — | — |
+| B1-1 | API 失败分类与 errand 重试 | 已完成 | 批次 1 | `api_error_kind_test.dart`、`anthropic_client_test.dart` 全通过 |
+| B1-2 | 危险命令与凭据路径守卫 | 已完成 | 批次 1 | `dangerous_commands_test.dart`、`permissions_units_test.dart` 全通过 |
+| B1-3 | 非交互审批超时 | 已完成 | 批次 1 | `permissions_test.dart --plain-name "times out"` 通过 |
+| B1-4 | 恢复会话已读状态 | 已完成 | 批次 1 | `resume_read_state_test.dart` 4 条全通过 |
 | B2-1 | CompressionBlock 存储与重建 | 未开始 | — | — |
 | B2-2 | 请求视图、refs、前缀缓存 | 未开始 | — | — |
 | B2-3 | ContextCompression 核心 | 未开始 | — | — |

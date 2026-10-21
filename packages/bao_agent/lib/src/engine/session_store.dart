@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import '../tools/file_state.dart';
 import '../util/ids.dart';
 import '../util/json.dart';
 
@@ -222,6 +223,52 @@ class SessionStore {
     _rebuildCleared();
     return true;
   }
+
+  /// Marks in [state] the files this conversation read or changed, as its
+  /// transcript records them: a file read then and not changed since needs
+  /// no read again after a resume. A call whose result was an error marks
+  /// nothing.
+  void seedReadState(ReadFileState state) {
+    final calls = <String, String>{};
+    for (final entry in chain) {
+      final content = asMap(entry['message'])['content'];
+      if (entry['type'] == 'assistant') {
+        for (final block in asList(content)) {
+          final call = asMap(block);
+          if (call['type'] != 'tool_use') continue;
+          final name = asText(call['name']);
+          if (name != 'Read' &&
+              name != 'Write' &&
+              name != 'Edit' &&
+              name != 'NotebookEdit') {
+            continue;
+          }
+          final input = asMap(call['input']);
+          final path =
+              asText(input['file_path']) ?? asText(input['notebook_path']);
+          final id = asText(call['id']);
+          if (id == null || path == null || path.isEmpty) continue;
+          calls[id] = path;
+        }
+      } else if (entry['type'] == 'user') {
+        for (final block in asList(content)) {
+          final result = asMap(block);
+          if (result['type'] != 'tool_result' || result['is_error'] == true) {
+            continue;
+          }
+          final path = calls[asText(result['tool_use_id'])];
+          if (path == null) continue;
+          state.seed(path, _timeOf(entry));
+        }
+      }
+    }
+  }
+
+  /// When [entry] was written; the epoch when it does not say (an old
+  /// file, a line another tool made), so a change asks for a read first.
+  static DateTime _timeOf(Map<String, Object?> entry) =>
+      DateTime.tryParse(asText(entry['timestamp']) ?? '') ??
+      DateTime.fromMillisecondsSinceEpoch(0);
 
   /// The user messages of the branch, in order: those the user typed (not
   /// results, notes or summaries).

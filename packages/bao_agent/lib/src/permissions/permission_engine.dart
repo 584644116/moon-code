@@ -212,46 +212,6 @@ class PermissionEngine {
 
   String _folderOf(String target) => _folderFor(target);
 
-  /// Whether [path] is one whose change could change how the agent or the
-  /// user's tools behave: settings, hooks, git's own files, shell
-  /// profiles. Asked about even when edits are accepted.
-  bool isProtectedPath(String path) {
-    final parts = p.split(p.normalize(path));
-    final name = parts.last;
-    const protectedNames = {
-      '.bashrc',
-      '.bash_profile',
-      '.zshrc',
-      '.zprofile',
-      '.zshenv',
-      '.profile',
-      '.gitconfig',
-      '.gitmodules',
-      '.mcp.json',
-      '.claude.json',
-      '.npmrc',
-      '.ripgreprc',
-    };
-    if (protectedNames.contains(name)) return true;
-    for (var i = 0; i < parts.length - 1; i++) {
-      final part = parts[i];
-      if (part == '.git' ||
-          part == '.vscode' ||
-          part == '.idea' ||
-          part == '.husky') {
-        return true;
-      }
-      if (part == '.claude') {
-        // What the agent keeps there as a matter of course (worktrees,
-        // plans, its own commands and agents) is not.
-        final next = i + 1 < parts.length - 1 ? parts[i + 1] : null;
-        if (next == 'worktrees' || next == 'plans') return false;
-        return name.startsWith('settings') || next == 'hooks' || next == null;
-      }
-    }
-    return false;
-  }
-
   // --- Commands --------------------------------------------------------------------
 
   /// May [command] run, from [cwd].
@@ -411,4 +371,66 @@ class PermissionEngine {
     }
     return PermissionPassthrough(suggestions: suggestions);
   }
+}
+
+/// Whether [path] is one whose change could change how the agent or the
+/// user's tools behave, or whose contents are credentials: settings,
+/// hooks, git's own files, shell profiles, SSH and cloud keys. Asked
+/// about even when edits are accepted.
+bool isProtectedPath(String path) {
+  final parts = p.split(p.normalize(path));
+  final name = parts.last;
+  const protectedNames = {
+    '.bashrc',
+    '.bash_profile',
+    '.zshrc',
+    '.zprofile',
+    '.zshenv',
+    '.profile',
+    '.gitconfig',
+    '.gitmodules',
+    '.mcp.json',
+    '.claude.json',
+    '.npmrc',
+    '.ripgreprc',
+    '.netrc',
+    '.pypirc',
+    '.git-credentials',
+    'id_rsa',
+    'id_ed25519',
+    'id_ecdsa',
+    'id_dsa',
+  };
+  if (protectedNames.contains(name)) return true;
+  // A key or cloud configuration directory, wherever it is.
+  const protectedDirs = {
+    '.ssh',
+    '.aws',
+    '.gnupg',
+    '.kube',
+    '.azure',
+    '.password-store',
+    '.pki',
+  };
+  if (parts.any(protectedDirs.contains)) return true;
+  for (var i = 0; i < parts.length - 1; i++) {
+    final part = parts[i];
+    if (part == '.docker' || part == '.config' && parts[i + 1] == 'gcloud') {
+      return true;
+    }
+    if (part == '.git' ||
+        part == '.vscode' ||
+        part == '.idea' ||
+        part == '.husky') {
+      return true;
+    }
+    if (part == '.claude') {
+      // What the agent keeps there as a matter of course (worktrees,
+      // plans, its own commands and agents) is not.
+      final next = i + 1 < parts.length - 1 ? parts[i + 1] : null;
+      if (next == 'worktrees' || next == 'plans') return false;
+      return name.startsWith('settings') || next == 'hooks' || next == null;
+    }
+  }
+  return false;
 }

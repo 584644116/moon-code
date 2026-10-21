@@ -12,6 +12,13 @@ class FileRecord {
     this.limit,
   });
 
+  /// A file known to have been read, without what it held: what a resumed
+  /// session starts from the transcript (see [ReadFileState.seed]).
+  const FileRecord.seeded({required this.modified})
+    : content = '',
+      offset = 0,
+      limit = 0;
+
   final String content;
   final DateTime modified;
 
@@ -35,6 +42,13 @@ class ReadFileState {
 
   void operator []=(String path, FileRecord record) {
     _records[path] = record;
+    _used[path] = ++_tick;
+  }
+
+  /// Knows [path] was read at [modified], without its content: enough to
+  /// let a change be made while the file is as it was then.
+  void seed(String path, DateTime modified) {
+    _records[path] = FileRecord.seeded(modified: modified);
     _used[path] = ++_tick;
   }
 

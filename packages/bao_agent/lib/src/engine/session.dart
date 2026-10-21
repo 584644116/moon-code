@@ -182,6 +182,19 @@ class MissingCredentials implements Exception {
   String toString() => message;
 }
 
+/// The host was asked and did not answer in time: the call is not made.
+class HostRequestTimeout implements Exception {
+  const HostRequestTimeout(this.subtype, this.timeout);
+
+  /// What was asked (`can_use_tool`, `elicitation`…).
+  final String subtype;
+  final Duration timeout;
+
+  @override
+  String toString() =>
+      'No answer to $subtype within ${timeout.inSeconds} seconds';
+}
+
 /// Everything one session works with: where it is, its settings, the
 /// model, its tools' state, and how it talks to the host.
 class AgentSession {
@@ -217,11 +230,14 @@ class AgentSession {
   final void Function(Map<String, Object?>) _emit;
   final ModelClient Function(ApiConfig config) _clientFactory;
 
-  /// Sends a control request to the host and waits for its answer.
+  /// Sends a control request to the host and waits for its answer; a
+  /// request given a [timeout] fails with [HostRequestTimeout] when the
+  /// host is silent that long.
   final Future<Map<String, Object?>> Function(
     String subtype,
-    Map<String, Object?> fields,
-  )
+    Map<String, Object?> fields, {
+    Duration? timeout,
+  })
   hostRequest;
 
   late final PermissionEngine permissions;
@@ -772,7 +788,7 @@ class AgentSession {
           {'role': 'user', 'content': prompt},
         ],
         if (info.canTurnThinkingOff) 'thinking': {'type': 'disabled'},
-      }),
+      }, errand: true),
       cancel: cancel,
     )) {
       if (event['type'] == 'stream_restart') {

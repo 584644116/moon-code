@@ -724,13 +724,9 @@ class AgentLoop {
   }
 
   static String _describe(ApiError error) {
-    if (error.authentication) {
-      return 'API Error: ${error.status ?? ''} ${error.message} · Check the '
-              'API key (or the provider set up in BaoCode)'
-          .replaceAll('  ', ' ');
-    }
     if (error.promptTooLong) return 'Prompt is too long';
-    return error.toString();
+    final action = error.action;
+    return action.isEmpty ? error.toString() : '${error.toString()} · $action';
   }
 
   LoopResult _result(String reason, {String? error}) => LoopResult(
@@ -1199,21 +1195,34 @@ class AgentLoop {
     final Map<String, Object?> response;
     try {
       response = await context.cancel.guard(
-        session.hostRequest('can_use_tool', {
-          'tool_name': tool.name,
-          'display_name': tool.name,
-          'input': input,
-          'tool_use_id': context.toolUseId,
-          'permission_suggestions': ask.suggestions,
-          'description': ?tool.describe(input),
-          'decision_reason': ?ask.message,
-          'decision_reason_type': ?ask.reasonType,
-          'matched_ask_rule': ?ask.matchedAskRule,
-          'classifier_approvable': ask.classifierApprovable,
-          'requires_user_interaction': userOnly,
-          'blocked_path': ?ask.blockedPath,
-          if (!isMain) 'agent_id': run.agentId,
-        }),
+        session.hostRequest(
+          'can_use_tool',
+          {
+            'tool_name': tool.name,
+            'display_name': tool.name,
+            'input': input,
+            'tool_use_id': context.toolUseId,
+            'permission_suggestions': ask.suggestions,
+            'description': ?tool.describe(input),
+            'decision_reason': ?ask.message,
+            'decision_reason_type': ?ask.reasonType,
+            'matched_ask_rule': ?ask.matchedAskRule,
+            'classifier_approvable': ask.classifierApprovable,
+            'requires_user_interaction': userOnly,
+            'blocked_path': ?ask.blockedPath,
+            if (!isMain) 'agent_id': run.agentId,
+          },
+          // A question to the user is the turn's point: it waits as long
+          // as they take. A permission for a call is not: a host that
+          // never answers must not hold the turn forever.
+          timeout: userOnly ? null : session.settings.approvalTimeout,
+        ),
+      );
+    } on HostRequestTimeout catch (error) {
+      return PermissionDeny(
+        '${error.toString()}, so this call was not made. The user can '
+        'answer it by asking again.',
+        reasonType: 'timeout',
       );
     } on Cancelled {
       rethrow;

@@ -124,6 +124,8 @@ class AnthropicClient implements ModelClient {
     void Function(RetryInfo info)? onRetry,
   }) async* {
     cancel ??= CancelToken();
+    final maxRetries =
+        request.maxRetries ?? (request.errand ? 1 : config.maxRetries);
     var attempt = 0;
     var started = false;
     while (true) {
@@ -137,13 +139,15 @@ class AnthropicClient implements ModelClient {
       } on Cancelled {
         rethrow;
       } on ApiError catch (error) {
-        if (!error.retryable || attempt >= config.maxRetries) rethrow;
+        // A request made on the side gives up on an overload at once: the
+        // model is busy, and nothing waits on the summary or the title.
+        if (!_retryable(error, request) || attempt >= maxRetries) rethrow;
         attempt++;
         final delay = _delay(attempt, error.retryAfter);
         onRetry?.call(
           RetryInfo(
             attempt: attempt,
-            maxRetries: config.maxRetries,
+            maxRetries: maxRetries,
             delay: delay,
             status: error.status,
             message: error.message,
@@ -156,6 +160,12 @@ class AnthropicClient implements ModelClient {
         }
       }
     }
+  }
+
+  /// Whether [error] is to be sent again for [request].
+  static bool _retryable(ApiError error, ModelRequest request) {
+    if (!error.retryable) return false;
+    return !(request.errand && error.kind == ApiFailureKind.overloaded);
   }
 
   /// How long to wait before attempt [attempt]: what the API said, else

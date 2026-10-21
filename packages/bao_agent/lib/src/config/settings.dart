@@ -154,6 +154,18 @@ class AgentSettings {
 
   int? get autoCompactWindow => asInt(merged['autoCompactWindow']);
 
+  /// How long a permission question waits for the user before it is taken
+  /// as a no; null when it waits as long as the session does. Ten minutes
+  /// by default.
+  Duration? get approvalTimeout {
+    final permissions = asMap(merged['permissions']);
+    final raw = permissions['approvalTimeoutSeconds'];
+    if (raw == null) return const Duration(minutes: 10);
+    final seconds = asInt(raw);
+    if (seconds == null) return const Duration(minutes: 10);
+    return seconds <= 0 ? null : Duration(seconds: seconds);
+  }
+
   String? get defaultMode =>
       asText(asMap(merged['permissions'])['defaultMode']);
 

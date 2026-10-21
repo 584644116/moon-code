@@ -705,7 +705,7 @@ class Compaction {
         ],
         'messages': conversation,
         if (info.canTurnThinkingOff) 'thinking': {'type': 'disabled'},
-      }),
+      }, errand: true),
       cancel: cancel,
     )) {
       if (event['type'] == 'stream_restart') {
