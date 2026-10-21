@@ -6,7 +6,7 @@
 >
 > 编写日期：2026-10-21
 >
-> 本轮只做方案，不改代码。
+> 2026-10-21 更新：批次 5 已实施（提交 `2df662f`），P0-2 完成第一步；状态见 §8.1。
 
 ---
 
@@ -380,6 +380,21 @@
 ## 8. 执行批次与验收
 
 > 原则：先 `lib/chat/panels/`、`lib/chat/composer/` 与工具执行层，后 `lib/channel/` 与权限；每批单独提交；只跑相关测试，不跑全量。
+
+### 8.1 实施状态（2026-10-21）
+
+| 条目 | 状态 | 提交/说明 |
+| --- | --- | --- |
+| P0-1 上下文用量与压缩阈值同源 | 已完成 | `2df662f`：`Compaction.reserve` / `reserveOf`，`contextUsage()` 不再另算 33000 |
+| P0-2 大工具结果先留全文 | 部分完成 | `2df662f`：CCR 开启时 Bash 上限 30000 → 1000000，先交给 offload；占位符带首尾预览。独立的 `tool-results/` 文件化 spill 未做 |
+| P0-3 重复工具调用提醒 | 已完成 | `2df662f`：`RepeatGuard`，3/5/8 次，新用户消息清零，建议性 |
+| P0-5 工具级超时 | 已完成（机制） | `2df662f`：`Tool.timeout` + `callWithTimeout`；WebFetch 90 秒。MCP 工具尚未声明预算 |
+| P0-4 空回答恢复 | 未开始 | — |
+| P0-6 审批风险与审计 | 未开始 | — |
+| P0-7 浏览器敏感工具确认 | 未开始 | — |
+| P1 / P2 | 未开始 | — |
+
+> 验证：`compaction_rounds_test`、`context_usage_test`、`context_tools_test`、`session_compression_test`、`repeat_guard_test`、`tool_timeout_test` 共 32 条通过；`controls_test` 仅剩既有的 Windows 路径失败；`dart analyze packages/bao_agent/lib` 无问题。
 
 ### 批次 5：上下文用量 + 重复提醒 + 工具超时（无协议风险）
 
