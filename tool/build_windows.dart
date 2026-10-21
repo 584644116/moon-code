@@ -372,15 +372,20 @@ Future<void> _putOpenSsh(Directory root, Directory bundle) async {
   }
 }
 
-/// The Inno Setup compiler: where winget puts it, then where a manual
-/// install does, then wherever the PATH has it.
+/// The Inno Setup compiler: the one an `ISCC` environment variable names
+/// (a copy installed elsewhere), then where winget puts it, then where a
+/// manual install does, then wherever the PATH has it. The newest major
+/// version first: 7 compiles what 6 does.
 String _findIscc() {
   final local = Platform.environment['LOCALAPPDATA'];
   final candidates = [
-    if (local != null) '$local\\Programs\\Inno Setup 6\\ISCC.exe',
-    for (final variable in ['ProgramFiles(x86)', 'ProgramFiles'])
-      if (Platform.environment[variable] case final root?)
-        '$root\\Inno Setup 6\\ISCC.exe',
+    ?Platform.environment['ISCC'],
+    for (final version in [7, 6]) ...[
+      if (local != null) '$local\\Programs\\Inno Setup $version\\ISCC.exe',
+      for (final variable in ['ProgramFiles(x86)', 'ProgramFiles'])
+        if (Platform.environment[variable] case final root?)
+          '$root\\Inno Setup $version\\ISCC.exe',
+    ],
   ];
   for (final candidate in candidates) {
     if (File(candidate).existsSync()) return candidate;
@@ -390,7 +395,7 @@ String _findIscc() {
     '\n'
     '  winget install --id JRSoftware.InnoSetup\n'
     '\n'
-    'or download it from https://jrsoftware.org/isdl.php',
+    'or download version 6 or 7 from https://jrsoftware.org/isdl.php',
   );
 }
 
