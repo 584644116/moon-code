@@ -2091,6 +2091,7 @@
   "remoteUploadingClaude": "正在把 Claude Code 传到 {host}… {percent}%",
   "remoteStatusTooltip": "已通过 SSH 连接到 {host}",
   "remoteStatusTooltipLost": "与 {host} 的连接已断开：点击立即重连",
+  "remoteStatusTooltipResuming": "与 {host} 的连接已断开，正在重连；远端的终端和 Claude Code 仍在运行。点击立即重连",
   "remoteReconnect": "重新连接",
   "remoteProjectTooltip": "位于 {host}（通过 SSH）",
   "quitConfirmRemote": "{count, plural, other{远程主机上的 {count} 个会话和终端也会结束。}}",

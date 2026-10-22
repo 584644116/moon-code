@@ -5571,6 +5571,14 @@
       }
     }
   },
+  "remoteStatusTooltipResuming": "The connection to {host} is lost, and being made again: its terminals and Claude Code keep running there meanwhile. Click to reconnect now",
+  "@remoteStatusTooltipResuming": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
   "remoteReconnect": "Reconnect",
   "remoteProjectTooltip": "On {host}, over SSH",
   "@remoteProjectTooltip": {

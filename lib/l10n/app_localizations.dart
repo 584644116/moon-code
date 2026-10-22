@@ -12609,6 +12609,12 @@ abstract class AppLocalizations {
   /// **'The connection to {host} is lost: click to reconnect now'**
   String remoteStatusTooltipLost(String host);
 
+  /// No description provided for @remoteStatusTooltipResuming.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection to {host} is lost, and being made again: its terminals and Claude Code keep running there meanwhile. Click to reconnect now'**
+  String remoteStatusTooltipResuming(String host);
+
   /// No description provided for @remoteReconnect.
   ///
   /// In en, this message translates to:
