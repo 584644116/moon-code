@@ -400,10 +400,15 @@ class AgentSidePanelView extends StatelessWidget {
     this.repositories = const [],
     this.onAddFolder,
     this.onRemoveFolder,
+    this.titleBarInset = 0,
   });
 
   final AgentSidePanel panel;
   final ChatSession session;
+
+  /// Room kept at the left of its tabs: for the traffic lights, where it
+  /// is at the window's top left.
+  final double titleBarInset;
 
   /// The name of the multi-folder workspace the conversation is in; null
   /// for a folder's.
@@ -518,6 +523,7 @@ class AgentSidePanelView extends StatelessWidget {
             session: session,
             tabs: tabs,
             changes: _gits.fold(0, (sum, git) => sum + (git.state?.count ?? 0)),
+            inset: titleBarInset,
           ),
           Expanded(
             child: switch (tabs.shown) {
@@ -1414,10 +1420,15 @@ class _SectionBar extends StatelessWidget {
     required this.session,
     required this.tabs,
     required this.changes,
+    this.inset = 0,
   });
   final AgentSidePanel panel;
   final ChatSession session;
   final SidePanelTabs tabs;
+
+  /// Room kept at the left of the tabs (see
+  /// [AgentSidePanelView.titleBarInset]).
+  final double inset;
 
   /// How many files Git has changed.
   final int changes;
@@ -1495,10 +1506,12 @@ class _SectionBar extends StatelessWidget {
                     SidePanelSection.changes: changes,
                     SidePanelSection.terminal: running,
                   }) +
-                  _actionsWidth;
+                  _actionsWidth +
+                  inset;
           return Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              SizedBox(width: inset),
               for (final section in sections)
                 _SectionTab(
                   section: section,

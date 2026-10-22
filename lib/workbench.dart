@@ -2599,10 +2599,10 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
       // With the sidebar, as the chat's window has it: over the
       // conversation while narrow, beside it once wide. Its toggle is the
       // header's on Windows, else by the traffic lights while it is hidden.
+      final showToggle = narrow || !_sidebarDocked;
       final chat = _withSidePanel(
-        _withTerminal(
-          _buildChat(showToggle: narrow || !_sidebarDocked, pane: thread),
-        ),
+        _withTerminal(_buildChat(showToggle: showToggle, pane: thread)),
+        showToggle: showToggle,
       );
       return narrow ? _buildNarrow(body: chat) : _buildWide(body: chat);
     }
@@ -3414,8 +3414,10 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
 
   /// The open agents side by side (see [ChatGridView]), the terminal panel
   /// under them, the side panel at their right.
-  Widget _buildPanes({required bool showToggle}) =>
-      _withSidePanel(_withTerminal(_buildGrid(showToggle: showToggle)));
+  Widget _buildPanes({required bool showToggle}) => _withSidePanel(
+    _withTerminal(_buildGrid(showToggle: showToggle)),
+    showToggle: showToggle,
+  );
 
   void _showSidePanelSection(SidePanelSection section) {
     final thread = _agentThread ?? _workspace.current;
@@ -3452,29 +3454,41 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
     if (_sidePanel.shown) _sidePanel.focusNode.requestFocus();
   }
 
-  Widget _withSidePanel(Widget child) => AgentSidePanelArea(
-    panel: _sidePanel,
-    // Customize, in place of the conversations, isn't one of theirs.
-    hidden: _sidePanelHidden || _replacingChat,
-    // Just under the conversation's title bar, whose right has the
-    // window's buttons on macOS; at the top under Windows' header, already
-    // a bar of its own (the title row's right is empty, the rail beside
-    // its column).
-    railTop: WindowControls.drawsHeader ? 12 : AppMetrics.titleBarHeight + 4,
-    // Not in a narrow window, where the conversation has no room to spare
-    // (the title bar's toggle shows the panel). Agents side by side have
-    // one each, over their own pane (see [_paneRail]).
-    rail: switch (_agentThread ?? _workspace.current) {
-      final thread? when _agentThread != null || _workspace.grid.length < 2 =>
-        _railFor(thread),
-      _ => null,
-    },
-    builder: (context) => switch (_agentThread ?? _workspace.current) {
-      final thread? => _buildSidePanel(thread),
-      null => const SizedBox.shrink(),
-    },
-    child: child,
-  );
+  /// [showToggle]: the window's sidebar hidden, the panel at the
+  /// conversations' left is at the window's, under the traffic lights.
+  Widget _withSidePanel(Widget child, {required bool showToggle}) =>
+      AgentSidePanelArea(
+        panel: _sidePanel,
+        // Customize, in place of the conversations, isn't one of theirs.
+        hidden: _sidePanelHidden || _replacingChat,
+        // Just under the conversation's title bar, whose right has the
+        // window's buttons on macOS; at the top under Windows' header, already
+        // a bar of its own (the title row's right is empty, the rail beside
+        // its column).
+        railTop: WindowControls.drawsHeader
+            ? 12
+            : AppMetrics.titleBarHeight + 4,
+        // Not in a narrow window, where the conversation has no room to spare
+        // (the title bar's toggle shows the panel). Agents side by side have
+        // one each, over their own pane (see [_paneRail]).
+        rail: switch (_agentThread ?? _workspace.current) {
+          final thread?
+              when _agentThread != null || _workspace.grid.length < 2 =>
+            _railFor(thread),
+          _ => null,
+        },
+        builder: (context) => switch (_agentThread ?? _workspace.current) {
+          final thread? => _buildSidePanel(
+            thread,
+            titleBarInset:
+                showToggle && _sidePanel.atLeft && !WindowControls.drawsHeader
+                ? AppMetrics.trafficLightsWidth
+                : 0,
+          ),
+          null => const SizedBox.shrink(),
+        },
+        child: child,
+      );
 
   /// [_sidePanelRail] for [thread], where it has one: not in a narrow
   /// window, in place of the conversations, nor for an agent not begun.
@@ -3506,7 +3520,7 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
     );
   }
 
-  Widget _buildSidePanel(AgentThread thread) {
+  Widget _buildSidePanel(AgentThread thread, {double titleBarInset = 0}) {
     final location = thread.project.path;
     final multi = _workspace.workspaceAt(location);
     // Its IDE's repositories, found in the folders' subfolders as they are
@@ -3514,13 +3528,14 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
     if (_ideSpaces[multi?.path ?? location] case final space?) {
       return ListenableBuilder(
         listenable: space,
-        builder: (context, _) => _sidePanelView(thread),
+        builder: (context, _) =>
+            _sidePanelView(thread, titleBarInset: titleBarInset),
       );
     }
-    return _sidePanelView(thread);
+    return _sidePanelView(thread, titleBarInset: titleBarInset);
   }
 
-  Widget _sidePanelView(AgentThread thread) {
+  Widget _sidePanelView(AgentThread thread, {double titleBarInset = 0}) {
     final (:files, :paths) = _projectFiles(thread);
     final location = thread.project.path;
     final multi = _workspace.workspaceAt(location);
@@ -3572,6 +3587,7 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
       onRemoveFolder: multi == null
           ? null
           : (folder) => _workspace.removeWorkspaceFolder(multi, folder),
+      titleBarInset: titleBarInset,
     );
   }
 

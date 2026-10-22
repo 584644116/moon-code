@@ -117,6 +117,7 @@ Future<({AgentSidePanel panel, ChatSession session, _Files files})> _pumpChat(
   TerminalService? terminals,
   IdeGitRepository? git,
   IdeCommitMessageModel? commitMessage,
+  double titleBarInset = 0,
 }) async {
   _bigWindow(tester);
   final session = ChatSession(
@@ -141,6 +142,7 @@ Future<({AgentSidePanel panel, ChatSession session, _Files files})> _pumpChat(
           terminals: terminals,
           git: git,
           commitMessage: commitMessage,
+          titleBarInset: titleBarInset,
         ),
         child: ChatScreen(
           session: session,
@@ -1397,6 +1399,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.getTopRight(view).dx, 1600);
     expect(panel.toJson(), isNot(contains('atLeft')));
+  });
+
+  testWidgets('at the window\'s top left, its tabs clear of the traffic '
+      'lights (#227)', (tester) async {
+    final (:panel, :session, files: _) = await _pumpChat(tester);
+    panel
+      ..atLeft = true
+      ..open(session, const FileOpenRequest('/p/lib/main.dart'));
+    await tester.pumpAndSettle();
+    final files = tester.getTopLeft(find.text('Files')).dx;
+
+    final (panel: inset, session: insetSession, files: _) = await _pumpChat(
+      tester,
+      titleBarInset: 78,
+    );
+    inset
+      ..atLeft = true
+      ..open(insetSession, const FileOpenRequest('/p/lib/main.dart'));
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.text('Files')).dx, files + 78);
   });
 
   testWidgets('hidden at their left, its rail is at the conversations\' top '
