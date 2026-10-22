@@ -156,6 +156,11 @@ class ChatSession extends ChangeNotifier implements ChatFeed {
   }
 
   void _apply(KernelEvent event) {
+    if (event case SessionRenamed(:final title)) {
+      _renamed = title;
+      notifyListeners();
+      return;
+    }
     if (event is KernelInfoChanged || _transcript.apply(event)) {
       _cache.clear();
       _timeQuiet();
@@ -1122,6 +1127,16 @@ class ChatSession extends ChangeNotifier implements ChatFeed {
 
   void rename(String title) {
     if (_kernel case final RenamesSession kernel) kernel.rename(title);
+  }
+
+  String? _renamed;
+
+  /// The name it was last given in the agent itself (Claude Code's
+  /// `/rename`), once: null after.
+  String? takeRenamed() {
+    final renamed = _renamed;
+    _renamed = null;
+    return renamed;
   }
 
   /// The conversation is deleted: what its review kept goes too.

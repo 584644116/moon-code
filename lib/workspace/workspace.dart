@@ -2208,6 +2208,8 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
   void _sync(AgentThread thread) {
     if (!_threads.contains(thread)) return;
     final session = thread.session;
+    // Renamed in Claude Code (/rename): named so here too.
+    if (session.takeRenamed() case final title?) rename(thread, title);
     if (thread._title.isEmpty && session.itemCount > 0) {
       if (session.itemAt(0) case UserMessageItem(:final text)) {
         thread._title = text.trim().split('\n').first;
