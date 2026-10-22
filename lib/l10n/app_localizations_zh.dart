@@ -3613,6 +3613,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get placeholderOpenAnyway => '仍然打开';
 
   @override
+  String get changeOpenWith => '打开方式';
+
+  @override
   String get openInDefaultApp => '使用默认应用打开';
 
   @override

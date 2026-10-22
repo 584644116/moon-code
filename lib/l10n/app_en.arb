@@ -2552,6 +2552,7 @@
   "placeholderNotFound": "The editor could not be opened because the file was not found.",
   "placeholderUnexpected": "The editor could not be opened due to an unexpected error.",
   "placeholderOpenAnyway": "Open Anyway",
+  "changeOpenWith": "Open With",
   "openInDefaultApp": "Open in Default App",
   "@openInDefaultApp": {
     "description": "Hands a file the IDE does not show (a PDF, a video…) to the app the system opens it with."

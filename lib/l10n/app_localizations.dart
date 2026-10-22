@@ -6380,6 +6380,12 @@ abstract class AppLocalizations {
   /// **'Open Anyway'**
   String get placeholderOpenAnyway;
 
+  /// No description provided for @changeOpenWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Open With'**
+  String get changeOpenWith;
+
   /// Hands a file the IDE does not show (a PDF, a video…) to the app the system opens it with.
   ///
   /// In en, this message translates to:

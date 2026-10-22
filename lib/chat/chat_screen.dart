@@ -4,8 +4,10 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 
 import '../channel/channel_setup.dart';
+import '../ide/ide_menu.dart';
 import '../kernel/kernel_types.dart';
 import '../kernel/claude_code/claude_path_setting.dart' show installLocalClaude;
 import '../keybindings/chat_keybindings.dart';
@@ -16,7 +18,9 @@ import '../remote/remote_status.dart' show ClaudeInstallBanner, SshHostBanner;
 import '../stash/stash_actions.dart';
 import '../stash/stash_store.dart';
 import '../theme/app_theme.dart';
+import '../workspace/editor_launcher.dart';
 import '../workspace/title_bar_double_click.dart';
+import '../workspace/window_controls.dart';
 import 'agent_view.dart';
 import 'chat_column.dart';
 import 'chat_feed.dart';
@@ -583,6 +587,7 @@ class _ChatScreenState extends State<ChatScreen>
       onOpenFile: open == null
           ? null
           : (change) => open(change, _session.originalOf(change)),
+      fileActions: _fileActions,
       onStopTask: _session.stopTask,
       canOpenTask: (task) => task.kind == KernelTaskKind.command
           ? widget.onOpenTerminalTask != null
@@ -655,6 +660,71 @@ class _ChatScreenState extends State<ChatScreen>
 
   void _openCode(String path, int start, int end) =>
       _openFile(FileOpenRequest(path, range: FileLineRange(start, end)));
+
+  /// What else a changed file's menu offers: the file itself opened, not
+  /// its changes; on this machine, in the browser, its default app or an
+  /// editor, shown in the file manager; its path copied.
+  List<List<IdeMenuEntry>> _fileActions(FileChange change) {
+    final l10n = context.l10n;
+    final path = change.path;
+    final local = switch (_session.kernelContext.cwd) {
+      final cwd? => !RemoteLocation.isRemote(cwd),
+      null => true,
+    };
+    final deleted = change.kind == FileChangeKind.deleted;
+    final extension = _session.paths.extension(path).toLowerCase();
+    final editors = [
+      for (final editor in Editor.availableEditors)
+        if (!editor.builtIn &&
+            editor != Editor.folder &&
+            editor != Editor.terminal)
+          editor,
+    ];
+    return [
+      [
+        if (widget.fileLinks != null && !deleted)
+          IdeMenuAction(
+            l10n.scmOpenFile,
+            onSelected: () => _openFile(FileOpenRequest(path)),
+          ),
+        if (local && !deleted && !kIsWeb) ...[
+          if (extension == '.html' || extension == '.htm')
+            IdeMenuAction(
+              l10n.fileLinkOpenInBrowser,
+              onSelected: () => unawaited(openExternal(path)),
+            ),
+          if (WindowControls.canOpenInDefaultApp)
+            IdeMenuAction(
+              l10n.openInDefaultApp,
+              onSelected: () => unawaited(openExternal(path)),
+            ),
+          IdeMenuAction(
+            l10n.changeOpenWith,
+            submenu: [
+              for (final editor in editors)
+                IdeMenuAction(
+                  editor.localizedPlatformLabel(l10n),
+                  onSelected: () => unawaited(openInEditor(editor, path)),
+                ),
+            ],
+          ),
+        ],
+      ],
+      [
+        IdeMenuAction(
+          l10n.tabCopyPath,
+          onSelected: () =>
+              unawaited(Clipboard.setData(ClipboardData(text: path))),
+        ),
+        if (local && !deleted && WindowControls.canRevealInFileManager)
+          IdeMenuAction(
+            l10n.revealInFileManager,
+            onSelected: () =>
+                unawaited(WindowControls.revealInFileManager(path)),
+          ),
+      ],
+    ];
+  }
 
   /// The files `@` offers: [ChatScreen.fileMentions]' with the kernel's, or
   /// the kernel's alone; null when neither looks.

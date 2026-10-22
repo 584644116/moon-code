@@ -3762,6 +3762,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get placeholderOpenAnyway => 'Open Anyway';
 
   @override
+  String get changeOpenWith => 'Open With';
+
+  @override
   String get openInDefaultApp => 'Open in Default App';
 
   @override

@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/codicons.dart';
 import '../../theme/workbench_theme.dart' show themeColors;
 import '../../ide/ide_hover.dart';
+import '../../ide/ide_menu.dart';
 import '../../kernel/kernel_types.dart';
 import '../chat_models.dart';
 import '../widgets/flip_switcher.dart';
@@ -32,6 +33,7 @@ class ActivityStrip extends StatefulWidget {
     this.onKeepFiles,
     this.onUndoFiles,
     this.onOpenFile,
+    this.fileActions,
     this.onStopTask,
     this.onOpenTask,
     this.canOpenTask,
@@ -73,6 +75,9 @@ class ActivityStrip extends StatefulWidget {
 
   /// Opens a file's changes.
   final ValueChanged<FileChange>? onOpenFile;
+
+  /// See [ChangeTree.fileActions].
+  final List<List<IdeMenuEntry>> Function(FileChange file)? fileActions;
 
   static bool hasContent(List<KernelTask> tasks, List<FileChange> changes) =>
       tasks.isNotEmpty || changes.isNotEmpty;
@@ -217,6 +222,7 @@ class _ActivityStripState extends State<ActivityStrip> {
                   paths: widget.paths,
                   changes: changes,
                   onOpen: widget.onOpenFile,
+                  fileActions: widget.fileActions,
                   onKeep: widget.onKeepFiles,
                   onUndo: widget.onUndoFiles,
                 ),

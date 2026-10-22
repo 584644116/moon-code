@@ -1047,6 +1047,7 @@
   "placeholderNotFound": "无法打开编辑器，因为找不到该文件。",
   "placeholderUnexpected": "由于意外错误，无法打开编辑器。",
   "placeholderOpenAnyway": "仍然打开",
+  "changeOpenWith": "打开方式",
   "openInDefaultApp": "使用默认应用打开",
   "openInDefaultAppFailed": "无法使用默认应用打开“{name}”。",
   "placeholderTryAgain": "重试",
