@@ -6312,6 +6312,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelsEdit => '编辑…';
 
   @override
+  String get modelsDuplicate => '复制…';
+
+  @override
   String get modelsRemove => '移除';
 
   @override
@@ -6446,6 +6449,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelsHeadersPlaceholder => 'x-session-id: my-session';
+
+  @override
+  String get modelsDuplicateProvider => '复制上游';
+
+  @override
+  String get modelsDuplicateProviderDescription => '复制一份此上游，连同模型、设置和 Key。';
+
+  @override
+  String modelsDuplicateName(String name) {
+    return '$name 副本';
+  }
 
   @override
   String get modelsDelete => '删除上游';
