@@ -3712,6 +3712,20 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
 
   /// Where the files [thread]'s conversation names open: the side panel,
   /// or the IDE for its chat ([embedded]).
+  /// The file of [thread]'s `/command` [name] (see [ChatScreen.commandFile]),
+  /// on the machine it works on.
+  Future<String?> _commandFileOf(AgentThread thread, String name) {
+    final location = thread.session.kernelContext.cwd ?? thread.project.path;
+    final host = RemoteLocation.hostOf(location);
+    final store = host == null
+        ? widget.customizations
+        : _hostCustomizations[host] ??= CustomizationStore(
+            disk: RemoteCustomizationDisk(SshHosts.instance[host]),
+          );
+    if (store == null) return Future.value();
+    return store.commandFile(name, project: RemoteLocation.pathOf(location));
+  }
+
   FileLinkTarget _fileLinks(AgentThread thread, {required bool embedded}) {
     final (:files, :paths) = _projectFiles(thread);
     return FileLinkTarget(
@@ -4116,6 +4130,9 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
         below: _branchBar(thread),
         sessions: () => _mentionable(thread),
         fileMentions: _fileMentionsOf(thread.project),
+        commandFile: widget.customizations == null
+            ? null
+            : (name) => _commandFileOf(thread, name),
         openEditor: openEditor ?? () => _sidePanelEditor(thread),
       ),
     );

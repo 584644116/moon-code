@@ -31,6 +31,7 @@ import 'chat_session.dart';
 import 'open_editor.dart';
 import 'session_export_action.dart';
 import 'chat_width.dart';
+import 'composer/command_details.dart';
 import 'composer/composer.dart';
 import 'composer/composer_embeds.dart';
 import 'composer/composer_mock_data.dart';
@@ -81,6 +82,7 @@ class ChatScreen extends StatefulWidget {
     this.below,
     this.sessions,
     this.fileMentions,
+    this.commandFile,
     this.openEditor,
   });
 
@@ -161,6 +163,11 @@ class ChatScreen extends StatefulWidget {
 
   /// Where `@` looks files up, besides the kernel (see [FileMentions]).
   final FileMentions? fileMentions;
+
+  /// The file of a `/command` (no `/`): a skill's SKILL.md, a command's
+  /// markdown; null for one built in. Its menu and its tags open it, as
+  /// [fileLinks] opens a file (see [CommandDetails]).
+  final Future<String?> Function(String command)? commandFile;
 
   /// The file open in the editor beside it, where there is one: the agent
   /// is told of it with the messages sent (see [ChatSession.send]).
@@ -631,6 +638,38 @@ class _ChatScreenState extends State<ChatScreen>
   List<KernelCommand>? _commandSource;
   List<Suggestion> _commands = const [];
 
+  /// [ChatScreen.commandFile]'s answers, asked once each while the
+  /// kernel's commands are the same.
+  final Map<String, Future<String?>> _commandFiles = {};
+  List<KernelCommand>? _commandFilesOf;
+
+  String? _describeCommand(String name) {
+    for (final command in _session.commands) {
+      if (command.name != name) continue;
+      if (command.argumentHint.isEmpty) return command.description;
+      return '${command.argumentHint}  ${command.description}';
+    }
+    return null;
+  }
+
+  Future<String?> _commandFile(String name) {
+    final find = widget.commandFile;
+    if (find == null || widget.fileLinks == null) return Future.value();
+    if (!identical(_session.commands, _commandFilesOf)) {
+      _commandFilesOf = _session.commands;
+      _commandFiles.clear();
+    }
+    return _commandFiles[name] ??= () async {
+      try {
+        return await find(name);
+      } on Object {
+        return null;
+      }
+    }();
+  }
+
+  void _openCommandFile(String path) => _openFile(FileOpenRequest(path));
+
   /// Which files the conversation's inline code names exist, asked once
   /// each (see [FileOpenScope]).
   FileExistence? _existence;
@@ -793,6 +832,13 @@ class _ChatScreenState extends State<ChatScreen>
             child: scoped,
           );
         }
+        scoped = CommandDetails(
+          // Methods: the same each build.
+          describe: _describeCommand,
+          fileOf: _commandFile,
+          open: _openCommandFile,
+          child: scoped,
+        );
         return PlanStartScope(session: _session, child: scoped);
       },
       child: _buildBody(),

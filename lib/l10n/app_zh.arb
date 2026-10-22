@@ -499,6 +499,7 @@
   "sidePanelPreview": "预览",
   "sidePanelSource": "源码",
   "sidePanelEdit": "编辑",
+  "commandOpenDetails": "查看详情",
   "sidePanelNoOriginal": "不知道智能体修改前的文件内容，显示当前内容。",
   "sidePanelUnchanged": "没有差异",
   "sidePanelDeleted": "智能体删除了这个文件。",

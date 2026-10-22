@@ -1633,6 +1633,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get sidePanelEdit => '编辑';
+  String get commandOpenDetails => '查看详情';
 
   @override
   String get sidePanelNoOriginal => '不知道智能体修改前的文件内容，显示当前内容。';

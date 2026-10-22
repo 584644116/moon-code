@@ -22,6 +22,7 @@ import '../side_panel/file_link_menu.dart';
 import '../side_panel/file_open.dart';
 import '../widgets/image_thumbnails.dart';
 import '../widgets/text_preview.dart';
+import 'command_details.dart';
 import 'composer_files.dart';
 import 'paste_store.dart';
 import 'composer_mock_data.dart';
@@ -531,6 +532,8 @@ class ComposerTokenChip extends StatelessWidget {
         child: tag,
       );
     }
+    // A command's whole description, its file on a click (#220).
+    if (isCommand) tag = CommandTagDetails(name: token.label, child: tag);
     return _SelectableToken(
       text: ComposerTokenEmbed.plainText(data),
       child: tag,
