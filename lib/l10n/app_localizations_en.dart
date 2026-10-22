@@ -3579,7 +3579,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get generalSettingsClaudeCoreDescription =>
-      'Claude Code CLI: Anthropic\'s own program, with this machine\'s sign-in and setup; pick it to use a Claude subscription. Built-in: comes with BaoCode, and uses only the models added in Settings → Models. The CLI is the default when Claude Code is installed here, the built-in core otherwise. Changes apply to new sessions.';
+      'Claude Code CLI: Anthropic\'s own program, with this machine\'s sign-in and setup; pick it to use a Claude subscription. Built-in: comes with BaoCode, and uses only the models added in Settings → Models. The CLI is the default, downloaded for you if this machine has none. Changes apply to new sessions.';
 
   @override
   String get generalSettingsClaudeCoreBuiltin => 'Built-in';
@@ -9975,6 +9975,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelSetUp => 'Set Up a Model';
+
+  @override
+  String get claudeCoreHint =>
+      'This chat runs on BaoCode\'s built-in core. We recommend the Claude Code core for the fullest experience; it\'s downloaded for you if needed.';
+
+  @override
+  String get claudeCoreHintSwitch => 'Switch to Claude Code';
+
+  @override
+  String get claudeCoreHintLater => 'Not Now';
 
   @override
   String get remoteAddServer => 'Add SSH Server...';

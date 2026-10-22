@@ -6065,7 +6065,7 @@ abstract class AppLocalizations {
   /// No description provided for @generalSettingsClaudeCoreDescription.
   ///
   /// In en, this message translates to:
-  /// **'Claude Code CLI: Anthropic\'s own program, with this machine\'s sign-in and setup; pick it to use a Claude subscription. Built-in: comes with BaoCode, and uses only the models added in Settings → Models. The CLI is the default when Claude Code is installed here, the built-in core otherwise. Changes apply to new sessions.'**
+  /// **'Claude Code CLI: Anthropic\'s own program, with this machine\'s sign-in and setup; pick it to use a Claude subscription. Built-in: comes with BaoCode, and uses only the models added in Settings → Models. The CLI is the default, downloaded for you if this machine has none. Changes apply to new sessions.'**
   String get generalSettingsClaudeCoreDescription;
 
   /// Claude Code core choice: BaoCode's own agent core, written in Dart and run inside the app.
@@ -16292,6 +16292,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Set Up a Model'**
   String get modelSetUp;
+
+  /// No description provided for @claudeCoreHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This chat runs on BaoCode\'s built-in core. We recommend the Claude Code core for the fullest experience; it\'s downloaded for you if needed.'**
+  String get claudeCoreHint;
+
+  /// No description provided for @claudeCoreHintSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Claude Code'**
+  String get claudeCoreHintSwitch;
+
+  /// No description provided for @claudeCoreHintLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Not Now'**
+  String get claudeCoreHintLater;
 
   /// No description provided for @remoteAddServer.
   ///

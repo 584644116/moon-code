@@ -3436,7 +3436,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get generalSettingsClaudeCoreDescription =>
-      'Claude Code CLI：Anthropic 官方程序，沿用本机的登录和配置，用 Claude 订阅请选它。内置：BaoCode 自带，只用 设置 → 模型 里添加的模型。本机装了 Claude Code 时默认用 CLI，否则用内置。改动对新开的会话生效。';
+      'Claude Code CLI：Anthropic 官方程序，沿用本机的登录和配置，用 Claude 订阅请选它。内置：BaoCode 自带，只用 设置 → 模型 里添加的模型。默认用 CLI，本机没有时会自动下载。改动对新开的会话生效。';
 
   @override
   String get generalSettingsClaudeCoreBuiltin => '内置';
@@ -9431,6 +9431,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelSetUp => '设置模型';
+
+  @override
+  String get claudeCoreHint =>
+      '当前用的是 BaoCode 内置内核。推荐换成 Claude Code 内核，体验更完整；没安装的话会自动帮你下载。';
+
+  @override
+  String get claudeCoreHintSwitch => '切换到 Claude Code';
+
+  @override
+  String get claudeCoreHintLater => '暂不';
 
   @override
   String get remoteAddServer => '新增 SSH 服务器…';

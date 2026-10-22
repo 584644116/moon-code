@@ -2398,7 +2398,7 @@
   "@generalSettingsClaudeCore": {
     "description": "Settings → General → Claude Code row: what runs Claude Code sessions, BaoCode's built-in core (written in Dart) or the Claude Code CLI."
   },
-  "generalSettingsClaudeCoreDescription": "Claude Code CLI: Anthropic's own program, with this machine's sign-in and setup; pick it to use a Claude subscription. Built-in: comes with BaoCode, and uses only the models added in Settings → Models. The CLI is the default when Claude Code is installed here, the built-in core otherwise. Changes apply to new sessions.",
+  "generalSettingsClaudeCoreDescription": "Claude Code CLI: Anthropic's own program, with this machine's sign-in and setup; pick it to use a Claude subscription. Built-in: comes with BaoCode, and uses only the models added in Settings → Models. The CLI is the default, downloaded for you if this machine has none. Changes apply to new sessions.",
   "generalSettingsClaudeCoreBuiltin": "Built-in",
   "@generalSettingsClaudeCoreBuiltin": {
     "description": "Claude Code core choice: BaoCode's own agent core, written in Dart and run inside the app."
@@ -7031,6 +7031,9 @@
   "modelWelcomeStart": "Start Chatting",
   "healthNoModel": "Pick a model to start: add an upstream and its models are ready to use.",
   "modelSetUp": "Set Up a Model",
+  "claudeCoreHint": "This chat runs on BaoCode's built-in core. We recommend the Claude Code core for the fullest experience; it's downloaded for you if needed.",
+  "claudeCoreHintSwitch": "Switch to Claude Code",
+  "claudeCoreHintLater": "Not Now",
   "remoteAddServer": "Add SSH Server...",
   "remoteEditServer": "Edit",
   "settingsSectionSsh": "SSH Servers",
