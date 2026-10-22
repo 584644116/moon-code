@@ -118,6 +118,7 @@ Future<({AgentSidePanel panel, ChatSession session, _Files files})> _pumpChat(
   IdeGitRepository? git,
   IdeCommitMessageModel? commitMessage,
   double titleBarInset = 0,
+  Widget? leading,
 }) async {
   _bigWindow(tester);
   final session = ChatSession(
@@ -143,6 +144,7 @@ Future<({AgentSidePanel panel, ChatSession session, _Files files})> _pumpChat(
           git: git,
           commitMessage: commitMessage,
           titleBarInset: titleBarInset,
+          leading: leading,
         ),
         child: ChatScreen(
           session: session,
@@ -1402,7 +1404,7 @@ void main() {
   });
 
   testWidgets('at the window\'s top left, its tabs clear of the traffic '
-      'lights (#227)', (tester) async {
+      'lights, the sidebar\'s toggle by them (#227)', (tester) async {
     final (:panel, :session, files: _) = await _pumpChat(tester);
     panel
       ..atLeft = true
@@ -1410,15 +1412,19 @@ void main() {
     await tester.pumpAndSettle();
     final files = tester.getTopLeft(find.text('Files')).dx;
 
+    // The sidebar's toggle by them, the tabs after it.
+    const toggle = ValueKey('sidebar-toggle');
     final (panel: inset, session: insetSession, files: _) = await _pumpChat(
       tester,
       titleBarInset: 78,
+      leading: const SizedBox(key: toggle, width: 22, height: 22),
     );
     inset
       ..atLeft = true
       ..open(insetSession, const FileOpenRequest('/p/lib/main.dart'));
     await tester.pumpAndSettle();
-    expect(tester.getTopLeft(find.text('Files')).dx, files + 78);
+    expect(tester.getTopLeft(find.byKey(toggle)).dx, 78);
+    expect(tester.getTopLeft(find.text('Files')).dx, files + 78 + 22 + 6);
   });
 
   testWidgets('hidden at their left, its rail is at the conversations\' top '

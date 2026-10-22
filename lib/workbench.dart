@@ -426,6 +426,15 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
     settings: widget.settings?.files?.settings,
   )..addListener(_sidePanelChanged);
   bool _sidePanelShown = false;
+  late bool _sidePanelAtLeft = _sidePanel.atLeft;
+
+  /// Whether the side panel shows at the conversations' left: at the
+  /// window's, the sidebar's toggle by the traffic lights is its.
+  bool get _sidePanelAtWindowLeft =>
+      _sidePanelShown &&
+      !_sidePanelHidden &&
+      !_replacingChat &&
+      _sidePanelAtLeft;
 
   /// The title bars' toggles follow it (not its width, as it is dragged).
   /// Asked for where it had given way, or with no room for it and the
@@ -433,7 +442,12 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
   /// [_sidePanelLast]).
   void _sidePanelChanged() {
     final asked = _sidePanel.asks != _sidePanelAsks;
-    if (_sidePanel.shown == _sidePanelShown && !asked) return;
+    if (_sidePanel.shown == _sidePanelShown &&
+        _sidePanel.atLeft == _sidePanelAtLeft &&
+        !asked) {
+      return;
+    }
+    _sidePanelAtLeft = _sidePanel.atLeft;
     if (asked) {
       _sidePanelAsks = _sidePanel.asks;
       // Showing already, the sidebar gives way only to a narrower window.
@@ -3456,39 +3470,44 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
 
   /// [showToggle]: the window's sidebar hidden, the panel at the
   /// conversations' left is at the window's, under the traffic lights.
-  Widget _withSidePanel(Widget child, {required bool showToggle}) =>
-      AgentSidePanelArea(
-        panel: _sidePanel,
-        // Customize, in place of the conversations, isn't one of theirs.
-        hidden: _sidePanelHidden || _replacingChat,
-        // Just under the conversation's title bar, whose right has the
-        // window's buttons on macOS; at the top under Windows' header, already
-        // a bar of its own (the title row's right is empty, the rail beside
-        // its column).
-        railTop: WindowControls.drawsHeader
-            ? 12
-            : AppMetrics.titleBarHeight + 4,
-        // Not in a narrow window, where the conversation has no room to spare
-        // (the title bar's toggle shows the panel). Agents side by side have
-        // one each, over their own pane (see [_paneRail]).
-        rail: switch (_agentThread ?? _workspace.current) {
-          final thread?
-              when _agentThread != null || _workspace.grid.length < 2 =>
-            _railFor(thread),
-          _ => null,
-        },
-        builder: (context) => switch (_agentThread ?? _workspace.current) {
-          final thread? => _buildSidePanel(
-            thread,
-            titleBarInset:
-                showToggle && _sidePanel.atLeft && !WindowControls.drawsHeader
-                ? AppMetrics.trafficLightsWidth
-                : 0,
+  Widget _withSidePanel(
+    Widget child, {
+    required bool showToggle,
+  }) => AgentSidePanelArea(
+    panel: _sidePanel,
+    // Customize, in place of the conversations, isn't one of theirs.
+    hidden: _sidePanelHidden || _replacingChat,
+    // Just under the conversation's title bar, whose right has the
+    // window's buttons on macOS; at the top under Windows' header, already
+    // a bar of its own (the title row's right is empty, the rail beside
+    // its column).
+    railTop: WindowControls.drawsHeader ? 12 : AppMetrics.titleBarHeight + 4,
+    // Not in a narrow window, where the conversation has no room to spare
+    // (the title bar's toggle shows the panel). Agents side by side have
+    // one each, over their own pane (see [_paneRail]).
+    rail: switch (_agentThread ?? _workspace.current) {
+      final thread? when _agentThread != null || _workspace.grid.length < 2 =>
+        _railFor(thread),
+      _ => null,
+    },
+    builder: (context) => switch (_agentThread ?? _workspace.current) {
+      final thread?
+          when showToggle && _sidePanel.atLeft && !WindowControls.drawsHeader =>
+        _buildSidePanel(
+          thread,
+          titleBarInset: AppMetrics.trafficLightsWidth,
+          leading: SidebarIconButton(
+            icon: Codicons.layoutSidebarLeftOff,
+            tooltip: context.l10n.windowShowSidebar,
+            command: 'workbench.action.toggleSidebarVisibility',
+            onTap: _toggle,
           ),
-          null => const SizedBox.shrink(),
-        },
-        child: child,
-      );
+        ),
+      final thread? => _buildSidePanel(thread),
+      null => const SizedBox.shrink(),
+    },
+    child: child,
+  );
 
   /// [_sidePanelRail] for [thread], where it has one: not in a narrow
   /// window, in place of the conversations, nor for an agent not begun.
@@ -3520,7 +3539,11 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
     );
   }
 
-  Widget _buildSidePanel(AgentThread thread, {double titleBarInset = 0}) {
+  Widget _buildSidePanel(
+    AgentThread thread, {
+    double titleBarInset = 0,
+    Widget? leading,
+  }) {
     final location = thread.project.path;
     final multi = _workspace.workspaceAt(location);
     // Its IDE's repositories, found in the folders' subfolders as they are
@@ -3528,14 +3551,25 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
     if (_ideSpaces[multi?.path ?? location] case final space?) {
       return ListenableBuilder(
         listenable: space,
-        builder: (context, _) =>
-            _sidePanelView(thread, titleBarInset: titleBarInset),
+        builder: (context, _) => _sidePanelView(
+          thread,
+          titleBarInset: titleBarInset,
+          leading: leading,
+        ),
       );
     }
-    return _sidePanelView(thread, titleBarInset: titleBarInset);
+    return _sidePanelView(
+      thread,
+      titleBarInset: titleBarInset,
+      leading: leading,
+    );
   }
 
-  Widget _sidePanelView(AgentThread thread, {double titleBarInset = 0}) {
+  Widget _sidePanelView(
+    AgentThread thread, {
+    double titleBarInset = 0,
+    Widget? leading,
+  }) {
     final (:files, :paths) = _projectFiles(thread);
     final location = thread.project.path;
     final multi = _workspace.workspaceAt(location);
@@ -3588,6 +3622,7 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
           ? null
           : (folder) => _workspace.removeWorkspaceFolder(multi, folder),
       titleBarInset: titleBarInset,
+      leading: leading,
     );
   }
 
@@ -3994,7 +4029,9 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
     // in the top left pane, by the traffic lights, and the pin and the
     // editor button in the top right one.
     final header = WindowControls.drawsHeader;
-    showToggle = showToggle && place.topLeft;
+    // The side panel at the window's left has it, by the traffic lights.
+    showToggle =
+        showToggle && place.topLeft && (embedded || !_sidePanelAtWindowLeft);
     final leading = !header && showToggle
         ? SidebarIconButton(
             icon: Codicons.layoutSidebarLeftOff,
