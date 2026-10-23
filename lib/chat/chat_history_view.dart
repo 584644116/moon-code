@@ -2017,6 +2017,8 @@ class _ChatHistoryViewState extends State<ChatHistoryView>
       _ => null,
     },
     _isExpanded(index),
+    // Opened for editing, its row is the editor's room, not the message.
+    index == _editingIndex,
     _motions[index] ?? 0,
     _appearing.contains(index),
     index == _handoffIndex,
