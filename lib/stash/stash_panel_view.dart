@@ -10,6 +10,7 @@ import '../base/smooth_scroll.dart';
 import '../chat/composer/file_drop.dart';
 import '../chat/widgets/hover_builder.dart';
 import '../chat/widgets/scroll_edge_fade.dart';
+import '../icons/brand_logos.dart' show BaoCodeLogo;
 import '../ide/ide_dialog.dart';
 import '../ide/ide_hover.dart';
 import '../ide/ide_input.dart';
@@ -26,7 +27,8 @@ import '../theme/codicons.dart';
 import '../theme/workbench_theme.dart' show themeColors;
 import '../workspace/pin_window_button.dart';
 import '../workspace/window_controls.dart';
-import 'stash_actions.dart' show stashReferenceOf, stashProjectIcon;
+import 'stash_actions.dart'
+    show implementStash, stashReferenceOf, stashProjectIcon;
 import 'stash_controller.dart';
 import 'stash_editor.dart' show StashAttachment, StashAttachmentIcon, StashRefs;
 import 'stash_note.dart';
@@ -156,6 +158,23 @@ class _StashPanelViewState extends State<StashPanelView> {
     await _controller.clarify(id);
   }
 
+  /// Carries the stash out in BaoCode (see [implementStash]): its project
+  /// and how asked here, the agent made shown in BaoCode's window, the
+  /// panel out of its way.
+  Future<void> _implement(int id, Rect anchor) async {
+    await _flush();
+    if (!mounted) return;
+    final thread = await implementStash(
+      context,
+      _controller,
+      id,
+      anchor: anchor,
+    );
+    if (thread == null) return;
+    await _controller.hide();
+    _controller.windows?.showAgent(thread);
+  }
+
   /// The panel's own keys (StashPanel.swift sends them, ahead of the app's
   /// menu), Esc among them.
   void _menuCommand(String command) {
@@ -272,6 +291,12 @@ class _StashPanelViewState extends State<StashPanelView> {
                         ),
                       _ => null,
                     },
+                    implement: switch (note) {
+                      final note? when !note.isBlank => (anchor) => unawaited(
+                        _implement(note.id, anchor),
+                      ),
+                      _ => null,
+                    },
                   ),
                   Expanded(child: editor),
                   _Footer(
@@ -360,11 +385,16 @@ class _TopBar extends StatelessWidget {
     required this.pinned,
     required this.onPinned,
     this.clarify,
+    this.implement,
   });
 
   /// Says the stash clearly, [compact] its icon alone; none while there is
   /// nothing written.
   final Widget Function(bool compact)? clarify;
+
+  /// Carries it out in BaoCode, its menus under [Rect]; none while there
+  /// is nothing written.
+  final void Function(Rect anchor)? implement;
 
   /// Whether the panel stays over other apps' windows; the pin changes it.
   final bool pinned;
@@ -404,6 +434,21 @@ class _TopBar extends StatelessWidget {
           final box = context.findRenderObject() as RenderBox?;
           if (box == null) return;
           onProject(box.localToGlobal(Offset.zero) & box.size);
+        },
+      ),
+    );
+    Widget implementPill(
+      void Function(Rect anchor) implement, {
+      required bool compact,
+    }) => Builder(
+      builder: (context) => _PillButton(
+        leading: const BaoCodeLogo(size: 13),
+        label: compact ? null : l10n.stashImplementShort,
+        tooltip: l10n.stashImplement,
+        onTap: () {
+          final box = context.findRenderObject() as RenderBox?;
+          if (box == null) return;
+          implement(box.localToGlobal(Offset.zero) & box.size);
         },
       ),
     );
@@ -500,6 +545,18 @@ class _TopBar extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: clarify(false),
+                ),
+              ),
+            if (implement case final implement?)
+              GiveWay(
+                priority: 3,
+                compact: Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: implementPill(implement, compact: true),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: implementPill(implement, compact: false),
                 ),
               ),
             GiveWay(
@@ -1556,9 +1613,13 @@ class _PillButton extends StatelessWidget {
     this.label,
     this.faint = false,
     this.active = false,
+    this.leading,
   });
 
   final IconData? icon;
+
+  /// In place of [icon], in its color.
+  final Widget? leading;
   final String? label;
   final String tooltip;
   final VoidCallback onTap;
@@ -1600,9 +1661,15 @@ class _PillButton extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (icon case final icon?) Icon(icon, size: 13, color: color),
+                if (leading case final leading?)
+                  IconTheme.merge(
+                    data: IconThemeData(color: color),
+                    child: leading,
+                  )
+                else if (icon case final icon?)
+                  Icon(icon, size: 13, color: color),
                 if (label != null) ...[
-                  if (icon != null) const SizedBox(width: 5),
+                  if (icon != null || leading != null) const SizedBox(width: 5),
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 160),
                     child: Text(

@@ -9840,4 +9840,102 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutOpen => '打开';
+
+  @override
+  String get stashSettingsIssueSync => 'Issue 同步为 Stash';
+
+  @override
+  String get stashSettingsIssueSyncDescription =>
+      '项目是 GitHub / GitLab 上的 Git 仓库（并已在「账号」中登录）时，它的未关闭 issue 会成为 Stash，一个 issue 只对应一条，双向保持一致。删除或取消关联的不会再被拉回来。';
+
+  @override
+  String get stashIssueSyncAuto => '自动：可推送的仓库同步全部，其余只同步我的';
+
+  @override
+  String get stashIssueSyncMine => '只同步指派给我或我创建的';
+
+  @override
+  String get stashIssueSyncOff => '关闭：只保留手动导入或发布的';
+
+  @override
+  String get stashIssueLocal => '仅本地';
+
+  @override
+  String get stashIssueAllow => '允许发布为 issue';
+
+  @override
+  String get stashIssueNotPublished => '尚未发布为 issue';
+
+  @override
+  String stashIssuePublishTo(String repo) {
+    return '发布为 $repo 的 issue…';
+  }
+
+  @override
+  String get stashIssueKeepLocal => '仅本地保存';
+
+  @override
+  String get stashIssuePush => '把本地改动推送到 issue…';
+
+  @override
+  String get stashIssuePushShort => '推送';
+
+  @override
+  String get stashIssueTakeRemote => '放弃本地改动，用 issue 上的版本';
+
+  @override
+  String get stashIssueUnlinkOwn => '取消关联，仅本地保存';
+
+  @override
+  String stashIssueConflict(String tag) {
+    return '$tag 在远端也被改过了，保留哪一边？';
+  }
+
+  @override
+  String get stashIssueKeepMine => '保留本地（推送）';
+
+  @override
+  String get stashIssueKeepTheirs => '用 issue 的';
+
+  @override
+  String stashIssueChangedHere(String tag) {
+    return '本地改动还没同步到 $tag。';
+  }
+
+  @override
+  String get stashIssueDiscard => '放弃改动';
+
+  @override
+  String stashIssuePublishTitle(String repo) {
+    return '发布为 $repo 的 issue';
+  }
+
+  @override
+  String stashIssuePushTitle(String tag) {
+    return '把改动推送到 $tag';
+  }
+
+  @override
+  String get stashIssuePublish => '发布';
+
+  @override
+  String get stashIssueNoText => '（没有描述）';
+
+  @override
+  String stashIssuePicturesGitHub(int count, String branch) {
+    return '$count 张图片会上传到仓库的 $branch 分支，供 issue 显示。';
+  }
+
+  @override
+  String stashIssuePicturesGitLab(int count) {
+    return '$count 张图片会上传到项目，供 issue 显示。';
+  }
+
+  @override
+  String get stashImplementShort => '实施';
+
+  @override
+  String stashImplementIssue(String issue) {
+    return '它对应 issue $issue，提 PR 时写明修复了它。';
+  }
 }

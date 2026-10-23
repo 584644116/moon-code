@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart' show sha1;
 import 'package:flutter/foundation.dart';
 
 /// Where a stash stands. It moves on by what is done with it, never by
@@ -244,6 +245,10 @@ class StashNote {
     List<StashIssueLink>? issues,
     this.source = StashSource.none,
     this.suggestedProject,
+    this.issue,
+    this.local = false,
+    this.synced,
+    this.syncedRemote,
   }) : updated = updated ?? created,
        threads = threads ?? [],
        issues = issues ?? [];
@@ -283,6 +288,58 @@ class StashNote {
 
   /// A project the model thinks it is about, for the user to confirm.
   String? suggestedProject;
+
+  /// The issue it is (its page): the same thing on the project's forge,
+  /// kept in step with it (see StashForge). Not the issues it links to.
+  String? issue;
+
+  /// Kept to this machine: not made an issue, nor asked to be.
+  bool local;
+
+  /// [syncHash] of its title and text, and of the issue's, as they were
+  /// when last the same: which of the two changed since.
+  String? synced;
+  String? syncedRemote;
+
+  /// The issue it is: [issue], else (imported before it was kept) the one
+  /// whose card its text starts with; none when [local].
+  String? get ownIssue {
+    if (local) return null;
+    if (issue case final issue?) return issue;
+    final card = _leadingCard(body);
+    if (card == null) return null;
+    return issues.any((link) => link.url == card) ? card : null;
+  }
+
+  /// Its text as its issue's description: without the card of the issue
+  /// it starts with (imported).
+  String get issueText {
+    final own = ownIssue;
+    if (own == null || _leadingCard(body) != own) return body.trim();
+    final newline = body.indexOf('\n');
+    return newline < 0 ? '' : body.substring(newline + 1).trim();
+  }
+
+  /// Its text with [text], its issue's, in place of [issueText].
+  String withIssueText(String text) {
+    final own = ownIssue;
+    if (own == null || _leadingCard(body) != own) return text.trim();
+    final card = body.split('\n').first;
+    return text.trim().isEmpty ? card : '$card\n\n${text.trim()}';
+  }
+
+  /// The address of the card (`[…](url "card")`) [body] starts with.
+  static String? _leadingCard(String body) =>
+      RegExp(r'^\[[^\n]*\]\((\S+) "card"\)[ \t]*(?:\n|$)')
+          .firstMatch(body.trimLeft())?[1];
+
+  /// What tells a title and text from another: [synced]'s.
+  static String syncHash(String title, String text) =>
+      sha1.convert(utf8.encode('${title.trim()}\n${text.trim()}')).toString();
+
+  /// Whether it was changed here since it was last as its issue is.
+  bool get changedHere =>
+      synced != null && syncHash(title, issueText) != synced;
 
   /// `#12`.
   String get tag => '#$id';
@@ -370,6 +427,10 @@ class StashNote {
     issues: [...issues],
     source: source,
     suggestedProject: suggestedProject,
+    issue: issue,
+    local: local,
+    synced: synced,
+    syncedRemote: syncedRemote,
   );
 
   // --- The file ---------------------------------------------------------------
@@ -390,6 +451,10 @@ class StashNote {
         'issues': [for (final link in issues) link.toJson()],
       if (!source.isEmpty) 'source': source.toJson(),
       'suggestedProject': ?suggestedProject,
+      'issue': ?issue,
+      if (local) 'local': true,
+      'synced': ?synced,
+      'syncedRemote': ?syncedRemote,
     };
     final buffer = StringBuffer('---\n');
     for (final MapEntry(:key, :value) in meta.entries) {
@@ -435,6 +500,13 @@ class StashNote {
       ],
       source: StashSource.fromJson(meta['source']),
       suggestedProject: meta['suggestedProject'] as String?,
+      issue: switch (meta['issue']) {
+        final String url when url.isNotEmpty => url,
+        _ => null,
+      },
+      local: meta['local'] == true,
+      synced: meta['synced'] as String?,
+      syncedRemote: meta['syncedRemote'] as String?,
     );
   }
 

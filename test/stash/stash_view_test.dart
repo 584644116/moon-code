@@ -12,6 +12,7 @@ import 'package:baocode/stash/stash_note_editor.dart';
 import 'package:baocode/stash/stash_store.dart';
 import 'package:baocode/sidebar/sidebar.dart' show SidebarIconButton;
 import 'package:baocode/stash/stash_thread_view.dart';
+import 'package:baocode/ide/ide_hover.dart';
 import 'package:baocode/stash/stash_view.dart';
 import 'package:baocode/chat/chat_session.dart' show ComposerMessage;
 import 'package:baocode/theme/app_theme.dart';
@@ -476,8 +477,8 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('the card shows the conversation it was last worked on in, '
-      'what its agent said; the detail lists them all, a click away', (
+  testWidgets('the row shows the conversation it was last worked on in, '
+      'what its agent said on hover; the detail lists them all, a click away', (
     tester,
   ) async {
     // Its agents' kernels started in the test's time.
@@ -520,17 +521,23 @@ void main() {
     AgentThread? opened;
     await pumpView(tester, onOpenAgent: (thread) => opened = thread);
 
-    final chip = find.byType(StashThreadChip);
+    final chip = find.byType(StashThreadInline);
     expect(chip, findsOneWidget);
     Finder inChip(String text) =>
         find.descendant(of: chip, matching: find.text(text));
     expect(inChip(thread.title), findsOneWidget);
-    expect(inChip('Uploads retry three times now.'), findsOneWidget);
     expect(inChip('+1'), findsOneWidget);
-    // In place of its text (its title stays).
+    // What its agent said, on hover.
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is IdeHover &&
+            '${widget.message}'.contains('Uploads retry three times now.'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Uploads fail'), findsOneWidget);
-    expect(find.text('They should retry on 503'), findsNothing);
-    // A click on it is the card's: the stash opens, not the conversation.
+    // A click on it is the row's: the stash opens, not the conversation.
     await tester.tap(chip);
     expect(opened, isNull);
     // Sliding in.

@@ -60,11 +60,14 @@ class StashIssueBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final own = note.ownIssue;
     final links = [
       for (final link in note.issues)
         if (forge.refOf(link.url) case final ref?) (link, ref),
     ];
     if (links.isEmpty) return const SizedBox.shrink();
+    // The issue it is first.
+    links.sort((a, b) => (b.$1.url == own ? 1 : 0) - (a.$1.url == own ? 1 : 0));
     final (link, ref) = links.first;
     final state = forge.stateOf(link);
     final (icon, color) = forgeStateLook(ref.kind, state);

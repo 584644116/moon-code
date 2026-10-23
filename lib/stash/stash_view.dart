@@ -3,8 +3,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart'
-    show SliverConstraints, SliverGridLayout, SliverGridRegularTileLayout;
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
@@ -37,17 +35,17 @@ import '../workspace/workspace.dart';
 import 'stash_actions.dart';
 import 'stash_ai.dart';
 import 'stash_controller.dart';
-import 'stash_editor.dart' show StashRefs, isRemoteStashPicture;
+import 'stash_editor.dart' show StashRefs;
 import 'stash_forge_view.dart';
-import 'stash_io_stub.dart' if (dart.library.io) 'stash_io.dart' as io;
+import 'stash_issue_view.dart';
 import 'stash_note.dart';
 import 'stash_note_editor.dart';
 import 'stash_settings.dart';
 import 'stash_thread_view.dart';
 import 'stash_welcome.dart';
 
-/// The stashes, in place of the conversations (see docs/stash.md): cards
-/// by their number, the newest first, those done last and faded; searched
+/// The stashes, in place of the conversations (see docs/stash.md): rows,
+/// as a forge lists issues, the newest first, those done last; searched
 /// by their words (and the text in their pictures), or by what they mean
 /// (AI, when asked: it costs); filtered by time, projects and statuses
 /// (those not done at first). Picked, one shows beside them to be read
@@ -955,13 +953,16 @@ class StashViewState extends State<StashView>
     else
       const SliverToBoxAdapter(child: SizedBox(height: 10)),
     SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      sliver: SliverGrid.builder(
-        gridDelegate: const _StashCardGrid(),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      sliver: SliverList.separated(
         itemCount: notes.length,
+        separatorBuilder: (context, _) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Container(height: 1, color: AppColors.partBorder),
+        ),
         itemBuilder: (context, i) {
           final note = notes[i];
-          return _StashCard(
+          return _StashRow(
             key: _cardKeys.putIfAbsent(note.id, GlobalKey.new),
             note: note,
             store: _controller,
@@ -1006,7 +1007,7 @@ class StashViewState extends State<StashView>
       spacing: 6,
       runSpacing: 6,
       children: [
-        _FilterChip(
+        StashChip(
           icon: Codicons.history,
           label: timeLabel,
           active: _time != _Time.all,
@@ -1027,7 +1028,7 @@ class StashViewState extends State<StashView>
           ),
         ),
         // Several of these, checked in the menu, which stays open.
-        _FilterChip(
+        StashChip(
           icon: Codicons.folder,
           label: projectLabel,
           active: _projects.isNotEmpty,
@@ -1056,7 +1057,7 @@ class StashViewState extends State<StashView>
             ]),
           ),
         ),
-        _FilterChip(
+        StashChip(
           icon: Codicons.filter,
           label: statusLabel,
           active: !allStatuses,
@@ -1520,7 +1521,7 @@ class _StashDetailState extends State<StashDetail> with _StashActions {
             runSpacing: 6,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              _FilterChip(
+              StashChip(
                 icon: _statusIcon(note.status),
                 label: stashStatusLabel(l10n, note.status),
                 active: true,
@@ -1531,7 +1532,7 @@ class _StashDetailState extends State<StashDetail> with _StashActions {
                   ),
                 ),
               ),
-              _FilterChip(
+              StashChip(
                 icon: Codicons.folder,
                 label: _projectName(note.project) ?? l10n.stashNoProject,
                 active: note.project != null,
@@ -1545,6 +1546,12 @@ class _StashDetailState extends State<StashDetail> with _StashActions {
                   ),
                 ),
               ),
+              if (_controller.forge case final forge?)
+                StashIssueChip(
+                  key: ValueKey(('issue', note.id)),
+                  forge: forge,
+                  note: note,
+                ),
               Text(
                 _sourceText(note),
                 style: TextStyle(color: AppColors.textFaint, fontSize: 11.5),
@@ -1552,6 +1559,11 @@ class _StashDetailState extends State<StashDetail> with _StashActions {
             ],
           ),
         ),
+        if (_controller.forge case final forge? when note.ownIssue != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+            child: StashIssueSyncBanner(forge: forge, note: note),
+          ),
         if (note.project == null && suggested != null && suggested.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
@@ -1718,8 +1730,12 @@ IconData _statusIcon(StashStatus status) => switch (status) {
 
 /// A stash's card: its title, the start of its text, its first picture,
 /// its project and status. Dragged, it goes into a composer.
-class _StashCard extends StatelessWidget {
-  const _StashCard({
+/// A stash in the list, as an issue is in a forge's: its status, title
+/// and what is worked on in it on a line; its number, time, project and
+/// the start of its text under it. A click shows it; dragged, it is
+/// mentioned where it is dropped.
+class _StashRow extends StatelessWidget {
+  const _StashRow({
     super.key,
     required this.note,
     required this.store,
@@ -1734,7 +1750,7 @@ class _StashCard extends StatelessWidget {
   final StashController store;
 
   /// Whether it is selected, as [selection] says it may have changed: the
-  /// card's frame drawn anew, not what is in it.
+  /// row's background drawn anew, not what is in it.
   final Listenable selection;
   final ValueGetter<bool> selected;
   final String? projectName;
@@ -1744,15 +1760,25 @@ class _StashCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final picture = note.images.firstOrNull;
     final done = note.status == StashStatus.done;
-    // Built once: a hover or a selection draws its frame anew alone.
+    final faint = TextStyle(color: AppColors.textFaint, fontSize: 11.5);
+    final summary = note.summary;
+    final forge = store.forge;
+    // Built once: a hover or a selection draws its background anew alone.
     final content = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: IdeHover(
+            message: stashStatusLabel(l10n, note.status),
+            child: StashStatusIcon(note.status),
+          ),
+        ),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
                 children: [
@@ -1766,117 +1792,70 @@ class _StashCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: AppColors.textPrimary,
+                        color: done
+                            ? AppColors.textMuted
+                            : AppColors.textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        decoration: done ? TextDecoration.lineThrough : null,
-                        decorationColor: AppColors.textFaint,
                       ),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Expanded(
-                // Worked on: where, in place of its text (its title says
-                // what it is).
-                child: note.threads.isNotEmpty
-                    ? StashThreadChip(controller: store, note: note)
-                    : Text(
-                        note.summary,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 12,
-                          height: 1.45,
-                        ),
-                      ),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Text(
-                    note.tag,
-                    style: TextStyle(color: AppColors.textFaint, fontSize: 11),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    stashDateText(note.updated),
-                    style: TextStyle(color: AppColors.textFaint, fontSize: 11),
-                  ),
-                  const SizedBox(width: 6),
-                  if (projectName case final name?)
-                    Flexible(
-                      child: StashBadge(icon: Codicons.folder, label: name),
-                    ),
                   if (store.clarifying(note.id)) ...[
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: StashBadge(
-                        icon: Codicons.sync,
-                        label: l10n.stashClarifying,
-                        spinning: true,
-                      ),
+                    const SizedBox(width: 8),
+                    StashBadge(
+                      icon: Codicons.sync,
+                      label: l10n.stashClarifying,
+                      spinning: true,
                     ),
                   ] else if (store.clarifyFailure(note.id) != null) ...[
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: StashBadge(
-                        icon: Codicons.error,
-                        label: l10n.stashClarifyFailedShort,
-                        color: themeColors['errorForeground'],
-                      ),
+                    const SizedBox(width: 8),
+                    StashBadge(
+                      icon: Codicons.error,
+                      label: l10n.stashClarifyFailedShort,
+                      color: themeColors['errorForeground'],
                     ),
                   ],
-                  if (note.status != StashStatus.collected) ...[
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: StashBadge(
-                        icon: _statusIcon(note.status),
-                        label: stashStatusLabel(l10n, note.status),
-                      ),
+                  if (note.threads.isNotEmpty) ...[
+                    const SizedBox(width: 12),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 220),
+                      child: StashThreadInline(controller: store, note: note),
                     ),
                   ],
-                  if (store.forge case final forge?
-                      when note.issues.isNotEmpty) ...[
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: StashIssueBadge(forge: forge, note: note),
-                    ),
+                  if (forge != null && note.issues.isNotEmpty) ...[
+                    const SizedBox(width: 10),
+                    StashIssueBadge(forge: forge, note: note),
                   ],
                 ],
+              ),
+              const SizedBox(height: 3),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: note.tag),
+                    TextSpan(text: '  ·  ${stashDateText(note.updated)}'),
+                    if (projectName case final name?)
+                      TextSpan(text: '  ·  $name'),
+                    if (summary.isNotEmpty && summary != note.displayTitle)
+                      TextSpan(
+                        text: '  ·  $summary',
+                        style: TextStyle(color: AppColors.textMuted),
+                      ),
+                  ],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: faint,
               ),
             ],
           ),
         ),
-        if (picture != null) ...[
-          const SizedBox(width: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(5),
-            child: Image(
-              // Decoded no bigger than it shows (covering its square): a
-              // screenshot in full is tens of megabytes a card.
-              image: ResizeImage(
-                isRemoteStashPicture(picture)
-                    ? NetworkImage(picture)
-                    : io.stashImageProvider(store.store.absolute(picture)),
-                width: _thumbnailPixels(context),
-                height: _thumbnailPixels(context),
-                policy: ResizeImagePolicy.fit,
-              ),
-              width: 64,
-              height: 64,
-              fit: BoxFit.cover,
-              errorBuilder: (context, _, _) => const SizedBox(width: 64),
-            ),
-          ),
-        ],
       ],
     );
-    final card = HoverBuilder(
+    final row = HoverBuilder(
       cursor: SystemMouseCursors.click,
       builder: (context, hovered) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
         onSecondaryTapUp: (details) => onMenu(details.globalPosition),
         child: ListenableBuilder(
@@ -1885,20 +1864,14 @@ class _StashCard extends StatelessWidget {
             // As the explorer's selected file.
             final on = selected();
             return Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 9),
               decoration: BoxDecoration(
                 color: on
                     ? IdeListColors.activeSelection
                     : hovered
                     ? AppColors.hover
-                    : AppColors.surface,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: on
-                      ? themeColors.get('list.focusAndSelectionOutline') ??
-                            IdeListColors.focusOutline
-                      : AppColors.border,
-                ),
+                    : null,
+                borderRadius: BorderRadius.circular(6),
               ),
               child: content,
             );
@@ -1908,21 +1881,39 @@ class _StashCard extends StatelessWidget {
       ),
     );
     final reference = stashReferenceOf(store.store, note);
-    return Opacity(
-      opacity: done ? .55 : 1,
-      child: Draggable<StashDragData>(
-        data: StashDragData([reference]),
-        dragAnchorStrategy: pointerDragAnchorStrategy,
-        feedback: _DragFeedback(label: '${note.tag} ${note.displayTitle}'),
-        child: card,
-      ),
+    return Draggable<StashDragData>(
+      data: StashDragData([reference]),
+      dragAnchorStrategy: pointerDragAnchorStrategy,
+      feedback: _DragFeedback(label: '${note.tag} ${note.displayTitle}'),
+      child: row,
     );
   }
+}
 
-  /// The box a thumbnail is decoded within: twice its side, so that a
-  /// picture up to twice as wide as high still covers it.
-  static int _thumbnailPixels(BuildContext context) =>
-      (64 * 2 * MediaQuery.devicePixelRatioOf(context)).round();
+/// A stash's status as its row and detail mark it: a ring just jotted
+/// down, a list for a requirement, running while worked on, a check done.
+class StashStatusIcon extends StatelessWidget {
+  const StashStatusIcon(this.status, {super.key, this.size = 15});
+
+  final StashStatus status;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, color) = switch (status) {
+      StashStatus.collected => (
+        Codicons.circleLargeOutline,
+        AppColors.textMuted,
+      ),
+      StashStatus.requirement => (
+        Codicons.checklist,
+        themeColors['charts.yellow'],
+      ),
+      StashStatus.implementing => (Codicons.play, themeColors['charts.blue']),
+      StashStatus.done => (Codicons.passFilled, themeColors['charts.purple']),
+    };
+    return Icon(icon, size: size, color: color);
+  }
 }
 
 class _DragFeedback extends StatelessWidget {
@@ -2006,18 +1997,25 @@ class StashBadge extends StatelessWidget {
   );
 }
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
+/// A pill that opens a menu: a filter's, or a stash's status, project
+/// and issue.
+class StashChip extends StatelessWidget {
+  const StashChip({
+    super.key,
     required this.icon,
     required this.label,
     required this.onTap,
     this.active = false,
+    this.leading,
   });
 
   final IconData icon;
   final String label;
   final void Function(Rect anchor) onTap;
   final bool active;
+
+  /// In place of [icon].
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) => HoverBuilder(
@@ -2041,7 +2039,7 @@ class _FilterChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 12, color: AppColors.textMuted),
+            leading ?? Icon(icon, size: 12, color: AppColors.textMuted),
             const SizedBox(width: 5),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 180),
@@ -2257,34 +2255,3 @@ class _TitleFieldState extends State<_TitleField> {
 /// The cards in as many columns as fit cards at least [minWidth] wide (a
 /// thumbnail, the title and summary beside it, the badges under them), one
 /// at the least.
-class _StashCardGrid extends SliverGridDelegate {
-  const _StashCardGrid();
-
-  static const minWidth = 250.0;
-  static const height = 132.0;
-  static const spacing = 10.0;
-
-  @override
-  SliverGridLayout getLayout(SliverConstraints constraints) {
-    final width = constraints.crossAxisExtent;
-    final columns = math.max(
-      1,
-      ((width + spacing) / (minWidth + spacing)).floor(),
-    );
-    final cardWidth = math.max(
-      0.0,
-      (width - spacing * (columns - 1)) / columns,
-    );
-    return SliverGridRegularTileLayout(
-      crossAxisCount: columns,
-      mainAxisStride: height + spacing,
-      crossAxisStride: cardWidth + spacing,
-      childMainAxisExtent: height,
-      childCrossAxisExtent: cardWidth,
-      reverseCrossAxis: axisDirectionIsReversed(constraints.crossAxisDirection),
-    );
-  }
-
-  @override
-  bool shouldRelayout(_StashCardGrid oldDelegate) => false;
-}

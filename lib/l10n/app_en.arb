@@ -7171,5 +7171,91 @@
   "aboutChangelogDetail": "What each version changed",
   "aboutFeedback": "Report an Issue",
   "aboutFeedbackDetail": "Open an issue on GitHub, or see those others opened",
-  "aboutOpen": "Open"
+  "aboutOpen": "Open",
+  "stashSettingsIssueSync": "Issues as stashes",
+  "stashSettingsIssueSyncDescription": "A project that is a Git repository on GitHub or GitLab (signed in under Accounts): its open issues are stashes, each once, kept in step both ways. A stash deleted, or unlinked from its issue, does not come back.",
+  "stashIssueSyncAuto": "Auto: all if you can push, else yours",
+  "stashIssueSyncMine": "Only those assigned to or opened by me",
+  "stashIssueSyncOff": "Off: imported or published ones only",
+  "stashIssueLocal": "Local only",
+  "stashIssueAllow": "Allow publishing as an issue",
+  "stashIssueNotPublished": "Not an issue yet",
+  "stashIssuePublishTo": "Publish as an issue of {repo}…",
+  "@stashIssuePublishTo": {
+    "placeholders": {
+      "repo": {
+        "type": "String"
+      }
+    }
+  },
+  "stashIssueKeepLocal": "Keep it local",
+  "stashIssuePush": "Push changes to the issue…",
+  "stashIssuePushShort": "Push",
+  "stashIssueTakeRemote": "Discard local changes, use the issue's",
+  "stashIssueUnlinkOwn": "Unlink, keep it local",
+  "stashIssueConflict": "{tag} was changed on the forge too. Which version to keep?",
+  "@stashIssueConflict": {
+    "placeholders": {
+      "tag": {
+        "type": "String"
+      }
+    }
+  },
+  "stashIssueKeepMine": "Keep mine (push)",
+  "stashIssueKeepTheirs": "Use the issue's",
+  "stashIssueChangedHere": "Changes here are not on {tag} yet.",
+  "@stashIssueChangedHere": {
+    "placeholders": {
+      "tag": {
+        "type": "String"
+      }
+    }
+  },
+  "stashIssueDiscard": "Discard",
+  "stashIssuePublishTitle": "Publish as an issue of {repo}",
+  "@stashIssuePublishTitle": {
+    "placeholders": {
+      "repo": {
+        "type": "String"
+      }
+    }
+  },
+  "stashIssuePushTitle": "Push changes to {tag}",
+  "@stashIssuePushTitle": {
+    "placeholders": {
+      "tag": {
+        "type": "String"
+      }
+    }
+  },
+  "stashIssuePublish": "Publish",
+  "stashIssueNoText": "(no description)",
+  "stashIssuePicturesGitHub": "{count, plural, =1{1 picture is uploaded to the repository's {branch} branch, for the issue to show it.} other{{count} pictures are uploaded to the repository's {branch} branch, for the issue to show them.}}",
+  "@stashIssuePicturesGitHub": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "branch": {
+        "type": "String"
+      }
+    }
+  },
+  "stashIssuePicturesGitLab": "{count, plural, =1{1 picture is uploaded to the project, for the issue to show it.} other{{count} pictures are uploaded to the project, for the issue to show them.}}",
+  "@stashIssuePicturesGitLab": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "stashImplementShort": "Implement",
+  "stashImplementIssue": "It is issue {issue}: the pull request should say it fixes it.",
+  "@stashImplementIssue": {
+    "placeholders": {
+      "issue": {
+        "type": "String"
+      }
+    }
+  }
 }

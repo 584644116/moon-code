@@ -3,7 +3,9 @@
 // GitLab's (/api/v4). Over [ForgeHttp], which tests answer themselves.
 
 import 'dart:convert';
+import 'dart:math' as math;
 
+import 'package:crypto/crypto.dart' show sha1;
 import 'package:flutter/foundation.dart';
 
 import 'forge_ref.dart';
@@ -21,8 +23,9 @@ class ForgeResponse {
   Object? get json => body.isEmpty ? null : jsonDecode(body);
 }
 
-/// Sends a request: [form] as a form, else [json] as JSON. Throws
-/// [ForgeException] when there is no answer.
+/// Sends a request: [form] as a form, else [json] as JSON, else [bytes]
+/// as they are (their type in [headers]). Throws [ForgeException] when
+/// there is no answer.
 abstract interface class ForgeHttp {
   Future<ForgeResponse> send(
     String method,
@@ -30,6 +33,7 @@ abstract interface class ForgeHttp {
     Map<String, String> headers = const {},
     Object? json,
     Map<String, String>? form,
+    List<int>? bytes,
   });
 }
 
@@ -186,6 +190,29 @@ abstract class ForgeApi {
   /// Closes the issue [ref].
   Future<void> close(ForgeRef ref);
 
+  /// Whether the user can push to [repo] (maintains it: all its issues
+  /// theirs to see to).
+  Future<bool> canPush(ForgeRepo repo);
+
+  /// Opens an issue in [repo], as the user: [title], [body] its
+  /// description.
+  Future<ForgeItem> createIssue(
+    ForgeRepo repo, {
+    required String title,
+    required String body,
+  });
+
+  /// Changes the issue [ref]'s title and description.
+  Future<ForgeItem> editIssue(
+    ForgeRef ref, {
+    required String title,
+    required String body,
+  });
+
+  /// Puts [bytes], a picture named [name], where [repo]'s issues can show
+  /// it; its address. The same picture is put there once.
+  Future<String> uploadImage(ForgeRepo repo, String name, List<int> bytes);
+
   Uri get _base;
 
   Map<String, String> _headers(String token);
@@ -195,6 +222,8 @@ abstract class ForgeApi {
     String path, {
     Map<String, String>? query,
     Object? json,
+    List<int>? bytes,
+    String? contentType,
   }) async {
     final url = _base.replace(
       path: '${_base.path}$path',
@@ -203,8 +232,9 @@ abstract class ForgeApi {
     final response = await http.send(
       method,
       url,
-      headers: _headers(await token()),
+      headers: {..._headers(await token()), 'Content-Type': ?contentType},
       json: json,
+      bytes: bytes,
     );
     if (!response.ok) {
       throw ForgeException(
@@ -217,6 +247,22 @@ abstract class ForgeApi {
 
   static DateTime? _date(Object? value) =>
       value is String ? DateTime.tryParse(value)?.toLocal() : null;
+
+  /// A picture's name by what it is: the same picture, the same name.
+  static String _assetName(String name, List<int> bytes) {
+    final dot = name.lastIndexOf('.');
+    final extension = dot < 0 ? '.png' : name.substring(dot).toLowerCase();
+    return '${sha1.convert(bytes).toString().substring(0, 20)}$extension';
+  }
+
+  static String _mimeOf(String name) =>
+      switch (name.substring(name.lastIndexOf('.') + 1).toLowerCase()) {
+        'jpg' || 'jpeg' => 'image/jpeg',
+        'gif' => 'image/gif',
+        'webp' => 'image/webp',
+        'svg' => 'image/svg+xml',
+        _ => 'image/png',
+      };
 }
 
 /// GitHub's REST API.
@@ -383,6 +429,119 @@ class GitHubApi extends ForgeApi {
     '/repos/${ref.repo.path}/issues/${ref.number}',
     json: {'state': 'closed'},
   );
+
+  @override
+  Future<bool> canPush(ForgeRepo repo) async {
+    final json = await _call('GET', '/repos/${repo.path}') as Map;
+    return switch (json['permissions']) {
+      {'push': true} => true,
+      _ => false,
+    };
+  }
+
+  @override
+  Future<ForgeItem> createIssue(
+    ForgeRepo repo, {
+    required String title,
+    required String body,
+  }) async {
+    final json = await _call(
+      'POST',
+      '/repos/${repo.path}/issues',
+      json: {'title': title, 'body': body},
+    ) as Map;
+    return _issue(repo, json);
+  }
+
+  @override
+  Future<ForgeItem> editIssue(
+    ForgeRef ref, {
+    required String title,
+    required String body,
+  }) async {
+    final json = await _call(
+      'PATCH',
+      '/repos/${ref.repo.path}/issues/${ref.number}',
+      json: {'title': title, 'body': body},
+    ) as Map;
+    return _issue(ref.repo, json);
+  }
+
+  /// The branch the pictures go in: one of their own, with no history of
+  /// the code's, made the first time.
+  static const assetsBranch = 'baocode-stash-assets';
+
+  /// GitHub has no API for an issue's attachments: the picture is a file
+  /// of [assetsBranch] (`stash/<its hash>.png`), shown from there.
+  @override
+  Future<String> uploadImage(
+    ForgeRepo repo,
+    String name,
+    List<int> bytes,
+  ) async {
+    final path = 'stash/${ForgeApi._assetName(name, bytes)}';
+    await _ensureAssetsBranch(repo);
+    try {
+      await _call(
+        'PUT',
+        '/repos/${repo.path}/contents/$path',
+        json: {
+          'message': 'Add a picture from BaoCode Stash',
+          'content': base64Encode(bytes),
+          'branch': assetsBranch,
+        },
+      );
+    } on ForgeException catch (error) {
+      // There already: put there before.
+      if (error.status != 422) rethrow;
+    }
+    return Uri.https(repo.host, '/${repo.path}/blob/$assetsBranch/$path', {
+      'raw': 'true',
+    }).toString();
+  }
+
+  final Set<ForgeRepo> _branched = {};
+
+  Future<void> _ensureAssetsBranch(ForgeRepo repo) async {
+    if (_branched.contains(repo)) return;
+    final at = '/repos/${repo.path}';
+    try {
+      await _call('GET', '$at/branches/$assetsBranch');
+    } on ForgeException catch (error) {
+      if (error.status != 404) rethrow;
+      final tree = await _call(
+        'POST',
+        '$at/git/trees',
+        json: {
+          'tree': [
+            {
+              'path': 'README.md',
+              'mode': '100644',
+              'type': 'blob',
+              'content':
+                  'Pictures of the issues opened from BaoCode\'s '
+                  'Stash (https://baocode.dev).\n',
+            },
+          ],
+        },
+      ) as Map;
+      final commit = await _call(
+        'POST',
+        '$at/git/commits',
+        json: {
+          'message': 'BaoCode Stash pictures',
+          'tree': tree['sha'],
+          'parents': const <String>[],
+        },
+      ) as Map;
+      await _call(
+        'POST',
+        '$at/git/refs',
+        json: {'ref': 'refs/heads/$assetsBranch', 'sha': commit['sha']},
+      );
+    }
+    _branched.add(repo);
+  }
 }
 
 /// GitLab's REST API (v4).
@@ -523,4 +682,76 @@ class GitLabApi extends ForgeApi {
     '${_project(ref.repo)}/issues/${ref.number}',
     json: {'state_event': 'close'},
   );
+
+  @override
+  Future<bool> canPush(ForgeRepo repo) async {
+    final json = await _call('GET', _project(repo)) as Map;
+    final permissions = json['permissions'];
+    if (permissions is! Map) return false;
+    int level(Object? access) =>
+        access is Map ? (access['access_level'] as num?)?.toInt() ?? 0 : 0;
+    // Developer (30) and up.
+    return level(permissions['project_access']) >= 30 ||
+        level(permissions['group_access']) >= 30;
+  }
+
+  @override
+  Future<ForgeItem> createIssue(
+    ForgeRepo repo, {
+    required String title,
+    required String body,
+  }) async {
+    final json = await _call(
+      'POST',
+      '${_project(repo)}/issues',
+      json: {'title': title, 'description': body},
+    ) as Map;
+    return _item(repo, json);
+  }
+
+  @override
+  Future<ForgeItem> editIssue(
+    ForgeRef ref, {
+    required String title,
+    required String body,
+  }) async {
+    final json = await _call(
+      'PUT',
+      '${_project(ref.repo)}/issues/${ref.number}',
+      json: {'title': title, 'description': body},
+    ) as Map;
+    return _item(ref.repo, json);
+  }
+
+  /// The project's uploads, as a picture pasted into an issue is.
+  @override
+  Future<String> uploadImage(
+    ForgeRepo repo,
+    String name,
+    List<int> bytes,
+  ) async {
+    final file = ForgeApi._assetName(name, bytes);
+    final boundary =
+        'baocode-${math.Random().nextInt(1 << 32).toRadixString(16)}';
+    final body = <int>[
+      ...utf8.encode(
+        '--$boundary\r\n'
+        'Content-Disposition: form-data; name="file"; filename="$file"\r\n'
+        'Content-Type: ${ForgeApi._mimeOf(file)}\r\n\r\n',
+      ),
+      ...bytes,
+      ...utf8.encode('\r\n--$boundary--\r\n'),
+    ];
+    final json = await _call(
+      'POST',
+      '${_project(repo)}/uploads',
+      bytes: body,
+      contentType: 'multipart/form-data; boundary=$boundary',
+    ) as Map;
+    return switch ((json['full_path'], json['url'])) {
+      (final String full, _) => 'https://$host$full',
+      (_, final String url) => 'https://$host/${repo.path}$url',
+      _ => throw const ForgeException('The picture was not taken.'),
+    };
+  }
 }

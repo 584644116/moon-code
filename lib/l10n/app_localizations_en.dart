@@ -10411,4 +10411,117 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutOpen => 'Open';
+
+  @override
+  String get stashSettingsIssueSync => 'Issues as stashes';
+
+  @override
+  String get stashSettingsIssueSyncDescription =>
+      'A project that is a Git repository on GitHub or GitLab (signed in under Accounts): its open issues are stashes, each once, kept in step both ways. A stash deleted, or unlinked from its issue, does not come back.';
+
+  @override
+  String get stashIssueSyncAuto => 'Auto: all if you can push, else yours';
+
+  @override
+  String get stashIssueSyncMine => 'Only those assigned to or opened by me';
+
+  @override
+  String get stashIssueSyncOff => 'Off: imported or published ones only';
+
+  @override
+  String get stashIssueLocal => 'Local only';
+
+  @override
+  String get stashIssueAllow => 'Allow publishing as an issue';
+
+  @override
+  String get stashIssueNotPublished => 'Not an issue yet';
+
+  @override
+  String stashIssuePublishTo(String repo) {
+    return 'Publish as an issue of $repo…';
+  }
+
+  @override
+  String get stashIssueKeepLocal => 'Keep it local';
+
+  @override
+  String get stashIssuePush => 'Push changes to the issue…';
+
+  @override
+  String get stashIssuePushShort => 'Push';
+
+  @override
+  String get stashIssueTakeRemote => 'Discard local changes, use the issue\'s';
+
+  @override
+  String get stashIssueUnlinkOwn => 'Unlink, keep it local';
+
+  @override
+  String stashIssueConflict(String tag) {
+    return '$tag was changed on the forge too. Which version to keep?';
+  }
+
+  @override
+  String get stashIssueKeepMine => 'Keep mine (push)';
+
+  @override
+  String get stashIssueKeepTheirs => 'Use the issue\'s';
+
+  @override
+  String stashIssueChangedHere(String tag) {
+    return 'Changes here are not on $tag yet.';
+  }
+
+  @override
+  String get stashIssueDiscard => 'Discard';
+
+  @override
+  String stashIssuePublishTitle(String repo) {
+    return 'Publish as an issue of $repo';
+  }
+
+  @override
+  String stashIssuePushTitle(String tag) {
+    return 'Push changes to $tag';
+  }
+
+  @override
+  String get stashIssuePublish => 'Publish';
+
+  @override
+  String get stashIssueNoText => '(no description)';
+
+  @override
+  String stashIssuePicturesGitHub(int count, String branch) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count pictures are uploaded to the repository\'s $branch branch, for the issue to show them.',
+      one:
+          '1 picture is uploaded to the repository\'s $branch branch, for the issue to show it.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String stashIssuePicturesGitLab(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count pictures are uploaded to the project, for the issue to show them.',
+      one: '1 picture is uploaded to the project, for the issue to show it.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get stashImplementShort => 'Implement';
+
+  @override
+  String stashImplementIssue(String issue) {
+    return 'It is issue $issue: the pull request should say it fixes it.';
+  }
 }

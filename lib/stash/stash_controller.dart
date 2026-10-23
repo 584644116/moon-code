@@ -141,6 +141,7 @@ class StashController extends ChangeNotifier {
     host.onPressed = pressed;
     windows?.stashCloseRequested = () => unawaited(hide());
     settingsChanges?.addListener(_settingsChanged);
+    _issueSync = settings.issueSync;
     store.addListener(_storeChanged);
     await store.load();
     threads.start();
@@ -169,7 +170,16 @@ class StashController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _settingsChanged() => unawaited(_takeHotkey());
+  StashIssueSync? _issueSync;
+
+  void _settingsChanged() {
+    unawaited(_takeHotkey());
+    final issueSync = settings.issueSync;
+    if (_issueSync != null && issueSync != _issueSync) {
+      unawaited(forge?.sync());
+    }
+    _issueSync = issueSync;
+  }
 
   /// Lets the shortcut go while a new one is recorded: pressed, it would
   /// show the panel rather than reach the recorder. [resumeHotkey] takes
@@ -537,6 +547,7 @@ class StashController extends ChangeNotifier {
       store: store,
       workspace: workspace,
       accounts: accounts,
+      issueSync: () => settings.issueSync,
     ),
     null => null,
   };

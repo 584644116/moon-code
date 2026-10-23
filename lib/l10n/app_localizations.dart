@@ -17048,6 +17048,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open'**
   String get aboutOpen;
+
+  /// No description provided for @stashSettingsIssueSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Issues as stashes'**
+  String get stashSettingsIssueSync;
+
+  /// No description provided for @stashSettingsIssueSyncDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'A project that is a Git repository on GitHub or GitLab (signed in under Accounts): its open issues are stashes, each once, kept in step both ways. A stash deleted, or unlinked from its issue, does not come back.'**
+  String get stashSettingsIssueSyncDescription;
+
+  /// No description provided for @stashIssueSyncAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto: all if you can push, else yours'**
+  String get stashIssueSyncAuto;
+
+  /// No description provided for @stashIssueSyncMine.
+  ///
+  /// In en, this message translates to:
+  /// **'Only those assigned to or opened by me'**
+  String get stashIssueSyncMine;
+
+  /// No description provided for @stashIssueSyncOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off: imported or published ones only'**
+  String get stashIssueSyncOff;
+
+  /// No description provided for @stashIssueLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local only'**
+  String get stashIssueLocal;
+
+  /// No description provided for @stashIssueAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow publishing as an issue'**
+  String get stashIssueAllow;
+
+  /// No description provided for @stashIssueNotPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Not an issue yet'**
+  String get stashIssueNotPublished;
+
+  /// No description provided for @stashIssuePublishTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish as an issue of {repo}…'**
+  String stashIssuePublishTo(String repo);
+
+  /// No description provided for @stashIssueKeepLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep it local'**
+  String get stashIssueKeepLocal;
+
+  /// No description provided for @stashIssuePush.
+  ///
+  /// In en, this message translates to:
+  /// **'Push changes to the issue…'**
+  String get stashIssuePush;
+
+  /// No description provided for @stashIssuePushShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Push'**
+  String get stashIssuePushShort;
+
+  /// No description provided for @stashIssueTakeRemote.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard local changes, use the issue\'s'**
+  String get stashIssueTakeRemote;
+
+  /// No description provided for @stashIssueUnlinkOwn.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlink, keep it local'**
+  String get stashIssueUnlinkOwn;
+
+  /// No description provided for @stashIssueConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'{tag} was changed on the forge too. Which version to keep?'**
+  String stashIssueConflict(String tag);
+
+  /// No description provided for @stashIssueKeepMine.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep mine (push)'**
+  String get stashIssueKeepMine;
+
+  /// No description provided for @stashIssueKeepTheirs.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the issue\'s'**
+  String get stashIssueKeepTheirs;
+
+  /// No description provided for @stashIssueChangedHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes here are not on {tag} yet.'**
+  String stashIssueChangedHere(String tag);
+
+  /// No description provided for @stashIssueDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get stashIssueDiscard;
+
+  /// No description provided for @stashIssuePublishTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish as an issue of {repo}'**
+  String stashIssuePublishTitle(String repo);
+
+  /// No description provided for @stashIssuePushTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Push changes to {tag}'**
+  String stashIssuePushTitle(String tag);
+
+  /// No description provided for @stashIssuePublish.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish'**
+  String get stashIssuePublish;
+
+  /// No description provided for @stashIssueNoText.
+  ///
+  /// In en, this message translates to:
+  /// **'(no description)'**
+  String get stashIssueNoText;
+
+  /// No description provided for @stashIssuePicturesGitHub.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 picture is uploaded to the repository\'s {branch} branch, for the issue to show it.} other{{count} pictures are uploaded to the repository\'s {branch} branch, for the issue to show them.}}'**
+  String stashIssuePicturesGitHub(int count, String branch);
+
+  /// No description provided for @stashIssuePicturesGitLab.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 picture is uploaded to the project, for the issue to show it.} other{{count} pictures are uploaded to the project, for the issue to show them.}}'**
+  String stashIssuePicturesGitLab(int count);
+
+  /// No description provided for @stashImplementShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Implement'**
+  String get stashImplementShort;
+
+  /// No description provided for @stashImplementIssue.
+  ///
+  /// In en, this message translates to:
+  /// **'It is issue {issue}: the pull request should say it fixes it.'**
+  String stashImplementIssue(String issue);
 }
 
 class _AppLocalizationsDelegate
