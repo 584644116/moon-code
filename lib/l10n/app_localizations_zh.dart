@@ -196,6 +196,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cmdChatCloseSubagent => '从子智能体返回';
 
   @override
+  String get cmdChatExportSession => '导出会话…';
+
+  @override
   String get cmdChatSubmit => '发送';
 
   @override

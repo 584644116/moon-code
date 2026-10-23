@@ -440,6 +440,12 @@ abstract class AppLocalizations {
   /// **'Back from Subagent'**
   String get cmdChatCloseSubagent;
 
+  /// No description provided for @cmdChatExportSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Session…'**
+  String get cmdChatExportSession;
+
   /// No description provided for @cmdChatSubmit.
   ///
   /// In en, this message translates to:

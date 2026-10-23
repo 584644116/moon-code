@@ -197,6 +197,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cmdChatCloseSubagent => 'Back from Subagent';
 
   @override
+  String get cmdChatExportSession => 'Export Session…';
+
+  @override
   String get cmdChatSubmit => 'Send';
 
   @override

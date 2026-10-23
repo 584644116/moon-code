@@ -153,6 +153,7 @@
   "cmdChatToggleContextPanel": "Toggle Context Panel",
   "cmdChatRenameAgent": "Rename Agent",
   "cmdChatCloseSubagent": "Back from Subagent",
+  "cmdChatExportSession": "Export Session…",
   "cmdChatSubmit": "Send",
   "cmdChatCancelEdit": "Cancel Edit",
   "cmdChatShowPreviousPrompt": "Show Previous Prompt",

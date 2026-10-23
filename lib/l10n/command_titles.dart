@@ -146,6 +146,7 @@ String localizedCommandLabel(AppLocalizations l10n, String id, String english) {
     ChatCommandIds.toggleContextPanel => l10n.cmdChatToggleContextPanel,
     ChatCommandIds.renameAgent => l10n.cmdChatRenameAgent,
     ChatCommandIds.closeSubagent => l10n.cmdChatCloseSubagent,
+    ChatCommandIds.exportSession => l10n.cmdChatExportSession,
     ChatCommandIds.submit => l10n.cmdChatSubmit,
     ChatCommandIds.cancelEdit => l10n.cmdChatCancelEdit,
     ChatCommandIds.showPreviousPrompt => l10n.cmdChatShowPreviousPrompt,

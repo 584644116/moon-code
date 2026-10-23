@@ -57,6 +57,7 @@
   "cmdChatToggleContextPanel": "切换上下文面板",
   "cmdChatRenameAgent": "重命名智能体",
   "cmdChatCloseSubagent": "从子智能体返回",
+  "cmdChatExportSession": "导出会话…",
   "cmdChatSubmit": "发送",
   "cmdChatCancelEdit": "取消编辑",
   "cmdChatShowPreviousPrompt": "显示上一条提示",
