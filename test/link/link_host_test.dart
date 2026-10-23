@@ -82,6 +82,26 @@ void main() {
     return peer;
   }
 
+  test('the addresses are looked for once, and kept for a while', () async {
+    await host.refreshEndpoints(force: true);
+    final looked = platform.endpointCalls;
+    expect(looked, greaterThan(0));
+
+    // Whatever asks next is given what was found, not another process.
+    await host.refreshEndpoints();
+    await host.refreshEndpoints();
+    expect(platform.endpointCalls, looked);
+
+    // The button on the screen asks for a look of its own.
+    await host.refreshEndpoints(force: true);
+    expect(platform.endpointCalls, looked + 1);
+
+    // A new port is a new address: the old answer does not carry it.
+    await host.setPort(47101);
+    await host.refreshEndpoints();
+    expect(platform.endpointCalls, looked + 2);
+  });
+
   test('a phone pairs with the code shown, and is kept', () async {
     expect(host.enabled, isFalse);
     final peer = await pair();
@@ -580,6 +600,34 @@ void main() {
     await peer.done;
     expect(host.phones, isEmpty);
     expect(host.offer, isNull);
+  });
+
+  test('a new code gives up the phone comparing the last one\'s', () async {
+    await host.beginPairing();
+    final peer = await connect(LinkIdentity.generate());
+    await peer.call(LinkMethods.hello, {'name': 'x', 'request': true});
+    final confirm = peer.call(LinkMethods.confirm);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(host.pending, isNotNull);
+
+    // Another code shown: the first phone is turned away, not left
+    // pending to turn every phone after it away in turn.
+    await host.beginPairing();
+    expect(host.pending, isNull);
+    await expectLater(
+      confirm,
+      throwsA(
+        isA<LinkRemoteException>().having((e) => e.code, 'code', 'rejected'),
+      ),
+    );
+    await peer.done;
+    expect(host.phones, isEmpty);
+
+    // And a phone may pair with the new code.
+    final second = await connect(LinkIdentity.generate());
+    await second.call(LinkMethods.hello, {'name': 'y', 'request': true});
+    expect(host.pending, isNotNull);
+    host.rejectPending();
   });
 
   test('unpaired on the desktop, the phone is told and let go', () async {

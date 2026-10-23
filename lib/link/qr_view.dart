@@ -21,13 +21,26 @@ class QrView extends StatelessWidget {
 }
 
 class _QrPainter extends CustomPainter {
-  _QrPainter(this.data)
-    : image = QrImage(
-        QrCode(
-          payload: QrPayload.fromString(data),
-          errorCorrectLevel: QrErrorCorrectLevel.medium,
-        ),
-      );
+  _QrPainter(this.data) : image = _encode(data);
+
+  /// The last code made, and what it was made of: the painter is built on
+  /// every rebuild (a phone pairing, the expiry tick), and making the code
+  /// again each time is work for the same picture.
+  static (String, QrImage)? _last;
+
+  /// [data] as modules; the same text for the same code, made once.
+  static QrImage _encode(String data) {
+    final last = _last;
+    if (last != null && last.$1 == data) return last.$2;
+    final image = QrImage(
+      QrCode(
+        payload: QrPayload.fromString(data),
+        errorCorrectLevel: QrErrorCorrectLevel.medium,
+      ),
+    );
+    _last = (data, image);
+    return image;
+  }
 
   final String data;
   final QrImage image;

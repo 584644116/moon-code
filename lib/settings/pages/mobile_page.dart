@@ -6,9 +6,11 @@ import 'package:flutter/services.dart';
 
 import '../../ide/ide_button.dart';
 import '../../l10n/l10n.dart';
+import '../../link/firewall.dart';
 import '../../link/link_host.dart';
 import '../../link/qr_view.dart';
 import '../../theme/codicons.dart';
+import '../../theme/workbench_theme.dart' show themeColors;
 import 'settings_widgets.dart';
 
 /// Settings → Mobile: whether phones may connect, where they reach this
@@ -127,12 +129,17 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
                     endpoints.join('\n'),
                     style: SettingsText.path,
                   ),
+                if (host.firewall == FirewallState.blocked)
+                  _FirewallWarning(host: host),
               ],
               trailing: IdeButton(
                 label: l10n.mobileAddressesRefresh,
                 icon: Codicons.refresh,
                 secondary: true,
-                onPressed: () => unawaited(host.refreshEndpoints()),
+                onPressed: () {
+                  unawaited(host.refreshEndpoints(force: true));
+                  unawaited(host.refreshFirewall(force: true));
+                },
               ),
             ),
             SettingsRow(
@@ -326,5 +333,125 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
     String two(int n) => n.toString().padLeft(2, '0');
     return '${time.year}-${two(time.month)}-${two(time.day)} '
         '${two(time.hour)}:${two(time.minute)}';
+  }
+}
+
+/// Said under the addresses when the system's firewall refuses phones on
+/// this port: what it costs, the one button that fixes it, and — when the
+/// user has no administrator to answer for them — the commands to run.
+class _FirewallWarning extends StatefulWidget {
+  const _FirewallWarning({required this.host});
+
+  final LinkHost host;
+
+  @override
+  State<_FirewallWarning> createState() => _FirewallWarningState();
+}
+
+class _FirewallWarningState extends State<_FirewallWarning> {
+  /// The rules were not added: the user turned the prompt down, or there
+  /// was none to show. The commands are offered instead.
+  bool _failed = false;
+  bool _copied = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colors = themeColors;
+    final commands = LinkFirewall.commandsFor(widget.host.port);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        decoration: BoxDecoration(
+          color: colors['inputValidation.warningBackground'],
+          border: Border.all(color: colors['inputValidation.warningBorder']),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Codicons.warning,
+                  size: 14,
+                  color: colors['editorWarning.foreground'],
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        l10n.mobileFirewallWarning(widget.host.port),
+                        style: TextStyle(
+                          color: colors['foreground'],
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        l10n.mobileFirewallFixDescription,
+                        style: TextStyle(
+                          color: colors['descriptionForeground'],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IdeButton(label: l10n.mobileFirewallFix, onPressed: _allow),
+              ],
+            ),
+            if (_failed) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.mobileFirewallFailed,
+                      style: TextStyle(
+                        color: colors['descriptionForeground'],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  IdeButton(
+                    label: _copied
+                        ? l10n.mobileFirewallCopied
+                        : l10n.mobileFirewallCopy,
+                    icon: _copied ? Codicons.check : Codicons.copy,
+                    secondary: true,
+                    onPressed: () => _copy(commands),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              SelectableText(commands.join('\n'), style: SettingsText.path),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _allow() async {
+    final allowed = await widget.host.allowThroughFirewall();
+    if (!mounted) return;
+    setState(() => _failed = !allowed);
+  }
+
+  Future<void> _copy(List<String> commands) async {
+    await Clipboard.setData(ClipboardData(text: commands.join('\r\n')));
+    if (!mounted) return;
+    setState(() => _copied = true);
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    setState(() => _copied = false);
   }
 }

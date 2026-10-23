@@ -21,10 +21,14 @@ class FakeLinkPlatform implements LinkPlatform {
   @override
   Future<LinkListener> listen(int port) async => _Listener(port, incoming);
 
+  /// How many times the addresses were looked for.
+  int endpointCalls = 0;
+
   @override
-  Future<List<DirectEndpoint>> endpoints(int port) async => [
-    DirectEndpoint('192.168.1.5', port),
-  ];
+  Future<List<DirectEndpoint>> endpoints(int port) async {
+    endpointCalls++;
+    return [DirectEndpoint('192.168.1.5', port)];
+  }
 
   @override
   Future<LinkAdvertising?> advertise(LinkAdvert advert) async {

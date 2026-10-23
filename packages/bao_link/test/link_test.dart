@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:bao_link/bao_link_io.dart';
@@ -341,7 +342,57 @@ void main() {
       throwsA(isA<LinkRelayUnavailableException>()),
     );
   });
+
+  group('the addresses a desktop gives a phone', () {
+    ({String name, List<InternetAddress> addresses}) interface(
+      String name,
+      List<String> addresses,
+    ) => (name: name, addresses: [for (final a in addresses) _address(a)]);
+
+    test('the LAN comes first, then the rest, each on the port', () {
+      final endpoints = endpointsFrom([
+        interface('Ethernet', ['203.0.113.9', '192.168.1.5', '10.1.2.3']),
+        interface('Wi-Fi', ['172.20.0.4', '2408:8207::1']),
+      ], 47100);
+      expect(endpoints.map((e) => e.host).take(4), [
+        '192.168.1.5',
+        '10.1.2.3',
+        '172.20.0.4',
+        '203.0.113.9',
+      ]);
+      expect(endpoints.last.host, '2408:8207::1');
+      expect(endpoints.every((e) => e.port == 47100), isTrue);
+    });
+
+    test('a stale address is left out, and the others stay', () {
+      final endpoints = endpointsFrom([
+        interface('Ethernet', ['192.153.1.144']),
+        // The Wi-Fi adapter's, kept by Windows after it disconnected.
+        interface('Wi-Fi', ['192.168.43.5']),
+      ], 47100, unusable: {'192.168.43.5'});
+      expect(endpoints.map((e) => e.host), ['192.153.1.144']);
+    });
+
+    test('bridges, loopback and link-local are left out', () {
+      final endpoints = endpointsFrom([
+        interface('vEthernet (Default Switch)', ['172.29.208.1']),
+        interface('utun3', ['10.8.0.2']),
+        interface('Ethernet', [
+          '127.0.0.1',
+          '169.254.11.4',
+          '192.168.1.5',
+        ]),
+      ], 47100);
+      expect(endpoints.map((e) => e.host), ['192.168.1.5']);
+    });
+  });
 }
+
+/// [address] as `NetworkInterface.list` would give it.
+InternetAddress _address(String address) =>
+    InternetAddress(address, type: address.contains(':')
+        ? InternetAddressType.IPv6
+        : InternetAddressType.IPv4);
 
 bool _contains(Uint8List haystack, Uint8List needle) {
   for (var i = 0; i + needle.length <= haystack.length; i++) {

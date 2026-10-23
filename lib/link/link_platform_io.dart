@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 
 import '../platform/data_dir.dart';
 import 'link_platform.dart';
+import 'powershell_io.dart';
 
 LinkPlatform? currentLinkPlatform() => IoLinkPlatform();
 
@@ -56,7 +57,40 @@ class IoLinkPlatform implements LinkPlatform {
       _Listener(await LinkServer.bind(port));
 
   @override
-  Future<List<DirectEndpoint>> endpoints(int port) => localEndpoints(port);
+  Future<List<DirectEndpoint>> endpoints(int port) =>
+      localEndpoints(port, unusable: _unusableAddresses);
+
+  /// The addresses this machine has but no one can reach: Windows keeps a
+  /// Wi-Fi adapter's address after it disconnects, marked `Deprecated`, and
+  /// hands it out again if the link comes back. A phone given one waits for
+  /// its timeout before it tries the next, so they are left out.
+  ///
+  /// Only `Get-NetIPAddress` says which these are (`ipconfig` and `netsh`
+  /// do not). Any failure answers none: an address wrongly left out is a
+  /// phone that cannot connect, and not filtering is what it did before.
+  static Future<Set<String>> _unusableAddresses() async {
+    if (!Platform.isWindows) return const {};
+    const script =
+        "Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue "
+        "| Where-Object { \$_.AddressState -ne 'Preferred' } "
+        "| ForEach-Object { \$_.IPAddress }";
+    try {
+      // PowerShell itself takes a second or two to start here, and the
+      // answer with it: three was not enough, and a check that ran out was
+      // left running.
+      final result = await runPowerShell(
+        script,
+        timeout: const Duration(seconds: 8),
+      );
+      if (result == null || result.exitCode != 0) return const {};
+      return {
+        for (final line in '${result.stdout}'.split('\n'))
+          if (line.trim() case final address when address.isNotEmpty) address,
+      };
+    } on Object {
+      return const {};
+    }
+  }
 
   @override
   Future<LinkAdvertising?> advertise(LinkAdvert advert) async {

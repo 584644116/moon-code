@@ -4,7 +4,9 @@ import 'package:bao_link/bao_link.dart';
 import 'package:flutter/foundation.dart';
 
 import '../customize/customization_store.dart';
+import '../platform/event_log.dart';
 import '../workspace/workspace.dart';
+import 'firewall.dart';
 import 'link_platform.dart';
 import 'workspace_bridge.dart';
 
@@ -171,12 +173,75 @@ class LinkHost extends ChangeNotifier {
 
   List<DirectEndpoint> _local = const [];
 
+  /// When the addresses were looked for last, and the look in progress:
+  /// each one is a process to start, so the screen opening, the listener
+  /// starting and the button being pressed ask for one between them, not
+  /// three.
+  DateTime? _refreshedAt;
+  Future<void>? _refreshing;
+  int? _refreshingPort;
+
+  /// How long addresses are taken as they are.
+  static const endpointLifetime = Duration(seconds: 30);
+
   /// Where phones can reach this desktop: its own addresses, then those
   /// given.
   List<DirectEndpoint> get endpoints => [
     ..._local,
     for (final address in _publicAddresses) ?_parse(address),
   ];
+
+  FirewallState _firewall = FirewallState.unknown;
+
+  /// Whether the system's firewall lets a phone in on this port: the
+  /// reason a code can be scanned and nothing happen (Settings → Mobile).
+  FirewallState get firewall => _firewall;
+
+  /// Whether this build can ask about, and change, that at all.
+  bool get firewallKnown => LinkFirewall.supported;
+
+  /// When the firewall was asked last, and the asking in progress. Its
+  /// answer changes with a rule or a network, not between two frames.
+  DateTime? _firewallAt;
+  Future<void>? _checkingFirewall;
+
+  /// How long the firewall's answer is taken as it is.
+  static const firewallLifetime = Duration(minutes: 5);
+
+  /// Asks the firewall again, after the network changed or a rule was
+  /// added. [force] asks even if the last answer is recent.
+  Future<void> refreshFirewall({bool force = false}) {
+    if (!LinkFirewall.supported) return Future.value();
+    final checking = _checkingFirewall;
+    if (checking != null) return checking;
+    final asked = _firewallAt;
+    if (!force &&
+        asked != null &&
+        DateTime.now().difference(asked) < firewallLifetime) {
+      return Future.value();
+    }
+    return _checkingFirewall = _checkFirewall().whenComplete(
+      () => _checkingFirewall = null,
+    );
+  }
+
+  Future<void> _checkFirewall() async {
+    final state = await LinkFirewall.check(_port);
+    _firewallAt = DateTime.now();
+    if (state == _firewall) return;
+    _firewall = state;
+    notifyListeners();
+  }
+
+  /// Adds the rules that let phones in, once the user allows it. False
+  /// when they did not, or there was no administrator to ask.
+  Future<bool> allowThroughFirewall() async {
+    if (!LinkFirewall.supported) return false;
+    final allowed = await LinkFirewall.allow(_port);
+    appEvent('link', 'firewall rules added: $allowed');
+    await refreshFirewall(force: true);
+    return allowed;
+  }
 
   DirectEndpoint? _parse(String address) {
     try {
@@ -296,6 +361,10 @@ class LinkHost extends ChangeNotifier {
   Future<void> setPort(int port) async {
     if (!_loaded || port == _port || port <= 0 || port > 65535) return;
     _port = port;
+    // The addresses carry the port, and so does the firewall's answer:
+    // what was found for the old one is not an answer anymore.
+    _refreshedAt = null;
+    _firewallAt = null;
     unawaited(_save());
     notifyListeners();
     if (_enabled) {
@@ -341,9 +410,11 @@ class LinkHost extends ChangeNotifier {
         (socket) => unawaited(_accept(socket)),
       );
       _status = LinkHostStatus.listening;
+      appEvent('link', 'listening on $_port');
     } on Object catch (error) {
       _status = LinkHostStatus.failed;
       _error = '$error';
+      appEvent('link', 'could not listen on $_port: $error');
     }
     await refreshEndpoints();
   }
@@ -366,12 +437,47 @@ class LinkHost extends ChangeNotifier {
   }
 
   /// Looks again for this machine's addresses: they change as it moves
-  /// from network to network.
-  Future<void> refreshEndpoints() async {
+  /// from network to network. [force] looks even if the last look is
+  /// recent — a new port, or the user asking.
+  ///
+  /// Asking is a process to start, so one look is shared by everything
+  /// that wants one at the same time, and the answer kept for a while.
+  Future<void> refreshEndpoints({bool force = false}) {
     final platform = this.platform;
-    if (platform == null) return;
-    _local = await platform.endpoints(_listener?.port ?? _port);
+    if (platform == null) return Future.value();
+    final port = _listener?.port ?? _port;
+    final running = _refreshing;
+    if (running != null && _refreshingPort == port) return running;
+    final found = _refreshedAt;
+    if (!force &&
+        found != null &&
+        DateTime.now().difference(found) < endpointLifetime) {
+      return Future.value();
+    }
+    _refreshingPort = port;
+    return _refreshing = _findEndpoints(platform, port).whenComplete(() {
+      _refreshing = null;
+      _refreshingPort = null;
+    });
+  }
+
+  Future<void> _findEndpoints(LinkPlatform platform, int port) async {
+    final found = await platform.endpoints(port);
+    // The port changed while this was out: what came back is for the old
+    // one, and not an answer.
+    if (port != (_listener?.port ?? _port)) return;
+    _local = found;
+    _refreshedAt = DateTime.now();
+    // What a phone is given, and in which order: the first one that does
+    // not answer costs it a timeout, so which comes first is worth seeing.
+    appEvent(
+      'link',
+      'addresses: ${endpoints.isEmpty ? 'none' : endpoints.join(', ')}',
+    );
     notifyListeners();
+    // Whether the firewall lets a phone in is worth knowing; it is not
+    // worth the code waiting for. Asked while the code is on screen.
+    unawaited(refreshFirewall());
   }
 
   DeviceInfo _deviceInfo() {
@@ -392,15 +498,31 @@ class LinkHost extends ChangeNotifier {
   Future<PairingOffer?> beginPairing() async {
     if (!_loaded) return null;
     if (!_enabled) await setEnabled(true);
-    await refreshEndpoints();
+    if (_local.isEmpty) {
+      await refreshEndpoints();
+    } else {
+      // The addresses this machine has now, without starting a process
+      // first: a code on screen beats a newer one in a few seconds. The
+      // look refreshes them for the next code.
+      unawaited(refreshEndpoints());
+    }
     if (_status != LinkHostStatus.listening) return null;
     _justPaired = null;
+    // A new code gives up the phone that was comparing the last one's
+    // safety code: left pending, it would turn away every phone after it.
+    if (_pending case final pending?) _turnAway(pending);
+    _pending = null;
     _offer = PairingOffer(
       name: _device?.name ?? '',
       key: _identity.publicKey,
       token: randomBytes(16),
       expires: DateTime.now().add(offerLifetime),
       endpoints: endpoints,
+    );
+    appEvent(
+      'link',
+      'pairing code shown, ${_offer!.endpoints.length} address(es): '
+          '${_offer!.endpoints.join(', ')}',
     );
     // Expired: no longer advertised as pairing.
     _expiry?.cancel();
@@ -477,7 +599,12 @@ class LinkHost extends ChangeNotifier {
     final SecureChannel channel;
     try {
       channel = await SecureChannel.accept(socket, identity: _identity);
-    } on Object {
+    } on Object catch (error) {
+      // A phone that paired with another desktop's key, or one that is not
+      // a phone: the handshake ends here, and saying nothing left a pairing
+      // that failed with no trace of why.
+      appEvent('link', 'handshake failed: $error');
+      unawaited(socket.close());
       return;
     }
     final connection = _Connection(LinkPeer(channel), channel.peerKey);
@@ -553,17 +680,23 @@ class LinkHost extends ChangeNotifier {
         if (token == null && params['request'] == true) {
           // Found nearby: no secret, so the user here allows it.
           if (offer == null || offer.expiredAt(DateTime.now())) {
+            appEvent('link', 'pairing asked for nearby, no code shown');
             throw const LinkRemoteException(
               LinkErrors.notPairing,
               'Not pairing a phone now',
             );
           }
           if (_pending != null) {
+            appEvent(
+              'link',
+              'pairing asked for nearby, another phone is at it',
+            );
             throw const LinkRemoteException(
               LinkErrors.busy,
               'Another phone is pairing',
             );
           }
+          appEvent('link', 'pairing asked for nearby, waiting for the user');
           _pending = PendingPairing._(
             connection,
             name,
@@ -585,11 +718,20 @@ class LinkHost extends ChangeNotifier {
             offer.expiredAt(DateTime.now()) ||
             !_same(token, offer.token) ||
             _pending != null) {
+          final why = offer == null
+              ? 'no code is shown'
+              : offer.expiredAt(DateTime.now())
+              ? 'the code expired'
+              : !_same(token, offer.token)
+              ? 'the code does not match'
+              : 'another phone is at it';
+          appEvent('link', 'pairing refused: $why');
           throw const LinkRemoteException(
             LinkErrors.badToken,
             'The code is not shown, or has expired',
           );
         }
+        appEvent('link', 'pairing started, comparing the safety code');
         _pending = PendingPairing._(
           connection,
           name,
@@ -628,6 +770,10 @@ class LinkHost extends ChangeNotifier {
     _pending = null;
     _offer = null;
     _expiry?.cancel();
+    appEvent(
+      'link',
+      'paired with ${phone.name.isEmpty ? phone.system : phone.name}',
+    );
     _justPaired = phone;
     unawaited(_save());
     _connect(connection, phone);

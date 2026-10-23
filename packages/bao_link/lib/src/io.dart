@@ -148,7 +148,17 @@ abstract final class LinkConnector {
 /// This machine's addresses others may reach it at, on [port]: those on
 /// the LAN (private IPv4, IPv6 of the site), then public IPv6 ones (often
 /// reachable from the internet as they are). Not loopback, nor link-local.
-Future<List<DirectEndpoint>> localEndpoints(int port) async {
+///
+/// [unusable] names addresses the system has but no one can reach — a
+/// Wi-Fi adapter's, left behind when it disconnected, whose DHCP lease
+/// outlived the link. They are left out: a phone given one of them waits
+/// for a timeout before it tries the next. Asking the system is the
+/// platform's work (see the desktop's `link_platform_io.dart`); here it is
+/// only called, and its absence leaves every address in.
+Future<List<DirectEndpoint>> localEndpoints(
+  int port, {
+  Future<Set<String>> Function()? unusable,
+}) async {
   final List<NetworkInterface> interfaces;
   try {
     interfaces = await NetworkInterface.list(
@@ -158,6 +168,27 @@ Future<List<DirectEndpoint>> localEndpoints(int port) async {
   } on Object {
     return const [];
   }
+  Set<String> stale;
+  try {
+    stale = await unusable?.call() ?? const {};
+  } on Object {
+    stale = const {};
+  }
+  return endpointsFrom([
+    for (final interface in interfaces)
+      (name: interface.name, addresses: interface.addresses),
+  ], port, unusable: stale);
+}
+
+/// [localEndpoints] without the system: the addresses of [interfaces] that
+/// others may reach this machine at, on [port], minus those named in
+/// [unusable]. Each interface is its name and its addresses — what
+/// `NetworkInterface.list` gives, which a test cannot make up itself.
+List<DirectEndpoint> endpointsFrom(
+  Iterable<({String name, List<InternetAddress> addresses})> interfaces,
+  int port, {
+  Set<String> unusable = const {},
+}) {
   final v4 = <DirectEndpoint>[];
   final v6 = <DirectEndpoint>[];
   for (final interface in interfaces) {
@@ -175,6 +206,7 @@ Future<List<DirectEndpoint>> localEndpoints(int port) async {
     for (final address in interface.addresses) {
       if (address.isLoopback || address.isLinkLocal) continue;
       final host = address.address.split('%').first;
+      if (unusable.contains(host)) continue;
       if (address.type == InternetAddressType.IPv4) {
         v4.add(DirectEndpoint(host, port));
       } else if (address.type == InternetAddressType.IPv6 &&
