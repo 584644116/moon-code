@@ -23,6 +23,7 @@ import 'chat/widgets/pixel_loader.dart';
 import 'chat/widgets/turn_footer.dart' show LiveTurnStatsSetting;
 import 'customize/customization_store.dart';
 import 'diagnostics/app_event_watch.dart';
+import 'diagnostics/frame_watch.dart';
 import 'diagnostics/diagnostics_upload.dart';
 import 'extensions/theme_extensions.dart';
 import 'ide/git/git_repository.dart';
@@ -149,7 +150,10 @@ Future<void> main(List<String> arguments) async {
   unawaited(reapLspProcesses());
   unawaited(reapPtyProcesses());
   WidgetsFlutterBinding.ensureInitialized();
-  if (!kIsWeb) AppEventWatch.start();
+  if (!kIsWeb) {
+    AppEventWatch.start();
+    FrameWatch.start();
+  }
   // The Windows app's own logs go beside it.
   if (errors != null) unawaited(errors.shareWithHost());
   // The editor's language packs are the language servers' (README.md in

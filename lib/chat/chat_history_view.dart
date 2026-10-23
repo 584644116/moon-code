@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../base/smooth_scroll.dart';
+import '../diagnostics/frame_watch.dart';
 import '../ide/ide_find_widget.dart';
 import '../ide/ide_hover.dart';
 import '../l10n/l10n.dart';
@@ -516,6 +517,9 @@ class _ChatHistoryViewState extends State<ChatHistoryView>
     _scrollController.addListener(_handleScroll);
     _feed.addListener(_handleSessionChanged);
     UserMessageStyle.current.addListener(_handleStyleChanged);
+    // Its size, for a slow frame's line in the event log.
+    FrameWatch.notes[this] = () =>
+        '${_feed.itemCount} items${_feed.isStreaming ? ', streaming' : ''}';
     _wasLive = _feed.isStreaming;
     _prependedSeen = _session?.prependedCount ?? 0;
     _refold();
@@ -615,6 +619,8 @@ class _ChatHistoryViewState extends State<ChatHistoryView>
 
   @override
   void dispose() {
+    FrameWatch.notes.remove(this);
+    _noteLeft(_feed);
     _steady.dispose();
     _feed.removeListener(_handleSessionChanged);
     _find
