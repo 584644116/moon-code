@@ -52,6 +52,8 @@ class ClaudeLaunch {
     this.permissionMode,
     this.effort,
     this.thinking,
+    this.thinkingDisplay = 'summarized',
+    this.language,
     this.autocompact,
     this.autoModeDuringPlan,
     this.attribution = CommitAttribution.agent,
@@ -102,6 +104,16 @@ class ClaudeLaunch {
   /// Whether the model thinks, as Claude Code's `alwaysThinkingEnabled`
   /// setting: false turns it off; null leaves the user's own.
   final bool? thinking;
+
+  /// How the thinking comes back (`--thinking-display`): `summarized` (the
+  /// chat shows it) or `omitted` (it does not). The models think either
+  /// way; see [ThinkingDisplay].
+  final String thinkingDisplay;
+
+  /// The language it answers in, as Claude Code's `language` setting
+  /// ("english", "japanese"...); null leaves it to the agent, which
+  /// answers as the conversation does.
+  final String? language;
 
   /// The context the conversation fills before it is compacted; null for
   /// the CLI's own. Only taken at start: `apply_flag_settings` stores it,
@@ -160,6 +172,8 @@ class ClaudeLaunch {
     permissionMode: permissionMode,
     effort: effort,
     thinking: thinking,
+    thinkingDisplay: thinkingDisplay,
+    language: language,
     autocompact: autocompact,
     autoModeDuringPlan: autoModeDuringPlan,
     attribution: attribution,
@@ -187,6 +201,7 @@ class ClaudeLaunch {
     'attribution': ?_attribution,
     'useAutoModeDuringPlan': ?autoModeDuringPlan,
     'alwaysThinkingEnabled': ?thinking,
+    'language': ?language,
     if (models.isNotEmpty)
       'modelPicker': {
         'options': [
@@ -234,10 +249,6 @@ class ClaudeLaunch {
   static const additionalDirectoriesEnvironment = {
     'CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD': '1',
   };
-
-  /// How the model's thinking comes back: summarized, for the chat to
-  /// show (the newest models leave it out unless asked).
-  static const thinkingDisplay = 'summarized';
 
   List<String> get arguments => _arguments(withSettings: true);
 

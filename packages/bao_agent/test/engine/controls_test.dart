@@ -211,6 +211,16 @@ void main() {
       expect(h.of('assistant'), isEmpty);
     });
 
+    test('language: replies are asked in it', () async {
+      h = await Harness.start(settings: {'language': 'chinese'});
+      h.model.script.add(Reply.text('好'));
+      await h.turn('hi');
+      expect(
+        jsonEncode(h.model.turns.single.body['system']),
+        contains('Always write your replies in chinese.'),
+      );
+    });
+
     test('thinking or effort refused: asked again without', () async {
       h = await Harness.start(
         effort: 'high',

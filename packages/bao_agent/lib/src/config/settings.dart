@@ -147,6 +147,10 @@ class AgentSettings {
   /// Whether the model thinks: unset leaves it to the model.
   bool? get alwaysThinkingEnabled => asBool(merged['alwaysThinkingEnabled']);
 
+  /// The language replies are written in ("english", "japanese"...), as
+  /// Claude Code's `language` setting: unset leaves it to the model.
+  String? get language => asText(merged['language']);
+
   /// The effort set for [model] (`modelSettings`), else for all.
   String? effortFor(String model) =>
       asText(asMap(asMap(merged['modelSettings'])[model])['effortLevel']) ??

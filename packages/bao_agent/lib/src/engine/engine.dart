@@ -838,6 +838,11 @@ class AgentEngine {
         },
         if (_appendedByHost case final extra? when extra.trim().isNotEmpty)
           extra,
+        // Settings → Region & Language: the language replies are written
+        // in, as Claude Code's own `language` setting.
+        if (session.settings.language case final language?
+            when language.trim().isNotEmpty)
+          'Always write your replies in ${language.trim()}.',
       ],
       model: session.resolvedModel,
       userContext: context,
