@@ -40,6 +40,10 @@ class _MemoryStore implements CustomizationStore {
   @override
   Future<String> config() async => '/c';
 
+  @override
+  Future<String?> commandFile(String name, {String? project}) async =>
+      files['/c/skills/$name/SKILL.md'];
+
   /// The MCP servers listed.
   List<Customization> servers = const [];
 

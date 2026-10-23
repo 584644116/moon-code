@@ -146,7 +146,7 @@ void main() {
     tester,
   ) async {
     final (:session, :cli) = await pumpScripted(tester, cli: FakeCli());
-    await tester.tap(find.byType(MarkdownEditor).last);
+    await tester.tap(find.byType(QuillEditor).last);
     await tester.pump();
     expect(session.isStreaming, isTrue);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
