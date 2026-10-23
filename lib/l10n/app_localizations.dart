@@ -10923,6 +10923,18 @@ abstract class AppLocalizations {
   /// **'No longer listed by the upstream; kept until you remove it.'**
   String get modelsMissingTooltip;
 
+  /// No description provided for @modelsRemoveMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Gone ({count})'**
+  String modelsRemoveMissing(int count);
+
+  /// No description provided for @modelsRemoveMissingConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {count} models the upstream no longer lists?'**
+  String modelsRemoveMissingConfirm(int count);
+
   /// No description provided for @modelsCustom.
   ///
   /// In en, this message translates to:

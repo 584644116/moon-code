@@ -657,6 +657,38 @@ void main() {
     expect(providers.provider('gw'), isNotNull);
   });
 
+  testWidgets('the models gone upstream are removed at once, asked first, '
+      'and their roles with them', (tester) async {
+    await providers.save(
+      const ModelProvider(
+        id: 'gw',
+        name: 'Gateway',
+        baseUrl: 'https://gw',
+        models: [
+          ProviderModel(id: 'up'),
+          ProviderModel(id: 'old', missing: true),
+          ProviderModel(id: 'older', missing: true),
+        ],
+        roles: ProviderRoles(main: 'up', haiku: 'old'),
+      ),
+    );
+    await pump(tester);
+    await tester.tap(find.text('Gateway'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove Gone (2)'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Remove 2 models the upstream no longer lists?'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Remove').last);
+    await tester.pumpAndSettle();
+    final provider = providers.provider('gw')!;
+    expect(provider.models.map((m) => m.id), ['up']);
+    expect((provider.roles.main, provider.roles.haiku), ('up', null));
+    expect(find.textContaining('Remove Gone'), findsNothing);
+  });
+
   testWidgets('a model duplicated: added as it is, under another id (#177)', (
     tester,
   ) async {

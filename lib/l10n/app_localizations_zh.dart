@@ -6320,6 +6320,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelsMissingTooltip => '上游已不再列出此模型；会一直保留，直到你手动移除。';
 
   @override
+  String modelsRemoveMissing(int count) {
+    return '移除已下架（$count）';
+  }
+
+  @override
+  String modelsRemoveMissingConfirm(int count) {
+    return '移除 $count 个上游已下架的模型？';
+  }
+
+  @override
   String get modelsCustom => '手动';
 
   @override

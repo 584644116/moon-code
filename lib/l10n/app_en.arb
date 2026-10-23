@@ -4785,6 +4785,22 @@
   "modelsNoMatch": "No model matches.",
   "modelsMissing": "Gone upstream",
   "modelsMissingTooltip": "No longer listed by the upstream; kept until you remove it.",
+  "modelsRemoveMissing": "Remove Gone ({count})",
+  "@modelsRemoveMissing": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "modelsRemoveMissingConfirm": "Remove {count} models the upstream no longer lists?",
+  "@modelsRemoveMissingConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "modelsCustom": "Manual",
   "modelsShowAll": "Show All ({count})",
   "@modelsShowAll": {

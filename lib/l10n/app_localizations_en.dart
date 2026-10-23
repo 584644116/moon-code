@@ -6740,6 +6740,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'No longer listed by the upstream; kept until you remove it.';
 
   @override
+  String modelsRemoveMissing(int count) {
+    return 'Remove Gone ($count)';
+  }
+
+  @override
+  String modelsRemoveMissingConfirm(int count) {
+    return 'Remove $count models the upstream no longer lists?';
+  }
+
+  @override
   String get modelsCustom => 'Manual';
 
   @override

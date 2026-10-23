@@ -1810,6 +1810,8 @@
   "modelsNoMatch": "没有匹配的模型。",
   "modelsMissing": "上游已下架",
   "modelsMissingTooltip": "上游已不再列出此模型；会一直保留，直到你手动移除。",
+  "modelsRemoveMissing": "移除已下架（{count}）",
+  "modelsRemoveMissingConfirm": "移除 {count} 个上游已下架的模型？",
   "modelsCustom": "手动",
   "modelsShowAll": "显示全部（{count}）",
   "modelsShowChecked": "仅显示已勾选",
