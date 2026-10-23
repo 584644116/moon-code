@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart' show Icons;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bao_remote/claude.dart'
@@ -352,6 +354,115 @@ void main() {
         agent.children.whereType<NoticeItem>().single.text,
         contains('50 left out'),
       );
+    });
+
+    test("a subagent's card is sent again only when something of it "
+        'changed', () {
+      final transcript = Transcript();
+      var seq = 0;
+      var upserts = 0;
+      final translator = ClaudeTranslator(
+        emit: (event) {
+          if (event is ItemUpserted) upserts++;
+          transcript.apply(event);
+        },
+        nextSeq: () => ++seq,
+      )..turnId = '11111111-1111-4111-8111-111111111111';
+      translator.translate({
+        'type': 'assistant',
+        'message': {
+          'content': [
+            {
+              'type': 'tool_use',
+              'id': 'a1',
+              'name': 'Agent',
+              'input': {
+                'description': 'worker',
+                'subagent_type': 'Explore',
+                'prompt': 'read them',
+              },
+            },
+          ],
+        },
+      });
+      final before = upserts;
+      // The same message again: nothing new of the card.
+      translator.translate({
+        'type': 'assistant',
+        'message': {
+          'content': [
+            {
+              'type': 'tool_use',
+              'id': 'a1',
+              'name': 'Agent',
+              'input': {
+                'description': 'worker',
+                'subagent_type': 'Explore',
+                'prompt': 'read them',
+              },
+            },
+          ],
+        },
+      });
+      expect(upserts, before, reason: 'the card as it was');
+      // A step of its own: the card is sent again.
+      translator.translate({
+        'type': 'assistant',
+        'parent_tool_use_id': 'a1',
+        'message': {
+          'content': [
+            {
+              'type': 'tool_use',
+              'id': 'c1',
+              'name': 'Read',
+              'input': {'file_path': '/p/f.txt'},
+            },
+          ],
+        },
+      });
+      expect(upserts, greaterThan(before), reason: 'a step came');
+    });
+
+    test('a hook that failed is a warning, one that ran is not shown', () {
+      final transcript = Transcript();
+      var seq = 0;
+      final translator = ClaudeTranslator(
+        emit: transcript.apply,
+        nextSeq: () => ++seq,
+      );
+      translator.translate({
+        'type': 'system',
+        'subtype': 'hook_response',
+        'hook_id': 'h1',
+        'hook_name': 'Stop',
+        'hook_event': 'Stop',
+        'output': '',
+        'stdout': '',
+        'stderr': 'ENOENT: no such file or directory, uv_spawn',
+        'exit_code': 1,
+        'outcome': 'error',
+        'uuid': 'u1',
+      });
+      translator.translate({
+        'type': 'system',
+        'subtype': 'hook_response',
+        'hook_id': 'h2',
+        'hook_name': 'PreToolUse',
+        'hook_event': 'PreToolUse',
+        'output': '',
+        'stdout': '',
+        'stderr': '',
+        'exit_code': 0,
+        'outcome': 'success',
+        'uuid': 'u2',
+      });
+      final notices = [
+        for (var i = 0; i < transcript.length; i++) transcript.itemAt(i),
+      ].whereType<NoticeItem>().toList();
+      expect(notices, hasLength(1));
+      expect(notices.single.kind, NoticeKind.warning);
+      expect(notices.single.text, contains('Stop hook failed'));
+      expect(notices.single.text, contains('ENOENT'));
     });
 
     test('the summary a compacted conversation goes on from is not shown '
@@ -1491,6 +1602,42 @@ void main() {
       kernel.dispose();
     });
 
+    test('a rule that would allow every command is not offered', () async {
+      final cli = FakeCli();
+      final (:kernel, :transcript, events: _) = claude(cli);
+      kernel.send(const KernelTurn(id: 'u1', text: 'run it'));
+      await pumpEventQueue();
+      cli.push({
+        'type': 'control_request',
+        'request_id': 'r9',
+        'request': {
+          'subtype': 'can_use_tool',
+          'tool_name': 'Bash',
+          'input': {'command': 'bash -c "npm test"'},
+          'permission_suggestions': [
+            {
+              'type': 'addRules',
+              'rules': [
+                {'toolName': 'Bash', 'ruleContent': 'bash:*'},
+              ],
+              'behavior': 'allow',
+              'destination': 'localSettings',
+            },
+          ],
+        },
+      });
+      await pumpEventQueue();
+      final request = transcript.pendingInteraction as ApprovalRequest;
+      // Nothing left to offer as "always allow": the one command stands in.
+      expect(request.alwaysAllowLabel, isNull);
+      kernel.answer(
+        request.id,
+        const ApprovalAnswer(ApprovalDecision.allowOnce),
+      );
+      expect(cli.responses.single['updatedPermissions'], isNull);
+      kernel.dispose();
+    });
+
     test(
       'denying says why; a plan is put to the user, who starts it',
       () async {
@@ -1514,6 +1661,9 @@ void main() {
         final bash = transcript.pendingInteraction as ApprovalRequest;
         expect((bash.preview as CommandPreview).command, 'rm -rf build');
         expect(bash.alwaysAllowLabel, isNull);
+        // The label says what; the why says what in the command said so.
+        expect(bash.risk, ApprovalRisk.destructive);
+        expect(bash.why, contains('recycle bin'));
         kernel.answer(
           'r1',
           const ApprovalAnswer(
@@ -1766,6 +1916,30 @@ void main() {
       await pumpEventQueue();
       expect(transcript.pendingInteraction, isNull);
       expect(cli.responses.last['message'], ClaudeTranslator.planPresented);
+      kernel.dispose();
+    });
+
+    test('full access is the CLI\'s own on Windows, where root is not', () async {
+      // The CLI refuses bypass as root, and has no root to be on Windows
+      // (`setup.ts` skips win32): there the pick is passed as it is, and
+      // the CLI asks nothing per call.
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final cli = FakeCli();
+      final launches = <ClaudeLaunch>[];
+      final kernel = ClaudeCodeKernel(
+        MockKernels.claudeCode,
+        const KernelContext(cwd: '/p', settings: {'permission': 'full'}),
+        start: (launch) async {
+          launches.add(launch);
+          return cli;
+        },
+      );
+      kernel.permission.select('bypassPermissions');
+      kernel.prepare();
+      await pumpEventQueue();
+      expect(launches.single.permissionMode, 'bypassPermissions');
+      expect(kernel.permission.selected, 'bypassPermissions');
       kernel.dispose();
     });
 
@@ -5770,11 +5944,207 @@ exec /usr/bin/env "\$@"
       expect(kernel, isNot(isA<RevertsChanges>()));
       expect(kernel, isA<SelectsMode>());
     });
+
+    test('every request the server makes is answered', () async {
+      kernel.send(const KernelTurn(id: 't1', text: 'hi'));
+      await pumpEventQueue();
+      // Each of these stops the turn where it stands when left unanswered.
+      for (final method in [
+        'item/permissions/requestApproval',
+        'item/tool/requestUserInput',
+        'mcpServer/elicitation/request',
+        'item/tool/call',
+        'account/chatgptAuthTokens/refresh',
+        'attestation/generate',
+        'something/new',
+      ]) {
+        server.push({
+          'id': 90,
+          'method': method,
+          'params': {'threadId': 'th'},
+        });
+        final answer = server.written.lastWhere((m) => m['id'] == 90);
+        expect(
+          answer.containsKey('result') || answer.containsKey('error'),
+          isTrue,
+          reason: method,
+        );
+      }
+      // A question it cannot show is declined, not left waiting.
+      expect(
+        server.written.lastWhere((m) => m['id'] == 90)['error'],
+        isNotNull,
+      );
+      // An MCP server asking the user something is declined.
+      server.push({
+        'id': 91,
+        'method': 'mcpServer/elicitation/request',
+        'params': {'serverName': 'x'},
+      });
+      expect(server.written.lastWhere((m) => m['id'] == 91)['result'], {
+        'action': 'decline',
+      });
+    });
+
+    test('a refused request is reported, not waited on', () async {
+      kernel.send(const KernelTurn(id: 't1', text: 'hi'));
+      await pumpEventQueue();
+      server.push({
+        'id': 3,
+        'error': {'code': -32601, 'message': 'no such method'},
+      });
+      await pumpEventQueue();
+      // The turn itself is untouched; a later one says what happened.
+      final notices = events.whereType<ItemUpserted>().where(
+        (e) => e.item is NoticeItem,
+      );
+      expect(notices, isEmpty);
+      final server2 = _FakeServer(failThreadStart: true);
+      final second = CodexKernel(MockKernels.codex, server2);
+      final said = <KernelEvent>[];
+      second.events.listen(said.add);
+      second.send(const KernelTurn(id: 't2', text: 'hi again'));
+      await pumpEventQueue();
+      final notice =
+          said
+                  .whereType<ItemUpserted>()
+                  .lastWhere((e) => e.item is NoticeItem)
+                  .item
+              as NoticeItem;
+      expect(notice.kind, NoticeKind.error);
+      expect(notice.text, contains('no such thread'));
+      expect(said.last, isA<TurnEnded>());
+      second.dispose();
+    });
+
+    test('what a command prints shows as it prints it', () async {
+      kernel.send(const KernelTurn(id: 't1', text: 'hi'));
+      await pumpEventQueue();
+      notify('item/started', {
+        'item': {
+          'type': 'commandExecution',
+          'id': 'c1',
+          'command': 'flutter test',
+          'status': 'inProgress',
+        },
+      });
+      notify('item/commandExecution/outputDelta', {
+        'itemId': 'c1',
+        'delta': '00:01 +1 ',
+      });
+      notify('item/commandExecution/outputDelta', {
+        'itemId': 'c1',
+        'delta': 'All tests passed!',
+      });
+      final running =
+          events.whereType<ItemUpserted>().lastWhere((e) => e.id == 'c1').item
+              as TerminalItem;
+      expect(running.output, '00:01 +1 All tests passed!');
+      expect(running.status, CommandStatus.running);
+    });
+
+    test('a request resolved elsewhere closes its dialog', () async {
+      kernel.send(const KernelTurn(id: 't1', text: 'hi'));
+      await pumpEventQueue();
+      server.push({
+        'id': 7,
+        'method': 'item/commandExecution/requestApproval',
+        'params': {'command': 'flutter test'},
+      });
+      notify('serverRequest/resolved', {'threadId': 'th', 'requestId': 7});
+      expect(
+        events.whereType<InteractionResolved>().single.requestId,
+        'approval:7',
+      );
+    });
+
+    test('always allow uses the prefix the server proposed', () async {
+      kernel.send(const KernelTurn(id: 't1', text: 'hi'));
+      await pumpEventQueue();
+      server.push({
+        'id': 8,
+        'method': 'item/commandExecution/requestApproval',
+        'params': {
+          'command': 'flutter test',
+          'proposedExecpolicyAmendment': ['flutter', 'test'],
+        },
+      });
+      final approval =
+          events.whereType<InteractionRequested>().single.request
+              as ApprovalRequest;
+      expect(approval.alwaysAllowLabel, 'Always allow flutter test');
+      kernel.answer(
+        approval.id,
+        const ApprovalAnswer(ApprovalDecision.allowAlways),
+      );
+      expect(server.written.last['result'], {
+        'decision': {
+          'acceptWithExecpolicyAmendment': {
+            'execpolicy_amendment': ['flutter', 'test'],
+          },
+        },
+      });
+    });
+
+    test('the model plan is the todo list, and a summary is said', () async {
+      kernel.send(const KernelTurn(id: 't1', text: 'hi'));
+      await pumpEventQueue();
+      notify('turn/plan/updated', {
+        'threadId': 'th',
+        'turnId': 'st1',
+        'explanation': 'two steps',
+        'plan': [
+          {'step': 'Read the code', 'status': 'completed'},
+          {'step': 'Change it', 'status': 'inProgress'},
+          {'step': 'Test it', 'status': 'pending'},
+        ],
+      });
+      final todos = events.whereType<TodosReported>().single.todos;
+      expect(todos.map((t) => t.content), [
+        'Read the code',
+        'Change it',
+        'Test it',
+      ]);
+      expect(todos[1].status, TodoStatus.inProgress);
+
+      notify('thread/compacted', {'threadId': 'th', 'turnId': 'st1'});
+      final notice =
+          events
+                  .whereType<ItemUpserted>()
+                  .lastWhere((e) => e.item is NoticeItem)
+                  .item
+              as NoticeItem;
+      expect(notice.kind, NoticeKind.compaction);
+    });
+
+    test('a rewind drops the server turns it takes back', () async {
+      kernel.send(const KernelTurn(id: 't1', text: 'one'));
+      await pumpEventQueue();
+      notify('turn/completed', {
+        'turn': {'id': 'st1', 'status': 'completed'},
+      });
+      kernel.send(const KernelTurn(id: 't2', text: 'two'));
+      await pumpEventQueue();
+      // The fake server answers every turn with the same id.
+      notify('turn/started', {
+        'turn': {'id': 'st2'},
+      });
+      expect(await kernel.rewind(itemId: 'i', index: 0, turns: 1), isTrue);
+      final revert = server.written.lastWhere(
+        (m) => m['method'] == 'thread/revert',
+      );
+      expect(revert['params'], {'threadId': 'th', 'beforeTurnId': 'st2'});
+    });
   });
 }
 
 /// Answers Codex requests the way the app server does.
 class _FakeServer implements CodexTransport {
+  _FakeServer({this.failThreadStart = false});
+
+  /// Answer `thread/start` with an error, as a server that cannot would.
+  final bool failThreadStart;
+
   final StreamController<Map<String, Object?>> _out =
       StreamController.broadcast(sync: true);
   final List<Map<String, Object?>> written = [];
@@ -5787,6 +6157,13 @@ class _FakeServer implements CodexTransport {
   @override
   void write(Map<String, Object?> message) {
     written.add(message);
+    if (failThreadStart && message['method'] == 'thread/start') {
+      push({
+        'id': message['id'],
+        'error': {'code': -32603, 'message': 'no such thread'},
+      });
+      return;
+    }
     final result = switch (message['method']) {
       'thread/start' => {
         'thread': {'id': 'th'},
