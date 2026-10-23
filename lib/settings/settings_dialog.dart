@@ -291,14 +291,24 @@ class SettingsDialogState extends State<SettingsDialog> {
   /// Words a section is also found by in the search, beyond its name.
   static String keywords(BuildContext context, SettingsSection section) =>
       switch (section) {
+        SettingsSection.general => context.l10n.settingsGeneralKeywords,
         SettingsSection.appearance => context.l10n.settingsAppearanceKeywords,
+        SettingsSection.models => context.l10n.settingsModelsKeywords,
         SettingsSection.network => context.l10n.settingsNetworkKeywords,
         SettingsSection.ssh => context.l10n.settingsSshKeywords,
         SettingsSection.mobile => context.l10n.settingsMobileKeywords,
         SettingsSection.browser => context.l10n.settingsBrowserKeywords,
+        SettingsSection.notifications =>
+          context.l10n.settingsNotificationsKeywords,
+        SettingsSection.stash => context.l10n.settingsStashKeywords,
         SettingsSection.customize => context.l10n.settingsCustomizeKeywords,
         SettingsSection.accounts => context.l10n.settingsAccountsKeywords,
-        _ => '',
+        SettingsSection.language => context.l10n.settingsLanguageKeywords,
+        SettingsSection.keyboard => context.l10n.settingsKeyboardKeywords,
+        SettingsSection.updates => context.l10n.settingsUpdatesKeywords,
+        SettingsSection.about => context.l10n.settingsAboutKeywords,
+        SettingsSection.dataDirectory =>
+          context.l10n.settingsDataDirectoryKeywords,
       };
 
   /// The pages the window's commands show while the dialog is up, by

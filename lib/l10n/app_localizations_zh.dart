@@ -52,6 +52,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get languageSettingsDescription => 'BaoCode 的菜单、视图和消息所用的语言。更改立即生效。';
 
   @override
+  String get languageSettingsResponseLanguage => '回复语言';
+
+  @override
+  String get languageSettingsResponseLanguageDescription =>
+      'agent 回复时使用的语言，从下一个会话开始生效。选择“自动”则跟随对话所用的语言。';
+
+  @override
+  String get languageSettingsResponseLanguageFollow => '自动';
+
+  @override
   String languageSettingsFollowSystemCurrent(String language) {
     return '跟随系统（$language）';
   }
@@ -8035,6 +8045,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileAddressesRefresh => '刷新';
 
   @override
+  String mobileFirewallWarning(int port) {
+    return 'Windows 防火墙拦截了 $port 端口的入站连接。同一网络下的手机连不上这台电脑，直到放行为止。';
+  }
+
+  @override
+  String get mobileFirewallFix => '放行';
+
+  @override
+  String get mobileFirewallFixDescription => '会请求管理员权限，然后在家用、工作、公用三种网络下都放行本程序。';
+
+  @override
+  String get mobileFirewallFailed => '未放行。请以管理员身份打开终端，执行以下命令：';
+
+  @override
+  String get mobileFirewallCopy => '复制';
+
+  @override
+  String get mobileFirewallCopied => '已复制';
+
+  @override
   String get mobilePort => '端口';
 
   @override
@@ -8314,6 +8344,36 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get generalSettingsLiveTurnStatsDescription =>
       '运行中在回复下方实时显示本轮耗时、输出速度和已输出的 token。一轮结束后的统计始终显示';
+
+  @override
+  String get generalSettingsThinking => '显示思考过程';
+
+  @override
+  String get generalSettingsThinkingDescription =>
+      '模型工作时，在回复上方显示它思考的简短摘要。关闭后只保留最终回答；无论开关，模型的思考方式不变。从下一个会话开始生效。';
+
+  @override
+  String get generalSettingsKeepAwake => '工作时保持唤醒';
+
+  @override
+  String get generalSettingsKeepAwakeDescription =>
+      'agent 工作期间阻止电脑因空闲进入睡眠。屏幕仍会关闭，合盖或手动睡眠仍会睡眠。仅 Windows 生效。';
+
+  @override
+  String get generalSettingsDefaultPermission => '新会话的权限模式';
+
+  @override
+  String get generalSettingsDefaultPermissionDescription =>
+      '新会话开始时使用的权限模式，已打开的会话仍可随时切换。在某个会话中选过的完全访问不再带到下一个会话。';
+
+  @override
+  String get generalSettingsDefaultPermissionAsk => '执行前询问';
+
+  @override
+  String get generalSettingsDefaultPermissionAcceptEdits => '自动接受编辑';
+
+  @override
+  String get generalSettingsDefaultPermissionAuto => '自主执行';
 
   @override
   String stashPolishFailed(String error) {
@@ -8756,6 +8816,35 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get settingsAccountsKeywords =>
       'GitHub GitLab 登录 令牌 token issue PR 合并请求';
+
+  @override
+  String get settingsGeneralKeywords =>
+      '主窗口 启动 提交署名 署名 排队消息 提示建议 润色 增强 实时速度 思考 保持唤醒 权限 claude 代码 shell 命令 右键菜单 资源管理器 排除';
+
+  @override
+  String get settingsModelsKeywords =>
+      '供应商 模型 api 密钥 地址 角色 opus sonnet haiku 子智能体 辅助 图片 余额 上下文 强度';
+
+  @override
+  String get settingsLanguageKeywords => '显示语言 回复语言 翻译 中文 英文';
+
+  @override
+  String get settingsNotificationsKeywords => '通知 声音 托盘 事件 提醒';
+
+  @override
+  String get settingsStashKeywords => '暂存 笔记 剪贴板 历史 快捷键';
+
+  @override
+  String get settingsKeyboardKeywords => '键盘 快捷键 键位 导入 vscode cursor';
+
+  @override
+  String get settingsUpdatesKeywords => '更新 版本 检查 诊断 日志';
+
+  @override
+  String get settingsAboutKeywords => '关于 版本 许可';
+
+  @override
+  String get settingsDataDirectoryKeywords => '数据 文件夹 目录 存储 位置';
 
   @override
   String get accountsDescription =>

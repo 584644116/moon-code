@@ -193,7 +193,10 @@ class AppSettings {
           workspace: workspace,
         );
       case SettingsSection.language:
-        return LanguageSettingsPage(locale: locale);
+        return LanguageSettingsPage(
+          locale: locale,
+          settings: files?.settings,
+        );
       case SettingsSection.keyboard:
         unawaited(refreshKeymaps());
         final sync = this.sync;

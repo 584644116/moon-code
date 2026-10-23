@@ -14,6 +14,9 @@
   "languageSettingsTitle": "Region & Language",
   "languageSettingsDisplayLanguage": "Display Language",
   "languageSettingsDescription": "The language of BaoCode's menus, views and messages. Changes apply at once.",
+  "languageSettingsResponseLanguage": "Reply Language",
+  "languageSettingsResponseLanguageDescription": "The language the agent answers in, for the next chat you start. Automatic follows the language of the conversation.",
+  "languageSettingsResponseLanguageFollow": "Automatic",
   "languageSettingsFollowSystemCurrent": "Follow System ({language})",
   "@languageSettingsFollowSystemCurrent": {
     "description": "Follow System, with the language the system's resolves to, named in its own language.",
@@ -6157,6 +6160,19 @@
   "mobileAddressesDescription": "Where phones reach this computer, in the order they try them: the local network first, then the internet.",
   "mobileAddressesNone": "No network found.",
   "mobileAddressesRefresh": "Refresh",
+  "mobileFirewallWarning": "Windows Firewall is blocking incoming connections on port {port}. A phone on the same network can't reach this computer until it is allowed.",
+  "@mobileFirewallWarning": {
+    "placeholders": {
+      "port": {
+        "type": "int"
+      }
+    }
+  },
+  "mobileFirewallFix": "Allow",
+  "mobileFirewallFixDescription": "Asks for an administrator's permission, then lets this app in on every network: home, work, and public.",
+  "mobileFirewallFailed": "Not allowed. Run these in a terminal opened as administrator:",
+  "mobileFirewallCopy": "Copy",
+  "mobileFirewallCopied": "Copied",
   "mobilePort": "Port",
   "mobilePortDescription": "The port phones connect to. Forward it on the router to reach this computer from the internet.",
   "mobilePortInvalid": "Not a port: {text}. Enter a number from 1 to 65535.",
@@ -6308,6 +6324,15 @@
   "generalSettingsComposerEnhanceDescription": "A button in the message box that has the auxiliary model read the project and write what you wrote out again as the whole instruction — the files it touches, the order, how to check it",
   "generalSettingsLiveTurnStats": "Live Speed and Time",
   "generalSettingsLiveTurnStatsDescription": "While the agent works, a line under the reply with how long the turn has taken, how fast the model writes and the tokens so far, changing as it goes. The figures under a finished turn always show.",
+  "generalSettingsThinking": "Show Thinking",
+  "generalSettingsThinkingDescription": "While the model works, show a short account of its thinking above the reply. Turned off, only the answer is kept; the model thinks the same either way. Applies to the next chat you start.",
+  "generalSettingsKeepAwake": "Stay Awake While Working",
+  "generalSettingsKeepAwakeDescription": "Keep the computer from going to sleep while an agent is working. The screen may still turn off, and closing the lid or sleeping by hand still sleeps. Windows only.",
+  "generalSettingsDefaultPermission": "Permission for New Chats",
+  "generalSettingsDefaultPermissionDescription": "The permission mode a new chat starts in. Each open chat can still be changed. Full access picked in one chat is no longer carried into the next.",
+  "generalSettingsDefaultPermissionAsk": "Ask Before Acting",
+  "generalSettingsDefaultPermissionAcceptEdits": "Accept Edits",
+  "generalSettingsDefaultPermissionAuto": "Act on Its Own",
   "stashPolishFailed": "Could not polish: {error}",
   "@stashPolishFailed": {
     "placeholders": {
@@ -6652,6 +6677,15 @@
   },
   "settingsSectionAccounts": "Git Accounts",
   "settingsAccountsKeywords": "GitHub GitLab sign in login token issue pull request merge request",
+  "settingsGeneralKeywords": "main window startup commit attribution queued message prompt suggestion composer polish enhance live speed thinking keep awake permission claude code shell command context menu explorer exclude",
+  "settingsModelsKeywords": "provider model api key base url role opus sonnet haiku subagent auxiliary image balance context effort",
+  "settingsLanguageKeywords": "display language reply language translation chinese english",
+  "settingsNotificationsKeywords": "notification sound tray events attention",
+  "settingsStashKeywords": "stash notes clipboard history hotkey shortcut",
+  "settingsKeyboardKeywords": "keyboard shortcuts keybindings keymap import vscode cursor",
+  "settingsUpdatesKeywords": "update version check diagnostics logs",
+  "settingsAboutKeywords": "about version license",
+  "settingsDataDirectoryKeywords": "data folder directory storage location",
   "accountsDescription": "Sign in to GitHub or GitLab to see the state of the issues and pull requests linked in Stash, import issues as stashes, and reply to them once you confirm.",
   "accountsSignedIn": "Signed in",
   "accountsAdd": "Add an account",

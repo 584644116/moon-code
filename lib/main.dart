@@ -46,7 +46,9 @@ import 'kernel/claude_code/turn_stats_stub.dart'
     if (dart.library.io) 'kernel/claude_code/turn_stats_io.dart'
     show turnStatsIn;
 import 'kernel/commit_attribution.dart';
+import 'kernel/default_permission.dart';
 import 'kernel/prompt_suggestions.dart';
+import 'kernel/thinking_display.dart';
 import 'chat/composer/composer_polish.dart'
     show ComposerEnhanceSetting, ComposerPolishSetting;
 import 'kernel/queued_messages.dart';
@@ -68,6 +70,7 @@ import 'platform/app_platform.dart';
 import 'platform/data_dir.dart';
 import 'platform/error_log.dart';
 import 'platform/event_log.dart';
+import 'platform/keep_awake.dart';
 import 'platform/open_requests.dart';
 import 'platform/shell_command.dart';
 import 'remote/project_host.dart';
@@ -83,6 +86,7 @@ import 'channel/channel_setup_platform.dart';
 import 'settings/app_locale.dart';
 import 'settings/app_settings.dart';
 import 'settings/data_dir_startup.dart';
+import 'settings/response_language.dart';
 import 'settings/user_settings.dart';
 import 'sidebar/sidebar_times.dart';
 import 'telemetry/telemetry_platform.dart';
@@ -173,6 +177,20 @@ Future<void> main(List<String> arguments) async {
     // Read as each agent starts, and as each message is sent.
     PromptSuggestions.current = () =>
         PromptSuggestions.enabled(files.settings[PromptSuggestions.settingKey]);
+    // Settings → General → Chat: whether the thinking is shown in the chat,
+    // read as each agent starts.
+    ThinkingDisplay.current = () =>
+        ThinkingDisplay.parse(files.settings[ThinkingDisplay.settingKey]);
+    // Settings → Region & Language: the language the agent answers in, read
+    // as each agent starts.
+    ResponseLanguage.current = () => ResponseLanguage.parse(
+      files.settings[ResponseLanguage.settingKey],
+    );
+    // Settings → General → Claude Code: the mode a new agent starts in,
+    // read as each new agent starts.
+    DefaultPermission.current = () => DefaultPermission.parse(
+      files.settings[DefaultPermission.settingKey],
+    );
     // The composer's Polish and Enhance buttons, shown or not as each
     // changes.
     ComposerPolishSetting.current = () => ComposerPolishSetting.enabled(
@@ -285,6 +303,15 @@ Future<void> main(List<String> arguments) async {
     l10n: () =>
         lookupAppLocalizations(locale.locale ?? AppLocale.systemLocale()),
   )..load();
+  // Settings → General → Chat: the machine stays awake while an agent
+  // works, when the user turned that on.
+  if (files != null) {
+    KeepAwakeFollow(
+      workspace: workspace,
+      enabled: () => KeepAwake.enabled(files.settings[KeepAwake.settingKey]),
+      changes: files.settings,
+    );
+  }
   // Claude Code's skills, agents, commands, rules, servers, hooks and
   // plugins: the Customize view beside the chat, and Settings → Customize.
   final customizations = CustomizationStore();

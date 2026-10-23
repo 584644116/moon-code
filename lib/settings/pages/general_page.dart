@@ -11,7 +11,9 @@ import '../../ide/ide_notifications.dart' show IdeSeverity;
 import '../../kernel/claude_code/claude_core_setting.dart';
 import '../../kernel/claude_code/claude_path_setting.dart';
 import '../../kernel/commit_attribution.dart';
+import '../../kernel/default_permission.dart';
 import '../../kernel/prompt_suggestions.dart';
+import '../../kernel/thinking_display.dart';
 import '../../chat/composer/composer_polish.dart'
     show ComposerEnhanceSetting, ComposerPolishSetting;
 import '../../chat/widgets/turn_footer.dart' show LiveTurnStatsSetting;
@@ -19,6 +21,7 @@ import '../../kernel/queued_messages.dart';
 import '../../l10n/l10n.dart';
 import '../../platform/app_platform.dart';
 import '../../platform/context_menu.dart';
+import '../../platform/keep_awake.dart';
 import '../../platform/shell_command.dart';
 import '../../theme/workbench_theme.dart' show themeColors;
 import '../../tips/feature_tips_controller.dart';
@@ -38,7 +41,10 @@ import 'settings_widgets.dart';
 /// whether the next prompt is suggested after each turn
 /// (`chat.promptSuggestions`), whether the composer has its Polish button
 /// (`chat.composer.polish`), whether the turn under way shows its time,
-/// speed and tokens (`chat.liveTurnStats`), the Claude Code to run
+/// speed and tokens (`chat.liveTurnStats`), whether the thinking is shown
+/// (`chat.thinkingDisplay`), whether the machine stays awake while an agent
+/// works (`chat.keepAwakeWhileRunning`), the permission mode a new chat
+/// starts in (`chat.defaultPermissionMode`), the Claude Code to run
 /// (`claudeCode.path`),
 /// the `code` shell command, and Open with BaoCode in Finder's or
 /// Explorer's context menu. A choice is written at once; the default is not
@@ -398,6 +404,25 @@ class GeneralSettingsPage extends StatelessWidget {
                     on ? null : LiveTurnStatsSetting.off,
                   ),
                 ),
+                SettingsSwitchRow(
+                  label: l10n.generalSettingsThinking,
+                  description: l10n.generalSettingsThinkingDescription,
+                  value: ThinkingDisplay.parse(
+                    settings?[ThinkingDisplay.settingKey],
+                  ).shown,
+                  onChanged: (on) => _write(
+                    ThinkingDisplay.settingKey,
+                    on ? null : ThinkingDisplay.omitted.name,
+                  ),
+                ),
+                if (KeepAwake.supported)
+                  SettingsSwitchRow(
+                    label: l10n.generalSettingsKeepAwake,
+                    description: l10n.generalSettingsKeepAwakeDescription,
+                    value: KeepAwake.enabled(settings?[KeepAwake.settingKey]),
+                    onChanged: (on) =>
+                        _write(KeepAwake.settingKey, on ? true : null),
+                  ),
               ],
             ),
             if (claudeStatus case final claudeStatus? when !kIsWeb)
@@ -406,6 +431,21 @@ class GeneralSettingsPage extends StatelessWidget {
                 children: [
                   SettingsCard(
                     children: [
+                      _choiceRow(
+                        context,
+                        key: DefaultPermission.settingKey,
+                        label: l10n.generalSettingsDefaultPermission,
+                        description:
+                            l10n.generalSettingsDefaultPermissionDescription,
+                        values: {
+                          DefaultPermission.ask.mode:
+                              l10n.generalSettingsDefaultPermissionAsk,
+                          DefaultPermission.acceptEdits.mode:
+                              l10n.generalSettingsDefaultPermissionAcceptEdits,
+                          DefaultPermission.auto.mode:
+                              l10n.generalSettingsDefaultPermissionAuto,
+                        },
+                      ),
                       _choiceRow(
                         context,
                         key: ClaudeCore.settingKey,

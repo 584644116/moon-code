@@ -53,6 +53,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'The language of BaoCode\'s menus, views and messages. Changes apply at once.';
 
   @override
+  String get languageSettingsResponseLanguage => 'Reply Language';
+
+  @override
+  String get languageSettingsResponseLanguageDescription =>
+      'The language the agent answers in, for the next chat you start. Automatic follows the language of the conversation.';
+
+  @override
+  String get languageSettingsResponseLanguageFollow => 'Automatic';
+
+  @override
   String languageSettingsFollowSystemCurrent(String language) {
     return 'Follow System ($language)';
   }
@@ -8521,6 +8531,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mobileAddressesRefresh => 'Refresh';
 
   @override
+  String mobileFirewallWarning(int port) {
+    return 'Windows Firewall is blocking incoming connections on port $port. A phone on the same network can\'t reach this computer until it is allowed.';
+  }
+
+  @override
+  String get mobileFirewallFix => 'Allow';
+
+  @override
+  String get mobileFirewallFixDescription =>
+      'Asks for an administrator\'s permission, then lets this app in on every network: home, work, and public.';
+
+  @override
+  String get mobileFirewallFailed =>
+      'Not allowed. Run these in a terminal opened as administrator:';
+
+  @override
+  String get mobileFirewallCopy => 'Copy';
+
+  @override
+  String get mobileFirewallCopied => 'Copied';
+
+  @override
   String get mobilePort => 'Port';
 
   @override
@@ -8808,6 +8840,36 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get generalSettingsLiveTurnStatsDescription =>
       'While the agent works, a line under the reply with how long the turn has taken, how fast the model writes and the tokens so far, changing as it goes. The figures under a finished turn always show.';
+
+  @override
+  String get generalSettingsThinking => 'Show Thinking';
+
+  @override
+  String get generalSettingsThinkingDescription =>
+      'While the model works, show a short account of its thinking above the reply. Turned off, only the answer is kept; the model thinks the same either way. Applies to the next chat you start.';
+
+  @override
+  String get generalSettingsKeepAwake => 'Stay Awake While Working';
+
+  @override
+  String get generalSettingsKeepAwakeDescription =>
+      'Keep the computer from going to sleep while an agent is working. The screen may still turn off, and closing the lid or sleeping by hand still sleeps. Windows only.';
+
+  @override
+  String get generalSettingsDefaultPermission => 'Permission for New Chats';
+
+  @override
+  String get generalSettingsDefaultPermissionDescription =>
+      'The permission mode a new chat starts in. Each open chat can still be changed. Full access picked in one chat is no longer carried into the next.';
+
+  @override
+  String get generalSettingsDefaultPermissionAsk => 'Ask Before Acting';
+
+  @override
+  String get generalSettingsDefaultPermissionAcceptEdits => 'Accept Edits';
+
+  @override
+  String get generalSettingsDefaultPermissionAuto => 'Act on Its Own';
 
   @override
   String stashPolishFailed(String error) {
@@ -9267,6 +9329,40 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsAccountsKeywords =>
       'GitHub GitLab sign in login token issue pull request merge request';
+
+  @override
+  String get settingsGeneralKeywords =>
+      'main window startup commit attribution queued message prompt suggestion composer polish enhance live speed thinking keep awake permission claude code shell command context menu explorer exclude';
+
+  @override
+  String get settingsModelsKeywords =>
+      'provider model api key base url role opus sonnet haiku subagent auxiliary image balance context effort';
+
+  @override
+  String get settingsLanguageKeywords =>
+      'display language reply language translation chinese english';
+
+  @override
+  String get settingsNotificationsKeywords =>
+      'notification sound tray events attention';
+
+  @override
+  String get settingsStashKeywords =>
+      'stash notes clipboard history hotkey shortcut';
+
+  @override
+  String get settingsKeyboardKeywords =>
+      'keyboard shortcuts keybindings keymap import vscode cursor';
+
+  @override
+  String get settingsUpdatesKeywords => 'update version check diagnostics logs';
+
+  @override
+  String get settingsAboutKeywords => 'about version license';
+
+  @override
+  String get settingsDataDirectoryKeywords =>
+      'data folder directory storage location';
 
   @override
   String get accountsDescription =>

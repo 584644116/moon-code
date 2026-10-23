@@ -182,6 +182,24 @@ abstract class AppLocalizations {
   /// **'The language of BaoCode\'s menus, views and messages. Changes apply at once.'**
   String get languageSettingsDescription;
 
+  /// No description provided for @languageSettingsResponseLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply Language'**
+  String get languageSettingsResponseLanguage;
+
+  /// No description provided for @languageSettingsResponseLanguageDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The language the agent answers in, for the next chat you start. Automatic follows the language of the conversation.'**
+  String get languageSettingsResponseLanguageDescription;
+
+  /// No description provided for @languageSettingsResponseLanguageFollow.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get languageSettingsResponseLanguageFollow;
+
   /// Follow System, with the language the system's resolves to, named in its own language.
   ///
   /// In en, this message translates to:
@@ -13827,6 +13845,42 @@ abstract class AppLocalizations {
   /// **'Refresh'**
   String get mobileAddressesRefresh;
 
+  /// No description provided for @mobileFirewallWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Windows Firewall is blocking incoming connections on port {port}. A phone on the same network can\'t reach this computer until it is allowed.'**
+  String mobileFirewallWarning(int port);
+
+  /// No description provided for @mobileFirewallFix.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get mobileFirewallFix;
+
+  /// No description provided for @mobileFirewallFixDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Asks for an administrator\'s permission, then lets this app in on every network: home, work, and public.'**
+  String get mobileFirewallFixDescription;
+
+  /// No description provided for @mobileFirewallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not allowed. Run these in a terminal opened as administrator:'**
+  String get mobileFirewallFailed;
+
+  /// No description provided for @mobileFirewallCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get mobileFirewallCopy;
+
+  /// No description provided for @mobileFirewallCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get mobileFirewallCopied;
+
   /// No description provided for @mobilePort.
   ///
   /// In en, this message translates to:
@@ -14336,6 +14390,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'While the agent works, a line under the reply with how long the turn has taken, how fast the model writes and the tokens so far, changing as it goes. The figures under a finished turn always show.'**
   String get generalSettingsLiveTurnStatsDescription;
+
+  /// No description provided for @generalSettingsThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Thinking'**
+  String get generalSettingsThinking;
+
+  /// No description provided for @generalSettingsThinkingDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'While the model works, show a short account of its thinking above the reply. Turned off, only the answer is kept; the model thinks the same either way. Applies to the next chat you start.'**
+  String get generalSettingsThinkingDescription;
+
+  /// No description provided for @generalSettingsKeepAwake.
+  ///
+  /// In en, this message translates to:
+  /// **'Stay Awake While Working'**
+  String get generalSettingsKeepAwake;
+
+  /// No description provided for @generalSettingsKeepAwakeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the computer from going to sleep while an agent is working. The screen may still turn off, and closing the lid or sleeping by hand still sleeps. Windows only.'**
+  String get generalSettingsKeepAwakeDescription;
+
+  /// No description provided for @generalSettingsDefaultPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission for New Chats'**
+  String get generalSettingsDefaultPermission;
+
+  /// No description provided for @generalSettingsDefaultPermissionDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The permission mode a new chat starts in. Each open chat can still be changed. Full access picked in one chat is no longer carried into the next.'**
+  String get generalSettingsDefaultPermissionDescription;
+
+  /// No description provided for @generalSettingsDefaultPermissionAsk.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask Before Acting'**
+  String get generalSettingsDefaultPermissionAsk;
+
+  /// No description provided for @generalSettingsDefaultPermissionAcceptEdits.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept Edits'**
+  String get generalSettingsDefaultPermissionAcceptEdits;
+
+  /// No description provided for @generalSettingsDefaultPermissionAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Act on Its Own'**
+  String get generalSettingsDefaultPermissionAuto;
 
   /// No description provided for @stashPolishFailed.
   ///
@@ -15116,6 +15224,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'GitHub GitLab sign in login token issue pull request merge request'**
   String get settingsAccountsKeywords;
+
+  /// No description provided for @settingsGeneralKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'main window startup commit attribution queued message prompt suggestion composer polish enhance live speed thinking keep awake permission claude code shell command context menu explorer exclude'**
+  String get settingsGeneralKeywords;
+
+  /// No description provided for @settingsModelsKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'provider model api key base url role opus sonnet haiku subagent auxiliary image balance context effort'**
+  String get settingsModelsKeywords;
+
+  /// No description provided for @settingsLanguageKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'display language reply language translation chinese english'**
+  String get settingsLanguageKeywords;
+
+  /// No description provided for @settingsNotificationsKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'notification sound tray events attention'**
+  String get settingsNotificationsKeywords;
+
+  /// No description provided for @settingsStashKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'stash notes clipboard history hotkey shortcut'**
+  String get settingsStashKeywords;
+
+  /// No description provided for @settingsKeyboardKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'keyboard shortcuts keybindings keymap import vscode cursor'**
+  String get settingsKeyboardKeywords;
+
+  /// No description provided for @settingsUpdatesKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'update version check diagnostics logs'**
+  String get settingsUpdatesKeywords;
+
+  /// No description provided for @settingsAboutKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'about version license'**
+  String get settingsAboutKeywords;
+
+  /// No description provided for @settingsDataDirectoryKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'data folder directory storage location'**
+  String get settingsDataDirectoryKeywords;
 
   /// No description provided for @accountsDescription.
   ///
