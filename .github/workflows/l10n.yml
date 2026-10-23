@@ -1,0 +1,63 @@
+# Checks the translations (lib/l10n): each ARB is JSON, English and Chinese
+# name the same messages, every one has text, and the classes gen-l10n
+# writes are what the ARBs make. tool/check_l10n.dart says it, and
+# test/l10n_test.dart says the first three from inside a test run.
+#
+#   a pull request that changes lib/l10n/**
+#                           check it, and that what is committed of the
+#                           generated classes is what they make
+#
+# A merge is what breaks an ARB — an entry left open, or two sides' entries
+# run into each other — and what it then gives reads as a broken build
+# rather than a broken file: `flutter pub get` stops on a FormatException,
+# and every test in test/l10n_test.dart fails on the same parse error.
+name: Localization
+
+on:
+  pull_request:
+    paths:
+      - 'lib/l10n/**'
+      - 'l10n.yaml'
+      - 'tool/check_l10n.dart'
+      - 'test/l10n_test.dart'
+      - '.github/workflows/l10n.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/l10n/**'
+      - 'l10n.yaml'
+      - 'tool/check_l10n.dart'
+      - 'test/l10n_test.dart'
+      - '.github/workflows/l10n.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: l10n-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.47.5
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Before Flutter is set up, where a broken file is named as such and
+      # the line it breaks at; the generated classes are compared once it
+      # is, since gen-l10n makes them.
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: The ARBs and the classes they make
+        run: dart run tool/check_l10n.dart
+
+      - name: The test file's own
+        run: flutter test test/l10n_test.dart

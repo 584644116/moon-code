@@ -105,6 +105,22 @@ final AppLocalizations _zh = AppLocalizationsZh();
 
 void main() {
   group('ARB files', () {
+    // Said here rather than left to the first read: an ARB that is not JSON
+    // stops gen-l10n, and every test below it in this file — each one calls
+    // [_arb] — fails with the same parse error, which reads as a broken
+    // test rather than a broken file. A merge is what breaks it (an entry
+    // left open), so this one names the file and the line.
+    test('each is JSON', () {
+      for (final name in const ['app_en.arb', 'app_zh.arb']) {
+        final text = File('lib/l10n/$name').readAsStringSync();
+        try {
+          jsonDecode(text);
+        } on FormatException catch (error) {
+          fail('lib/l10n/$name is not JSON: ${error.message}');
+        }
+      }
+    });
+
     test('en and zh have the same keys', () {
       final en = _messages(_arb('app_en.arb'));
       final zh = _messages(_arb('app_zh.arb'));
