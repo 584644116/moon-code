@@ -207,6 +207,8 @@ class ToolCallItem extends ChatItem {
     this.input = const {},
     this.images = const [],
     this.imageFiles = const [],
+    this.startedAt,
+    this.duration,
   });
 
   final ToolKind kind;
@@ -244,6 +246,47 @@ class ToolCallItem extends ChatItem {
   /// Where they were saved (absolute, on the project's host), as the CLI
   /// told the agent: files of the session, which its text may link to.
   final List<String> imageFiles;
+
+  /// When it was called, while it runs (live sessions only).
+  final DateTime? startedAt;
+
+  /// How long it took, once done: what a tool that took 40 seconds is
+  /// asked about first (see [ToolStatus]).
+  final Duration? duration;
+
+  ToolCallItem copyWith({
+    ToolKind? kind,
+    String? target,
+    String? detail,
+    String? path,
+    List<String>? results,
+    String? label,
+    ToolStatus? status,
+    String? output,
+    String? tool,
+    String? callId,
+    Map<String, Object?>? input,
+    List<ImageAttachment>? images,
+    List<String>? imageFiles,
+    DateTime? startedAt,
+    Duration? duration,
+  }) => ToolCallItem(
+    kind: kind ?? this.kind,
+    target: target ?? this.target,
+    detail: detail ?? this.detail,
+    path: path ?? this.path,
+    results: results ?? this.results,
+    label: label ?? this.label,
+    status: status ?? this.status,
+    output: output ?? this.output,
+    tool: tool ?? this.tool,
+    callId: callId ?? this.callId,
+    input: input ?? this.input,
+    images: images ?? this.images,
+    imageFiles: imageFiles ?? this.imageFiles,
+    startedAt: startedAt ?? this.startedAt,
+    duration: duration ?? this.duration,
+  );
 }
 
 /// A subagent at work: its own conversation, one card in the history that

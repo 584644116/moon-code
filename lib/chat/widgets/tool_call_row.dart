@@ -31,6 +31,7 @@ class ToolCallRow extends StatelessWidget {
     this.output,
     this.images = const [],
     this.imageFiles = const [],
+    this.duration,
     this.expanded = false,
     this.onToggle,
     this.onSetGoal,
@@ -51,6 +52,20 @@ class ToolCallRow extends StatelessWidget {
 
   /// Where the CLI saved them (see [ToolCallItem.imageFiles]).
   final List<String> imageFiles;
+
+  /// How long it took, once it has (see [ToolCallItem.duration]).
+  final Duration? duration;
+
+  /// What it took, for one that took a second or more: the ones under
+  /// that are every call, and saying so is noise.
+  String? get _took {
+    final duration = this.duration;
+    if (duration == null || duration < const Duration(seconds: 1)) return null;
+    final seconds = duration.inMilliseconds / 1000;
+    return seconds < 10
+        ? '${seconds.toStringAsFixed(1)}s'
+        : '${seconds.round()}s';
+  }
 
   List<ChatImage> get _images => status == ToolStatus.failed
       ? const []
@@ -115,9 +130,34 @@ class ToolCallRow extends StatelessWidget {
         _ => null,
       },
       trailingGap: 0,
-      trailing: images.isEmpty || status == ToolStatus.failed
-          ? null
-          : StepThumbnails(images: _images, shown: !expanded),
+      trailing: switch ((
+        _took,
+        images.isEmpty || status == ToolStatus.failed,
+      )) {
+        (null, true) => null,
+        (final took?, true) => Text(
+          took,
+          style: TextStyle(
+            color: AppColors.textFaint,
+            fontSize: StepHeader.fontSize - 1,
+          ),
+        ),
+        (null, false) => StepThumbnails(images: _images, shown: !expanded),
+        (final took?, false) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              took,
+              style: TextStyle(
+                color: AppColors.textFaint,
+                fontSize: StepHeader.fontSize - 1,
+              ),
+            ),
+            const SizedBox(width: 6),
+            StepThumbnails(images: _images, shown: !expanded),
+          ],
+        ),
+      },
       action: switch ((kind, _shown, onSetGoal)) {
         (ToolKind.goal, final condition?, final set?) when !_running =>
           _SetGoalButton(onTap: () => set(condition)),

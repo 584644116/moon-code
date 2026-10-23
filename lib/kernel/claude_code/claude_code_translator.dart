@@ -449,6 +449,7 @@ class ClaudeTranslator {
       final agent = _agents[parent];
       if (agent == null) return; // A subagent's message we cannot place.
       agent.children[id] = item;
+      agent.version++;
       _trimAgent(agent);
       _putAgent(parent);
       return;
@@ -475,23 +476,47 @@ class ClaudeTranslator {
       }
       agent.children.remove(key);
       agent.dropped++;
+      agent.version++;
       excess--;
     }
   }
 
   void _putAgent(String id) {
     final agent = _agents[id]!;
-    agent.item = agent.item.copyWith(
-      children: [
-        if (agent.dropped > 0)
-          NoticeItem(
-            NoticeKind.info,
-            'Earlier steps are not shown (${agent.dropped} left out).',
-          ),
-        ...agent.children.values,
-      ],
-    );
+    agent.item = agent.item.copyWith(children: agent.childrenList());
+    // The card as it was last sent shows what this one does: nothing to
+    // send. A subagent at work takes a step a second, and its card's line
+    // changes with it; a card sent with nothing new costs the history a
+    // rebuild of every row it has.
+    if (agent.sent case final sent? when _sameAgent(sent, agent.item)) {
+      return;
+    }
+    agent.sent = agent.item;
     _put(id, agent.item, parent: _tools[id]?.parent);
+  }
+
+  /// Whether [a] and [b] are a card with nothing new between them: the same
+  /// line, and the same steps, each the one it was.
+  static bool _sameAgent(AgentItem a, AgentItem b) {
+    if (a.description != b.description ||
+        a.agentType != b.agentType ||
+        a.prompt != b.prompt ||
+        a.status != b.status ||
+        a.tokens != b.tokens ||
+        a.toolUses != b.toolUses ||
+        a.lastTool != b.lastTool ||
+        a.activity != b.activity ||
+        a.duration != b.duration ||
+        a.model != b.model ||
+        a.result != b.result ||
+        a.background != b.background ||
+        a.children.length != b.children.length) {
+      return false;
+    }
+    for (var i = 0; i < a.children.length; i++) {
+      if (!identical(a.children[i], b.children[i])) return false;
+    }
+    return true;
   }
 
   // --- Streaming ---------------------------------------------------------------
@@ -987,7 +1012,33 @@ class ClaudeTranslator {
     );
   }
 
+  /// [tool] as an item, with when it was called and, once done, how long
+  /// it took. A session being replayed kept no times, nor has one still
+  /// running a length yet.
   ChatItem _toolItem(
+    _Tool tool,
+    _Outcome outcome, {
+    String? output,
+    List<ImageAttachment> images = const [],
+    List<String> imageFiles = const [],
+  }) {
+    final item = _toolItemOf(
+      tool,
+      outcome,
+      output: output,
+      images: images,
+      imageFiles: imageFiles,
+    );
+    if (item is! ToolCallItem) return item;
+    return item.copyWith(
+      startedAt: replaying ? null : tool.startedAt,
+      duration: replaying || outcome == _Outcome.running
+          ? null
+          : DateTime.now().difference(tool.startedAt),
+    );
+  }
+
+  ChatItem _toolItemOf(
     _Tool tool,
     _Outcome outcome, {
     String? output,
@@ -1343,14 +1394,10 @@ class ClaudeTranslator {
         final item = _toolItem(tool, outcome) as ToolCallItem;
         _put(
           id,
-          ToolCallItem(
-            kind: item.kind,
-            label: item.label,
-            target: item.target,
+          item.copyWith(
             detail:
                 '${matches.length} ${tool.name == 'Glob' ? 'files' : 'results'}',
             results: matches,
-            status: item.status,
           ),
           parent: tool.parent,
         );
@@ -1577,6 +1624,19 @@ class ClaudeTranslator {
 
   // --- Runtime messages ------------------------------------------------------------
 
+  /// The first line of [text] with anything in it, cut short: a hook's
+  /// failure is a line in a notice, not its whole output.
+  static String? _firstLine(String text) {
+    for (final line in text.split(RegExp(r'\r?\n'))) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      return trimmed.length <= 200
+          ? trimmed
+          : '${trimmed.substring(0, 200)}…';
+    }
+    return null;
+  }
+
   /// Whether the CLI's [content] is a notice not shown: the one on auto
   /// mode's classifier billing, which it gives each session whose requests
   /// go through a gateway (ours, on this machine), nothing the user can do.
@@ -1762,6 +1822,34 @@ class ClaudeTranslator {
           summary: _string(message['summary']),
           outputFile: _string(message['output_file']),
           usage: _map(message['usage']),
+        );
+      // A hook that failed: what it said, and that it did not stop the
+      // turn (a hook's failure is not the agent's). Silent while a kept
+      // session is replayed: what it said then is not news now.
+      case 'hook_response' when !replaying:
+        if (message['outcome'] != 'error') return;
+        final name = _string(message['hook_name']);
+        final event = _string(message['hook_event']);
+        final said = switch ((
+          _string(message['stderr'])?.trim(),
+          _string(message['output'])?.trim(),
+        )) {
+          (final stderr?, final _) when stderr.isNotEmpty => stderr,
+          (final _, final output?) when output.isNotEmpty => output,
+          _ => null,
+        };
+        final code = _int(message['exit_code']);
+        _put(
+          'hook:${message['hook_id'] ?? uuid}',
+          NoticeItem(
+            NoticeKind.warning,
+            [
+              '${event ?? 'A'} hook failed',
+              if (name case final name? when name.isNotEmpty) '($name)',
+              if (code case final code? when code != 0) 'exit $code',
+              if (said case final said?) _firstLine(said),
+            ].join(' · '),
+          ),
         );
       case 'background_tasks_changed' when !replaying:
         final live = {
@@ -2104,4 +2192,33 @@ class _Agent {
 
   /// Steps left out of [children] past the cap (see _maxAgentChildren).
   int dropped = 0;
+
+  /// The card as last sent to the history; null before it was.
+  AgentItem? sent;
+
+  /// Bumped whenever [children] changes: a step added, replaced, or left
+  /// out.
+  int version = 0;
+
+  /// [children] as the card shows them, the note of what was left out
+  /// first: the very list last handed out while no step came or went, so
+  /// that a card whose steps did not change is one the history keeps.
+  List<ChatItem>? _listed;
+  int _listedVersion = -1;
+
+  List<ChatItem> childrenList() {
+    if (_listed case final listed? when _listedVersion == version) {
+      return listed;
+    }
+    _listed = [
+      if (dropped > 0)
+        NoticeItem(
+          NoticeKind.info,
+          'Earlier steps are not shown ($dropped left out).',
+        ),
+      ...children.values,
+    ];
+    _listedVersion = version;
+    return _listed!;
+  }
 }
