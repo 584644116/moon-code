@@ -73,10 +73,71 @@ class _MarkdownViewState extends State<MarkdownView> {
   Widget? _built;
   Object? _builtFrom;
 
+  /// The blocks already finished, as widgets built once: while a reply
+  /// streams in, only the block being written changes. Parsing the whole
+  /// of a long message on every frame and laying it out again is what a
+  /// reply costs (tens of milliseconds at 30 000 characters); a finished
+  /// block is kept as it was, and only the last one is made again.
+  final List<Widget> _chunks = [];
+
+  /// How much of [MarkdownView.data] [_chunks] was built from, and that
+  /// text kept to know whether an edit still begins with it.
+  int _chunkEnd = 0;
+  String _chunkText = '';
+
+  /// What the chunks were built with: another style or theme is another
+  /// set of widgets.
+  Object? _chunkFrom;
+
+  /// The images the finished blocks showed, and all of them for a click
+  /// on one to go through: the last block's are added as it is parsed,
+  /// the finished blocks' are read from the shared list.
+  final List<String> _settledImages = [];
+  final List<String> _gallery = [];
+
+  /// What files are known to exist. A file found changes icons already
+  /// built, which are made again then.
+  FileExistence? _existence;
+  int _existenceVersion = 0;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _built = null;
+    _forgetChunks();
+    final existence = FileOpenScope.maybeOf(context)?.existence;
+    if (!identical(existence, _existence)) {
+      _existence?.removeListener(_existenceFound);
+      _existence = existence;
+      _existence?.addListener(_existenceFound);
+      _existenceVersion = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _existence?.removeListener(_existenceFound);
+    super.dispose();
+  }
+
+  /// A file was found: the icons of what was built before it are not the
+  /// ones to show.
+  void _existenceFound() {
+    _existenceVersion++;
+    _forgetChunks();
+    // What was built holds the old icons: made again, not handed back.
+    _built = null;
+    _builtFrom = null;
+    if (mounted) setState(() {});
+  }
+
+  void _forgetChunks() {
+    _chunks.clear();
+    _settledImages.clear();
+    _gallery.clear();
+    _chunkEnd = 0;
+    _chunkText = '';
+    _chunkFrom = null;
   }
 
   @override
@@ -86,6 +147,7 @@ class _MarkdownViewState extends State<MarkdownView> {
       widget.style,
       themeColors,
       WorkbenchThemeScope.restyles,
+      _existenceVersion,
     );
     if (_built case final built? when from == _builtFrom) return built;
     _builtFrom = from;
@@ -94,65 +156,138 @@ class _MarkdownViewState extends State<MarkdownView> {
 
   Widget _build(BuildContext context) {
     final MarkdownView(:data, :style) = widget;
-    final baseStyle = MarkdownView.baseStyle;
-    final nodes = MarkdownView._document.parse(data);
+    final textStyle = style ?? MarkdownView.baseStyle;
     // In a chat whose files open (see FileOpenScope): links to them, and
     // inline code naming one once it is known to be there.
     final files = FileOpenScope.maybeOf(context);
-    if (files == null) {
-      return MarkdownBlocks(nodes: nodes, style: style ?? baseStyle);
+    // What the blocks were built as: the scope itself is made anew on
+    // rebuilds of the chat, its project and its files' existence are not.
+    final look = (
+      style,
+      themeColors,
+      WorkbenchThemeScope.restyles,
+      files?.root,
+      files?.existence,
+      _existenceVersion,
+    );
+    if (look != _chunkFrom) {
+      _forgetChunks();
+      _chunkFrom = look;
     }
-    Widget? icon(FileLink? link) {
-      final path = link == null ? null : files.resolve(link.path);
-      if (path == null) return null;
-      return _isFolder(link!.path, files.existence.known(path))
-          ? FolderIcon(path, size: _fileIconSize)
-          : FileIcon(path, size: _fileIconSize);
+    // An edit: what was kept is not how this text begins anymore.
+    if (_chunkEnd > 0 &&
+        (data.length < _chunkEnd || !data.startsWith(_chunkText))) {
+      _forgetChunks();
     }
 
-    // The message's image files, for a click on one to go through them.
-    late final gallery = [
-      for (final src in _imageSources(nodes)) ?markdownImagePath(src, files),
-    ];
-    final options = MarkdownOptions(
-      link: (href) =>
-          _linkRecognizer(href) ?? files.linkRecognizer(href, context: context),
-      code: (code) => files.codeRecognizer(code, context: context),
-      linkIcon: (href) => icon(FileLink.parseHref(href)),
-      codeIcon: (code) => icon(FileLink.parseText(code)),
-      // An image as an attached one's tag.
-      fileTag: (href, label) {
-        final link = FileLink.parseHref(href);
-        final path = link == null || link.range != null
-            ? null
-            : files.resolve(link.path);
-        if (path == null || !files.showsImage(path)) return null;
-        return FileImageChip.span(
-          path: path,
-          label: label.trim().isEmpty
-              ? (files.paths ?? p.context).basename(path)
-              : label.trim(),
-          files: files,
-          textStyle: style ?? baseStyle,
-        );
-      },
-      // An image file as it is; the others of the message a click away.
-      image: (src, alt, title, {width, height}) {
-        final path = markdownImagePath(src, files);
-        if (path == null) return _imageLink(src, alt);
-        return MarkdownImage(
-          path: path,
-          alt: alt,
-          files: files,
-          gallery: gallery,
-        );
-      },
+    final MarkdownOptions options;
+    if (files == null) {
+      options = const MarkdownOptions();
+    } else {
+      Widget? icon(FileLink? link) {
+        final path = link == null ? null : files.resolve(link.path);
+        if (path == null) return null;
+        return _isFolder(link!.path, files.existence.known(path))
+            ? FolderIcon(path, size: _fileIconSize)
+            : FileIcon(path, size: _fileIconSize);
+      }
+
+      options = MarkdownOptions(
+        link: (href) =>
+            _linkRecognizer(href) ??
+            files.linkRecognizer(href, context: context),
+        code: (code) => files.codeRecognizer(code, context: context),
+        linkIcon: (href) => icon(FileLink.parseHref(href)),
+        codeIcon: (code) => icon(FileLink.parseText(code)),
+        // An image as an attached one's tag.
+        fileTag: (href, label) {
+          final link = FileLink.parseHref(href);
+          final path = link == null || link.range != null
+              ? null
+              : files.resolve(link.path);
+          if (path == null || !files.showsImage(path)) return null;
+          return FileImageChip.span(
+            path: path,
+            label: label.trim().isEmpty
+                ? (files.paths ?? p.context).basename(path)
+                : label.trim(),
+            files: files,
+            textStyle: textStyle,
+          );
+        },
+        // An image file as it is; the others of the message a click away.
+        image: (src, alt, title, {width, height}) {
+          final path = markdownImagePath(src, files);
+          if (path == null) return _imageLink(src, alt);
+          return MarkdownImage(
+            path: path,
+            alt: alt,
+            files: files,
+            gallery: _gallery,
+          );
+        },
+      );
+    }
+
+    // What is surely finished, kept; the block still being written, made
+    // again. A block is finished when a blank line ends it: a fence, a
+    // math block or a tag section still open is not.
+    //
+    // A reference link's definition is read by the document as a whole,
+    // wherever it is written: a message with one is parsed whole.
+    final linked = _linkDefinition.hasMatch(data);
+    if (linked && _chunks.isNotEmpty) _forgetChunks();
+    final cut = linked ? _chunkEnd : _settledCut(data, _chunkEnd);
+    if (cut > _chunkEnd) {
+      final nodes = MarkdownView._document.parse(
+        data.substring(_chunkEnd, cut),
+      );
+      if (files != null) {
+        _settledImages.addAll([
+          for (final src in _imageSources(nodes))
+            ?markdownImagePath(src, files),
+        ]);
+      }
+      _chunks.add(
+        MarkdownBlocks(
+          nodes: nodes,
+          style: textStyle,
+          options: options,
+          leadingGap: _leadingGap(nodes, options),
+        ),
+      );
+      _chunkEnd = cut;
+      _chunkText = data.substring(0, cut);
+    }
+    final tail = data.substring(_chunkEnd);
+    final tailNodes = tail.isEmpty
+        ? const <md.Node>[]
+        : MarkdownView._document.parse(tail);
+    if (files != null) {
+      // The same list the blocks already built read, so a click on one of
+      // theirs finds the last block's too.
+      _gallery
+        ..clear()
+        ..addAll(_settledImages)
+        ..addAll([
+          for (final src in _imageSources(tailNodes))
+            ?markdownImagePath(src, files),
+        ]);
+    }
+    final tailBlocks = tailNodes.isEmpty
+        ? null
+        : MarkdownBlocks(
+            nodes: tailNodes,
+            style: textStyle,
+            options: options,
+            leadingGap: _leadingGap(tailNodes, options),
+          );
+    Widget blocks(BuildContext context) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [..._chunks, ?tailBlocks],
     );
-    Widget blocks(BuildContext context) => MarkdownBlocks(
-      nodes: nodes,
-      style: style ?? baseStyle,
-      options: options,
-    );
+    if (files == null) return blocks(context);
     // Code is a link, and a link's icon a file's, once the file is found.
     if (!data.contains('`') && !data.contains('](')) return blocks(context);
     return ListenableBuilder(
@@ -160,6 +295,115 @@ class _MarkdownViewState extends State<MarkdownView> {
       builder: (context, _) => blocks(context),
     );
   }
+
+  /// The gap before [nodes]' first block, or none when they are the
+  /// message's first.
+  double _leadingGap(List<md.Node> nodes, MarkdownOptions options) =>
+      _chunks.isEmpty || nodes.isEmpty
+      ? 0
+      : MarkdownBlocks.gapBefore(nodes.first, options);
+}
+
+/// A reference link's definition: `[name]: address`, read by the whole
+/// document and not by the block it stands beside.
+final _linkDefinition = RegExp(r'^\s{0,3}\[[^\]]+\]:', multiLine: true);
+
+/// Where [data] can be cut into what is finished and what is still being
+/// written: the start of the block after a blank line — never inside a
+/// fenced code block, a math block or a tag section still open, and never
+/// before a line that goes on with a list, a quote, a table or an
+/// indented block (which a blank line may separate, not end).
+int _settledCut(String data, int from) {
+  var cut = from;
+  var fence = '';
+  String? math;
+  var tag = '';
+  var tagDepth = 0;
+  var tagFence = '';
+  var offset = from;
+  while (offset < data.length) {
+    final newline = data.indexOf('\n', offset);
+    final end = newline < 0 ? data.length : newline;
+    final line = data.substring(offset, end);
+    final next = newline < 0 ? data.length : newline + 1;
+    final indent = line.length - line.trimLeft().length;
+    final content = line.substring(indent);
+    final marker = indent <= 3 ? _fenceMarker(content) : null;
+    if (fence.isNotEmpty) {
+      if (marker != null &&
+          marker[0] == fence[0] &&
+          marker.length >= fence.length &&
+          content.substring(marker.length).trim().isEmpty) {
+        fence = '';
+      }
+    } else if (math != null) {
+      if (line.trimRight().endsWith(math)) math = null;
+    } else if (tag.isNotEmpty) {
+      // Code within it, whose lines are not tags.
+      if (tagFence.isNotEmpty) {
+        if (marker != null &&
+            marker[0] == tagFence[0] &&
+            marker.length >= tagFence.length) {
+          tagFence = '';
+        }
+      } else if (marker != null) {
+        tagFence = marker;
+      } else if (TagBlockSyntax.closes(line, tag)) {
+        if (--tagDepth == 0) tag = '';
+      } else if (TagBlockSyntax.reopens(line, tag)) {
+        tagDepth++;
+      }
+    } else {
+      final opens = indent <= 3 ? MathBlockSyntax.opens(line) : null;
+      final section = indent <= 3 ? TagBlockSyntax.opens(line) : null;
+      if (marker != null) {
+        fence = marker;
+      } else if (opens != null) {
+        math = opens;
+      } else if (section != null) {
+        tag = section;
+        tagDepth = 1;
+      } else if (line.trim().isEmpty && next < data.length) {
+        final after = _nextBlockStart(data, next);
+        if (after != null) cut = after;
+      }
+    }
+    offset = next;
+  }
+  return cut;
+}
+
+/// The fence [content] opens or closes (``` or ~~~, three or more).
+String? _fenceMarker(String content) =>
+    RegExp(r'^(`{3,}|~{3,})').firstMatch(content)?[1];
+
+/// Where the block beginning after a blank line at [from] starts; null
+/// when there is none, or it goes on with what the blank line separates.
+int? _nextBlockStart(String data, int from) {
+  var offset = from;
+  while (offset < data.length) {
+    final newline = data.indexOf('\n', offset);
+    final end = newline < 0 ? data.length : newline;
+    final line = data.substring(offset, end);
+    if (line.trim().isNotEmpty) return _continues(line) ? null : offset;
+    offset = newline < 0 ? data.length : newline + 1;
+  }
+  return null;
+}
+
+/// Whether [line] goes on with a list, a quote, a table or an indented
+/// block: no blank line ends those.
+bool _continues(String line) {
+  final indent = line.length - line.trimLeft().length;
+  if (indent >= 4) return true;
+  final content = line.substring(indent);
+  if (content.startsWith('>') || content.startsWith('|')) return true;
+  if (content.startsWith('- ') ||
+      content.startsWith('* ') ||
+      content.startsWith('+ ')) {
+    return true;
+  }
+  return RegExp(r'^\d{1,9}[.)](\s|$)').hasMatch(content);
 }
 
 /// The `src` of each image in [nodes], in the order they come.
@@ -278,11 +522,24 @@ class MarkdownBlocks extends StatelessWidget {
     required this.nodes,
     required this.style,
     this.options = const MarkdownOptions(),
+    this.leadingGap = 0,
   });
 
   final List<md.Node> nodes;
   final TextStyle style;
   final MarkdownOptions options;
+
+  /// The gap before its first block, where it is not the message's first:
+  /// a message is built a finished block at a time (see `MarkdownView`),
+  /// and the gap belongs to the block after it.
+  final double leadingGap;
+
+  /// The gap before [node] as one of the blocks.
+  static double gapBefore(md.Node node, MarkdownOptions options) =>
+      switch (node) {
+        md.Element(tag: 'h1' || 'h2' || 'h3') => options.headingGap,
+        _ => options.gap,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -290,7 +547,11 @@ class MarkdownBlocks extends StatelessWidget {
     for (final node in nodes) {
       final block = _block(node, style, options);
       if (block == null) continue;
-      if (children.isNotEmpty) children.add(SizedBox(height: _gap(node)));
+      if (children.isNotEmpty) {
+        children.add(SizedBox(height: gapBefore(node, options)));
+      } else if (leadingGap > 0) {
+        children.add(SizedBox(height: leadingGap));
+      }
       children.add(block);
     }
     return Column(
@@ -299,11 +560,6 @@ class MarkdownBlocks extends StatelessWidget {
       children: children,
     );
   }
-
-  double _gap(md.Node node) => switch (node) {
-    md.Element(tag: 'h1' || 'h2' || 'h3') => options.headingGap,
-    _ => options.gap,
-  };
 }
 
 Widget? _block(md.Node node, TextStyle style, MarkdownOptions options) {

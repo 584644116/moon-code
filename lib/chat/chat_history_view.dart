@@ -782,6 +782,7 @@ class _ChatHistoryViewState extends State<ChatHistoryView>
       ..clear()
       ..addAll(motions);
     _hiddenRows.clear();
+    _shownRows.clear();
     _seenItems += count;
     _appearing.clear();
     _endHandoff();
@@ -1905,11 +1906,63 @@ class _ChatHistoryViewState extends State<ChatHistoryView>
     return row;
   }
 
+  /// The rows shown, as last built, by what they were built from: the very
+  /// widget each was last built as while nothing it is made of changed,
+  /// which Flutter then does not rebuild. A word streamed rebuilds the
+  /// history every frame, and each of its rows would otherwise be built
+  /// again — the one that changed and every other one with it.
+  final Map<int, (Object, Widget)> _shownRows = {};
+
+  /// What row [index] is built from: the item it shows (by identity — the
+  /// kernel hands out a new one only when it changed), the row of folds it
+  /// is ([row], asked for every frame: it steadies what shows as a run goes
+  /// on, and that is state), whether what it begins is open, and what else
+  /// it reads that changes without the item. A row built from the same all
+  /// this is the very widget it was, and Flutter builds nothing.
+  Object _shownRowKey(int index, ChatItem item, StepRow row) => (
+    identityHashCode(item),
+    identityHashCode(_feed.itemAt(index)),
+    row,
+    switch (row.work) {
+      final fold? when fold.start == index => _isFoldOpen(fold),
+      _ => null,
+    },
+    switch (row.steps) {
+      final fold? when fold.start == index => _isFoldOpen(fold),
+      _ => null,
+    },
+    _isExpanded(index),
+    _motions[index] ?? 0,
+    _appearing.contains(index),
+    index == _handoffIndex,
+    widget.maxContentWidth,
+    _columnRight,
+    _columnLeft,
+    _room,
+  );
+
+  Widget _shownRow(int index) {
+    final item = _shownAt(index);
+    // Asked every frame: it steadies what shows as a run goes on.
+    final folds = _rowAt(index);
+    final made = _shownRowKey(index, item, folds);
+    if (_shownRows[index] case (final from, final row) when from == made) {
+      return row;
+    }
+    final row = _row(
+      index,
+      gap: _gapBefore(index),
+      child: _buildItem(index, item: item, folds: folds),
+    );
+    _shownRows[index] = (made, row);
+    return row;
+  }
+
   double _insetOf(int index) =>
       _feed.itemAt(index) is UserMessageItem ? 0 : UserMessageBubble.radius;
 
-  Widget _buildItem(int index) {
-    final item = _shownAt(index);
+  Widget _buildItem(int index, {ChatItem? item, StepRow? folds}) {
+    item ??= _shownAt(index);
     if (index == _editingIndex) {
       return AnimatedBuilder(
         animation: _editorReveal,
@@ -1917,11 +1970,11 @@ class _ChatHistoryViewState extends State<ChatHistoryView>
             SizedBox(key: _editorPlaceholderKey, height: _editorShownHeight),
       );
     }
-    final row = _rowAt(index);
-    final folds = [?row.work, ?row.steps];
+    final row = folds ?? _rowAt(index);
+    final shownFolds = [?row.work, ?row.steps];
     final footer = _turnFooter(index) ?? _liveFooter(index);
     // Folded away (what the turn under way has written showing still).
-    if (folds.isEmpty && !row.item) {
+    if (shownFolds.isEmpty && !row.item) {
       return footer == null
           ? const SizedBox(width: double.infinity)
           : SizedBox(width: double.infinity, child: footer);
@@ -1961,7 +2014,7 @@ class _ChatHistoryViewState extends State<ChatHistoryView>
     return _ItemSelectionScope(
       index: index,
       delegate: _selectionDelegate,
-      child: folds.isEmpty && footer == null
+      child: shownFolds.isEmpty && footer == null
           ? shown!
           // Steps line up on the left, folds' lines too.
           : SizedBox(
@@ -2346,11 +2399,7 @@ class _ChatHistoryViewState extends State<ChatHistoryView>
                                               _isHidden(index) &&
                                                   index != _editingIndex
                                               ? _hiddenRow(index)
-                                              : _row(
-                                                  index,
-                                                  gap: _gapBefore(index),
-                                                  child: _buildItem(index),
-                                                ),
+                                              : _shownRow(index),
                                         ),
                                       ),
                                     ),
@@ -2758,8 +2807,16 @@ class _ChatSelectionDelegate extends StaticSelectionContainerDelegate {
       );
     }
 
-    final lineA = firstLine(a);
-    final lineB = firstLine(b);
+    final Rect lineA;
+    final Rect lineB;
+    try {
+      lineA = firstLine(a);
+      lineB = firstLine(b);
+    } on Object {
+      // One of them left the tree since it was listed: it sorts as it came,
+      // which leaves the order of the rest alone.
+      return 0;
+    }
     final overlap =
         math.min(lineA.bottom, lineB.bottom) - math.max(lineA.top, lineB.top);
     if (overlap > math.min(lineA.height, lineB.height) / 2) {
@@ -2872,6 +2929,8 @@ class _ChatSelectionDelegate extends StaticSelectionContainerDelegate {
   /// came of it, drags again on the list rid of text listed twice or no
   /// longer registered, in order.
   void checkDrag(Offset from, Offset to) {
+    // A drag queued before the list went: the text it was on is gone.
+    if (_disposed) return;
     if ((to - from).distance < 12) return;
     if (!selectables.any((s) => _holds(s, from) && _holds(s, to))) return;
     if (getSelectedContent()?.plainText.trim().isNotEmpty ?? false) return;

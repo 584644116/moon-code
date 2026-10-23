@@ -22,6 +22,30 @@ class TagBlockSyntax extends md.BlockSyntax {
   @override
   RegExp get pattern => _opening;
 
+  /// The tag [line] opens a section with; null when it opens none, or is
+  /// HTML's own. For text not yet parsed (see `MarkdownView`): a section
+  /// still open is text not to cut.
+  static String? opens(String line) {
+    final name = _opening.firstMatch(line)?[1];
+    if (name == null) return null;
+    final lower = name.toLowerCase();
+    return lower == 'details' || lower == 'summary' || !_html.contains(lower)
+        ? name
+        : null;
+  }
+
+  /// Whether [line] closes [name]'s section.
+  static bool closes(String line, String name) => RegExp(
+    '^ {0,3}</${RegExp.escape(name)}\\s*>\\s*\$',
+    caseSensitive: false,
+  ).hasMatch(line);
+
+  /// Whether [line] opens [name]'s section again, within one.
+  static bool reopens(String line, String name) => RegExp(
+    '^ {0,3}<${RegExp.escape(name)}(?:\\s[^<>]*)?>\\s*\$',
+    caseSensitive: false,
+  ).hasMatch(line);
+
   static final _opening = RegExp(r'^ {0,3}<([A-Za-z][\w-]*)(\s[^<>]*)?>\s*$');
   static final _fence = RegExp(r'^ {0,3}(`{3,}|~{3,})');
   static final _summary = RegExp(

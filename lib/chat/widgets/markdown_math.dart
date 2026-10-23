@@ -11,8 +11,20 @@ import '../../theme/app_theme.dart';
 class MathBlockSyntax extends md.BlockSyntax {
   const MathBlockSyntax();
 
+  /// What closes the math block [line] opens; null when it opens none, or
+  /// closes on the line it opens on. For text not yet parsed (see
+  /// `MarkdownView`): a block still open is text not to cut.
+  static String? opens(String line) {
+    final match = _pattern.firstMatch(line);
+    if (match == null) return null;
+    final close = match[1] == r'$$' ? r'$$' : r'\]';
+    return match[2]!.trimRight().endsWith(close) ? null : close;
+  }
+
+  static final _pattern = RegExp(r'^ {0,3}(\$\$|\\\[)(.*)$');
+
   @override
-  RegExp get pattern => RegExp(r'^ {0,3}(\$\$|\\\[)(.*)$');
+  RegExp get pattern => _pattern;
 
   @override
   md.Node parse(md.BlockParser parser) {
