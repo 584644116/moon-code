@@ -120,7 +120,14 @@ void FlutterWindow::OnDestroy() {
   }
   open_requests_ = nullptr;
   attention_ = nullptr;
-  logs_ = nullptr;
+  if (logs_ != nullptr) {
+    // Its handler goes while the engine is there: a channel's destructor
+    // does not take it out (see ~MethodChannel, which is the default), and
+    // one left behind is the messenger called back once the engine is gone
+    // — a crash on the way out, every time the app quits.
+    logs_->SetMethodCallHandler(nullptr);
+    logs_ = nullptr;
+  }
   if (flutter_controller_) {
     // Native child destruction can re-enter this window's message handler.
     auto controller = std::move(flutter_controller_);

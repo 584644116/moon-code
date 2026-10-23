@@ -25,6 +25,12 @@
 namespace log_folder {
 
 // Answers `baocode/logs` on |messenger| for as long as the channel is kept.
+//
+// The handler outlives the channel's destructor: a MethodChannel does not
+// take its own out, so whoever keeps this one calls
+// SetMethodCallHandler(nullptr) before letting it go — and while |messenger|
+// is still there. Left in, it is called through once the engine is gone,
+// which is a crash on the way out (see FlutterWindow::OnDestroy).
 std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> Listen(
     flutter::BinaryMessenger* messenger);
 
