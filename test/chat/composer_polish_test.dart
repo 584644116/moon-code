@@ -155,9 +155,7 @@ void main() {
 
       setUp(() {
         previous = ModelProviders.current;
-        ModelProviders.current = ModelProviders.memory(
-          providers: [upstream],
-        );
+        ModelProviders.current = ModelProviders.memory(providers: [upstream]);
       });
 
       tearDown(() {
@@ -168,18 +166,12 @@ void main() {
       test('gives no answer: the model itself asked, and asked first from '
           'then on', () async {
         final asked = <({bool exact})>[];
-        composerPolishAsker = (
-          system,
-          prompt, {
-          model,
-          exact = false,
-          location,
-          tools,
-        }) async {
-          asked.add((exact: exact));
-          if (exact) return 'Fix it.';
-          throw Exception("There's an issue with the selected model");
-        };
+        composerPolishAsker =
+            (system, prompt, {model, exact = false, location, tools}) async {
+              asked.add((exact: exact));
+              if (exact) return 'Fix it.';
+              throw Exception("There's an issue with the selected model");
+            };
         final content = await polishComposerText(
           composerPolishText(Delta()..insert('fix it')),
           model: '@up/big',
@@ -199,17 +191,11 @@ void main() {
           'not asked again', () async {
         await ModelProviders.current.setAuxiliaryModel('@up/small');
         final asked = <({bool exact})>[];
-        composerPolishAsker = (
-          system,
-          prompt, {
-          model,
-          exact = false,
-          location,
-          tools,
-        }) async {
-          asked.add((exact: exact));
-          throw Exception('Out of quota');
-        };
+        composerPolishAsker =
+            (system, prompt, {model, exact = false, location, tools}) async {
+              asked.add((exact: exact));
+              throw Exception('Out of quota');
+            };
         await expectLater(
           polishComposerText(
             composerPolishText(Delta()..insert('fix it')),
@@ -259,10 +245,11 @@ void main() {
         'it back', (tester) async {
       final reply = Completer<String>();
       String? prompt;
-      composerPolishAsker = (system, asked, {model, exact = false, location, tools}) {
-        prompt = asked;
-        return reply.future;
-      };
+      composerPolishAsker =
+          (system, asked, {model, exact = false, location, tools}) {
+            prompt = asked;
+            return reply.future;
+          };
       final controller = await pumpComposer(tester);
       controller.compose(
         Delta()
@@ -300,8 +287,14 @@ void main() {
 
     testWidgets('typed on meanwhile, the reply is not taken', (tester) async {
       final reply = Completer<String>();
-      composerPolishAsker = (system, asked, {model, exact = false, location, tools}) =>
-          reply.future;
+      composerPolishAsker = (
+        system,
+        asked, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) => reply.future;
       final controller = await pumpComposer(tester);
       controller.replaceText(0, 0, 'fix it', null);
       await tester.pump();
@@ -330,18 +323,12 @@ void main() {
       final reply = Completer<String>();
       String? system;
       ClaudeHaikuTools? seen;
-      composerPolishAsker = (
-        s,
-        asked, {
-        model,
-        exact = false,
-        location,
-        tools,
-      }) {
-        system = s;
-        seen = tools;
-        return reply.future;
-      };
+      composerPolishAsker =
+          (s, asked, {model, exact = false, location, tools}) {
+            system = s;
+            seen = tools;
+            return reply.future;
+          };
       final controller = await pumpComposer(tester);
       controller.compose(
         Delta()
@@ -366,7 +353,9 @@ void main() {
       expect(ops[2].data, ': correct the typo, then run the tests.\n');
     });
 
-    testWidgets('Enhance turned off in the settings, no button', (tester) async {
+    testWidgets('Enhance turned off in the settings, no button', (
+      tester,
+    ) async {
       ComposerEnhanceSetting.current = () => false;
       await pumpComposer(tester);
       expect(enhanceButton(), findsNothing);
@@ -380,18 +369,12 @@ void main() {
     test('the project is read, and named in the prompt', () async {
       ClaudeHaikuTools? seen;
       String? prompt;
-      composerPolishAsker = (
-        system,
-        asked, {
-        model,
-        exact = false,
-        location,
-        tools,
-      }) {
-        prompt = asked;
-        seen = tools;
-        return Future.value('Fix it.');
-      };
+      composerPolishAsker =
+          (system, asked, {model, exact = false, location, tools}) {
+            prompt = asked;
+            seen = tools;
+            return Future.value('Fix it.');
+          };
       await enhanceComposerText(
         composerPolishText(Delta()..insert('fix it')),
         location: r'C:\w\app',
@@ -405,18 +388,34 @@ void main() {
     test('it went looking and came back without the message: asked again, '
         'the message alone', () async {
       final seen = <ClaudeHaikuTools?>[];
-      composerPolishAsker = (
-        system,
-        asked, {
-        model,
-        exact = false,
-        location,
-        tools,
-      }) async {
-        seen.add(tools);
-        if (tools != null) throw Exception('Reached maximum number of turns');
-        return 'Fix it.';
-      };
+      composerPolishAsker =
+          (system, asked, {model, exact = false, location, tools}) async {
+            seen.add(tools);
+            if (tools != null) {
+              throw Exception('Reached maximum number of turns');
+            }
+            return 'Fix it.';
+          };
+      final content = await enhanceComposerText(
+        composerPolishText(Delta()..insert('fix it')),
+        location: r'C:\w\app',
+      );
+      expect(content.toList().first.data, 'Fix it.');
+      expect(seen, hasLength(2));
+      expect(seen.first?.directory, r'C:\w\app');
+      expect(seen.last, isNull);
+    });
+
+    test('the project made it run long: asked again, the message alone', () async {
+      // A folder with nothing in it leaves the model nothing to name, so
+      // it writes a plan instead of the message: far longer than what was
+      // said. Asked without it, the message is all there is to go on.
+      final seen = <ClaudeHaikuTools?>[];
+      composerPolishAsker =
+          (system, asked, {model, exact = false, location, tools}) async {
+            seen.add(tools);
+            return tools == null ? 'Fix it.' : 'x' * 3000;
+          };
       final content = await enhanceComposerText(
         composerPolishText(Delta()..insert('fix it')),
         location: r'C:\w\app',
@@ -430,18 +429,12 @@ void main() {
     test('a project on a host: the message alone, no tools', () async {
       ClaudeHaikuTools? seen;
       String? prompt;
-      composerPolishAsker = (
-        system,
-        asked, {
-        model,
-        exact = false,
-        location,
-        tools,
-      }) {
-        prompt = asked;
-        seen = tools;
-        return Future.value('Fix it.');
-      };
+      composerPolishAsker =
+          (system, asked, {model, exact = false, location, tools}) {
+            prompt = asked;
+            seen = tools;
+            return Future.value('Fix it.');
+          };
       await enhanceComposerText(
         composerPolishText(Delta()..insert('fix it')),
         location: 'ssh://box/home/me/app',
@@ -450,28 +443,135 @@ void main() {
       expect(prompt, contains('<project>\n/home/me/app\n</project>'));
     });
 
-    test('what it found and how to check it: several times the words taken',
-        () async {
-      composerPolishAsker = (system, asked, {model, exact = false, location, tools}) async =>
-          'Fix the typo in lib/main.dart, where the button is built, then run '
-          'flutter test test/chat/composer_polish_test.dart and check that the '
-          'reply is still taken as one change.';
-      final content = await enhanceComposerText(
-        composerPolishText(Delta()..insert('fix it')),
-      );
-      expect(
-        content.toList().map((op) => op.data).join(),
-        contains('lib/main.dart'),
-      );
-    });
+    test(
+      'what it found and how to check it: several times the words taken',
+      () async {
+        composerPolishAsker =
+            (system, asked, {model, exact = false, location, tools}) async =>
+                'Fix the typo in lib/main.dart, where the button is built, then run '
+                'flutter test test/chat/composer_polish_test.dart and check that the '
+                'reply is still taken as one change.';
+        final content = await enhanceComposerText(
+          composerPolishText(Delta()..insert('fix it')),
+        );
+        expect(
+          content.toList().map((op) => op.data).join(),
+          contains('lib/main.dart'),
+        );
+      },
+    );
 
     test('a whole file written out: not taken', () async {
-      composerPolishAsker = (system, asked, {model, exact = false, location, tools}) async =>
-          'x' * 3000;
+      composerPolishAsker = (
+        system,
+        asked, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) async => 'x' * 3000;
       await expectLater(
         enhanceComposerText(composerPolishText(Delta()..insert('fix it'))),
         throwsA(isA<ComposerPolishException>()),
       );
+    });
+
+    test('a reply that wrote around the message: not taken', () async {
+      Future<void> rejects(String reply) async {
+        composerPolishAsker = (
+          system,
+          asked, {
+          model,
+          exact = false,
+          location,
+          tools,
+        }) async => reply;
+        await expectLater(
+          polishComposerText(composerPolishText(Delta()..insert('fix it'))),
+          throwsA(isA<ComposerPolishRejected>()),
+        );
+      }
+
+      // A heading, a preamble in either language, or the whole in a fence.
+      await rejects('## Fix it\n\nFix the typo.');
+      await rejects('Sure, fix the typo.');
+      await rejects('好的，修复这个错字。');
+      await rejects('```\nFix the typo.\n```');
+    });
+
+    test('a heading or a preamble the message itself had is kept', () async {
+      composerPolishAsker = (
+        system,
+        asked, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) async => '## Fix the typo\n\nFix the typo in the label.';
+      await polishComposerText(
+        composerPolishText(Delta()..insert('## Fix the typo\n\nIt is wrong.')),
+      );
+
+      composerPolishAsker = (
+        system,
+        asked, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) async => '好的，修复这个错字，并运行测试。';
+      await polishComposerText(
+        composerPolishText(Delta()..insert('好的，修复这个错字。')),
+      );
+    });
+
+    test('a reply that is not the message is not asked again without the '
+        'project', () async {
+      final seen = <ClaudeHaikuTools?>[];
+      composerPolishAsker =
+          (system, asked, {model, exact = false, location, tools}) async {
+            seen.add(tools);
+            return '## Fix it\n\nFix the typo.';
+          };
+      await expectLater(
+        enhanceComposerText(
+          composerPolishText(Delta()..insert('fix it')),
+          location: r'C:\w\app',
+        ),
+        throwsA(isA<ComposerPolishRejected>()),
+      );
+      // The answer was wrong, not missing: the message alone would be
+      // answered the same way.
+      expect(seen, hasLength(1));
+    });
+
+    test('the prompts ask for no padding, and show what that means', () async {
+      final systems = <String>[];
+      composerPolishAsker =
+          (system, asked, {model, exact = false, location, tools}) async {
+            systems.add(system);
+            return 'Fix it.';
+          };
+
+      await enhanceComposerText(
+        composerPolishText(Delta()..insert('fix it')),
+        location: r'C:\w\app',
+      );
+      await enhanceComposerText(composerPolishText(Delta()..insert('fix it')));
+
+      final [withTools, alone] = systems;
+      for (final system in systems) {
+        expect(system, contains('Add only what changes what the agent does'));
+        expect(system, contains('nothing before or after it'));
+        // Given to Claude Code as a command-line argument: one line, and
+        // no quoting a shell would take apart.
+        expect(system, isNot(contains('\n')));
+        expect(system, isNot(contains('"')));
+      }
+      expect(withTools, contains('not a wish to improve performance'));
+      expect(withTools, contains('the page\'s build path'));
+      expect(alone, contains('You cannot look at the project here'));
+      expect(alone, contains('what to measure'));
     });
   });
 }
