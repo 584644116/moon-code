@@ -95,6 +95,11 @@ abstract final class ChatCommandIds {
   /// Find in the conversation shown (see ChatFind).
   static const find = 'baocode.chat.find';
 
+  /// Packs the conversation shown — its transcript, its subagents' and the
+  /// files kept beside it — as a ZIP, asking where to save it. Offered for
+  /// a local session that has something to export.
+  static const exportSession = 'baocode.chat.exportSession';
+
   // Its input's (see ChatComposer).
   static const submit = 'workbench.action.chat.submit';
   static const cancelEdit = 'workbench.edit.chat.cancel';
@@ -210,6 +215,7 @@ final List<CommandInfo> chatExtraCommands = [
     (ChatCommandIds.renameAgent, 'Rename Agent'),
     (ChatCommandIds.closeSubagent, 'Back from Subagent'),
     (ChatCommandIds.find, 'Find in Chat'),
+    (ChatCommandIds.exportSession, 'Export Session…'),
     (ChatCommandIds.submit, 'Send'),
     (ChatCommandIds.cancelEdit, 'Cancel Edit'),
     (ChatCommandIds.showPreviousPrompt, 'Show Previous Prompt'),

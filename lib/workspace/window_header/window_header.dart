@@ -49,6 +49,7 @@ class WindowHeader extends StatefulWidget {
     required this.onToggleContextPanel,
     this.terminalShown = false,
     this.onToggleTerminal,
+    this.onExportSession,
     this.sidePanelShown = false,
     this.onToggleSidePanel,
     this.onOpenSettings,
@@ -139,6 +140,11 @@ class WindowHeader extends StatefulWidget {
   /// Terminal); with none, neither is offered.
   final bool terminalShown;
   final VoidCallback? onToggleTerminal;
+
+  /// Over the chat, Export Session: packs the conversation shown as a ZIP,
+  /// asking where to save it. Null where there is nothing to export yet
+  /// (a local session that has not been sent anything, or a remote one).
+  final VoidCallback? onExportSession;
 
   /// Over the chat, the side panel at the right of the conversations:
   /// whether it shows, and its toggle (the button by the terminal's, and
@@ -327,6 +333,15 @@ class _WindowHeaderState extends State<WindowHeader> {
               // The chat's terminal and side panel where the IDE has its
               // panel and chat, the pin after them, and the way to the other
               // layout last: each where it was after a switch.
+              if (widget.onExportSession case final export? when !ide)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: SidebarIconButton(
+                    icon: Codicons.chatExport,
+                    tooltip: context.l10n.chatExportSession,
+                    onTap: export,
+                  ),
+                ),
               if (widget.onToggleTerminal case final toggle? when !ide)
                 KeyedSubtree(
                   key: _terminal,

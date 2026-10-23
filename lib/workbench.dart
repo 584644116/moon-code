@@ -873,6 +873,7 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
         if (BrowserBridge.instance.supported)
           browserWelcomeCommandId: _showBrowserWelcome,
         modelWelcomeCommandId: _showModelWelcome,
+        ChatCommandIds.exportSession: ?_exportCommand(_agentThread),
         ChatCommandIds.search: () => unawaited(_openPalette()),
         ..._sidePanelCommands(),
         ..._terminalCommands(),
@@ -898,6 +899,7 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
       if (StashController.current != null)
         stashWelcomeCommandId: _showStashWelcome,
       modelWelcomeCommandId: _showModelWelcome,
+      ChatCommandIds.exportSession: ?_exportCommand(current),
       // As the sidebar's New Agent button: a folder first, without one.
       if (_workspace.sidebarProjects.isNotEmpty)
         ChatCommandIds.newChat: _newAgent
@@ -1290,6 +1292,7 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
 
     return [
       ?action(ChatCommandIds.newChat, Codicons.add),
+      ?action(ChatCommandIds.exportSession, Codicons.chatExport),
       ?action(_customizeCommand, Codicons.plug),
       ?action(openSettingsCommandId, Codicons.settingsGear),
       ?action(openKeybindingsCommandId, Codicons.keyboard),
@@ -3090,6 +3093,7 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
       onToggleTerminal: ide || _terminals?.root == null
           ? null
           : _toggleTerminal,
+      onExportSession: ide ? null : _exportCommand(agent ?? _workspace.current),
       sidePanelShown: _sidePanel.shown && !_sidePanelHidden,
       onToggleSidePanel: ide || (agent ?? _workspace.current) == null
           ? null
@@ -3928,6 +3932,17 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
       sessionId: id,
       title: thread.localizedTitle(context.l10n),
     );
+  }
+
+  /// Export Session for [thread], where it can be had: a local session
+  /// that has something to export, on a machine that can ask where to save
+  /// it. The palette's, the window header's and the chat's own button all
+  /// go by it.
+  VoidCallback? _exportCommand(AgentThread? thread) {
+    if (thread == null || thread.id == null) return null;
+    if (thread.project.host != null) return null;
+    if (!WindowControls.canPickFiles) return null;
+    return () => unawaited(_exportSession(thread));
   }
 
   /// The chat of [pane] (by default the current agent), at [place] among
