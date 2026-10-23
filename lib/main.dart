@@ -119,6 +119,7 @@ import 'update/update_store.dart';
 import 'update/version.dart';
 import 'window/app_windows.dart';
 import 'window/code_args.dart';
+import 'window/startup_splash.dart';
 import 'window/window_host.dart';
 import 'window/window_settings.dart';
 import 'workbench.dart';
@@ -857,7 +858,12 @@ class _BaoCodeAppState extends State<BaoCodeApp> {
           ),
           child: MediaQuery(
             data: media.copyWith(textScaler: snapped(system)),
-            child: UiZoom(scale: zoom, child: scaled),
+            child: UiZoom(
+              scale: zoom,
+              // The app's start over the first window to show (see
+              // lib/window/startup_splash.dart).
+              child: scaled == null ? null : StartupSplash(child: scaled),
+            ),
           ),
         );
       },
