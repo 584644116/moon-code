@@ -15,6 +15,7 @@ import '../icons/emoji_sheet.dart';
 import '../icons/icon_library.dart';
 import '../icons/project_icon.dart';
 import '../kernel/agent_kernel.dart';
+import '../kernel/default_permission.dart';
 import '../kernel/kernel_registry.dart';
 import '../kernel/kernel_types.dart';
 import '../l10n/l10n.dart';
@@ -1043,8 +1044,13 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
   KernelDescriptor _preferredKernel;
 
   /// The mode, model, context and effort a new agent starts with: the
-  /// last ones picked.
-  Map<String, String> get _preferredSettings => Map.unmodifiable(_settings);
+  /// last ones picked — but for the permission mode, which starts where
+  /// the user set new agents to start ([DefaultPermission]): full access
+  /// picked for one task is not carried into every new one.
+  Map<String, String> get _preferredSettings => Map.unmodifiable({
+    ..._settings,
+    KernelChoiceKind.permission.name: DefaultPermission.now().mode,
+  });
   final Map<String, String> _settings = {};
 
   /// Language servers the Fast Ide is not to recommend installing again.
@@ -1932,6 +1938,9 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
       _layout = WorkspaceLayout.ide;
     }
     _settings.addAll(strings(kept['settings']));
+    // Kept by an earlier run, when the permission mode was one of the
+    // last-picked: new agents start where the user set them to now.
+    _settings.remove(KernelChoiceKind.permission.name);
     if (kept['ignoredRecommendations'] case final List<Object?> ignored) {
       _ignoredRecommendations.addAll(ignored.whereType<String>());
     }
@@ -2235,11 +2244,8 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
       }
 
       remember(KernelChoiceKind.mode, before.mode, snapshot.mode);
-      remember(
-        KernelChoiceKind.permission,
-        before.permission,
-        snapshot.permission,
-      );
+      // The permission mode is not remembered for new agents: it starts
+      // where the user set them to (see _preferredSettings).
       remember(KernelChoiceKind.model, before.model, snapshot.model);
       remember(KernelChoiceKind.effort, before.effort, snapshot.effort);
       remember(KernelChoiceKind.context, before.context, snapshot.context);

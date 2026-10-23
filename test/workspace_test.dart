@@ -12,6 +12,7 @@ import 'package:baocode/chat/chat_screen.dart';
 import 'package:baocode/chat/chat_session.dart';
 import 'package:baocode/kernel/agent_kernel.dart';
 import 'package:baocode/kernel/claude_code/claude_code_kernel.dart';
+import 'package:baocode/kernel/default_permission.dart';
 import 'package:baocode/kernel/claude_code/mock_claude_code_transport.dart';
 import 'package:baocode/main.dart';
 import 'package:baocode/models/model_provider.dart';
@@ -391,9 +392,8 @@ void main() {
     expect(workspace.selected.title, 'Write a.txt and read it back');
   });
 
-  testWidgets('a new agent starts in the mode and approvals picked last', (
-    tester,
-  ) async {
+  testWidgets('a new agent starts in the mode picked last, and in the '
+      'permission mode the setting gives', (tester) async {
     final workspace = await pumpLoaded(tester);
     final first = workspace.selected.session;
     await tester.pump();
@@ -413,13 +413,31 @@ void main() {
     await tester.pump();
     final second = workspace.selected.session;
     expect(second, isNot(first));
+    // The mode is kept for the next agent; the permission mode is not:
+    // full access (or accepted edits) picked for one chat stays with it.
     expect(second.kernelContext.settings, {
       KernelChoiceKind.mode.name: 'ask',
-      KernelChoiceKind.permission.name: 'acceptEdits',
+      KernelChoiceKind.permission.name: 'default',
     });
     expect(second.modes!.selected.id, 'ask');
-    expect(second.permissions!.selected.id, 'acceptEdits');
+    expect(second.permissions!.selected.id, 'default');
     first.stop();
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('a new agent starts in the permission mode set for new '
+      'chats', (tester) async {
+    DefaultPermission.current = () => DefaultPermission.auto;
+    addTearDown(() => DefaultPermission.current = null);
+    final workspace = await pumpLoaded(tester);
+    final agent = workspace.selected.session;
+    await tester.pump();
+    expect(agent.permissions!.selected.id, 'auto');
+    expect(
+      agent.kernelContext.settings[KernelChoiceKind.permission.name],
+      'auto',
+    );
+    agent.stop();
     await tester.pump(const Duration(seconds: 1));
   });
 
@@ -439,7 +457,7 @@ void main() {
   });
 
   testWidgets('choices are kept between runs: a new agent starts with the '
-      'last ones, a kept session with its own', (tester) async {
+      'last mode, a kept session with its own', (tester) async {
     final store = MemoryPreferenceStore({
       'editor': 'zed',
       'settings': {'mode': 'plan', 'permission': 'bypassPermissions'},
@@ -452,14 +470,19 @@ void main() {
     final first = workspace.selected.session;
     await tester.pump();
     expect(first.modes!.selected.id, 'plan');
-    expect(first.permissions!.selected.id, 'bypassPermissions');
+    // Full access kept by an earlier run is dropped by this one: a new
+    // agent asks until the user says where they start.
+    expect(first.permissions!.selected.id, 'default');
 
-    // Picked again: kept for the next run.
+    // Picked for this chat alone: not kept for the next run.
     first.permissions!.onSelected(
-      first.permissions!.options.firstWhere((p) => p.id == 'default'),
+      first.permissions!.options.firstWhere((p) => p.id == 'acceptEdits'),
     );
     await tester.pump();
-    expect((store.preferences['settings'] as Map)['permission'], 'default');
+    expect(
+      (store.preferences['settings'] as Map).containsKey('permission'),
+      isFalse,
+    );
 
     // Reopened, a kept session is as it was left.
     final kept = workspace.threads.firstWhere(
