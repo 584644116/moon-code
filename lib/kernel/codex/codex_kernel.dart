@@ -122,6 +122,10 @@ class CodexKernel
   String? _turn;
   String? _serverTurn;
 
+  /// The server's turns, in order: `thread/revert` asks for the one to
+  /// drop everything from.
+  final List<String> _serverTurns = [];
+
   /// When [_turn] began, to time it.
   DateTime? _turnStarted;
   final Set<String> _sentTurns = {};
@@ -137,8 +141,9 @@ class CodexKernel
   /// Commands started and not completed yet, as they started.
   final Map<String, Map<String, Object?>> _commands = {};
 
-  /// Pending approvals: our request id → the server's JSON-RPC id.
-  final Map<String, Object?> _approvals = {};
+  /// Pending approvals: our request id → the server's JSON-RPC id, and
+  /// the prefix it proposed if it proposed one.
+  final Map<String, ({Object? id, List<Object?>? amendment})> _approvals = {};
 
   // --- Commands -------------------------------------------------------------
 
@@ -170,30 +175,55 @@ class CodexKernel
   }
 
   Future<void> _start(KernelTurn turn) async {
-    if (!_initialized) {
-      _initialized = true;
-      await _request('initialize', {
-        'clientInfo': {'name': 'baocode', 'version': '1.0.0'},
+    try {
+      if (!_initialized) {
+        _initialized = true;
+        await _request('initialize', {
+          'clientInfo': {
+            'name': 'baocode',
+            'title': 'BaoCode',
+            'version': '1.0.0',
+          },
+          // Nothing here is experimental: what this adapter reads is the
+          // protocol's stable part (`plan`, `steer` and friends are not).
+          'capabilities': {'experimentalApi': false},
+        });
+      }
+      if (_threadId == null) {
+        final started = await _request('thread/start', {
+          'model': model.selected,
+        });
+        _threadId = (started['thread'] as Map)['id'] as String;
+      }
+      final readOnly = mode.selected == 'ask';
+      final started = await _request('turn/start', {
+        'threadId': _threadId,
+        'input': [
+          {'type': 'text', 'text': turn.text},
+          for (final note in turn.notes) {'type': 'text', 'text': note},
+        ],
+        'model': model.selected,
+        'approvalPolicy': readOnly ? 'never' : 'on-request',
+        'sandboxPolicy': {'type': readOnly ? 'readOnly' : 'workspaceWrite'},
       });
+      final serverId = (started['turn'] as Map)['id'] as String;
+      _serverTurn ??= serverId;
+      if (!_serverTurns.contains(serverId)) _serverTurns.add(serverId);
+      // Stopped before the server knew the turn: stop it there too.
+      if (_turn != turn.id) _interrupt();
+    } on Object catch (error) {
+      // The server refused the turn, or is gone: say so rather than wait.
+      if (_turn == turn.id) {
+        emit(
+          ItemUpserted(
+            nextSeq,
+            'codex-error:${turn.id}',
+            NoticeItem(NoticeKind.error, '$error'),
+          ),
+        );
+        _endTurn(turn.id, interrupted: true);
+      }
     }
-    if (_threadId == null) {
-      final started = await _request('thread/start', {'model': model.selected});
-      _threadId = (started['thread'] as Map)['id'] as String;
-    }
-    final readOnly = mode.selected == 'ask';
-    final started = await _request('turn/start', {
-      'threadId': _threadId,
-      'input': [
-        {'type': 'text', 'text': turn.text},
-        for (final note in turn.notes) {'type': 'text', 'text': note},
-      ],
-      'model': model.selected,
-      'approvalPolicy': readOnly ? 'never' : 'on-request',
-      'sandboxPolicy': {'type': readOnly ? 'readOnly' : 'workspaceWrite'},
-    });
-    _serverTurn ??= (started['turn'] as Map)['id'] as String;
-    // Stopped before the server knew the turn: stop it there too.
-    if (_turn != turn.id) _interrupt();
   }
 
   void _interrupt() {
@@ -206,17 +236,26 @@ class CodexKernel
 
   @override
   void answer(String requestId, InteractionAnswer answer) {
-    if (!_approvals.containsKey(requestId)) return;
-    final rpcId = _approvals.remove(requestId);
+    final pending = _approvals.remove(requestId);
+    if (pending == null) return;
     emit(InteractionResolved(nextSeq, requestId));
-    final decision = switch (answer) {
+    final amendment = pending.amendment;
+    final Object decision = switch (answer) {
       ApprovalAnswer(decision: ApprovalDecision.allowOnce) => 'accept',
+      // "Always allow": the server's own proposal is narrower than a
+      // session-wide yes — it names the prefix it would approve — so use
+      // it when it made one.
+      ApprovalAnswer(decision: ApprovalDecision.allowAlways)
+          when amendment != null =>
+        {
+          'acceptWithExecpolicyAmendment': {'execpolicy_amendment': amendment},
+        },
       ApprovalAnswer(decision: ApprovalDecision.allowAlways) =>
         'acceptForSession',
       _ => 'decline',
     };
     _transport.write({
-      'id': rpcId,
+      'id': pending.id,
       'result': {'decision': decision},
     });
   }
@@ -236,10 +275,21 @@ class CodexKernel
     required int turns,
     String? lastSeen,
   }) async {
-    if (_threadId case final threadId? when turns > 0) {
-      unawaited(
-        _request('thread/rollback', {'threadId': threadId, 'numTurns': turns}),
-      );
+    final threadId = _threadId;
+    if (threadId != null && turns > 0) {
+      // The server keeps the history, and drops whole turns: the turn to
+      // drop from is the one `turns` back.
+      final at = _serverTurns.length - turns;
+      if (at < 0 || at >= _serverTurns.length) return false;
+      try {
+        await _request('thread/revert', {
+          'threadId': threadId,
+          'beforeTurnId': _serverTurns[at],
+        });
+        _serverTurns.removeRange(at, _serverTurns.length);
+      } on Object {
+        return false;
+      }
     }
     emit(Rewound(nextSeq, itemId: itemId, index: index));
     return true;
@@ -258,8 +308,20 @@ class CodexKernel
     final method = message['method'] as String?;
     final params = (message['params'] as Map?)?.cast<String, Object?>();
     if (method == null) {
+      final response = _responses.remove(message['id']);
+      if (response == null) return;
+      // An error is an answer too: the caller waits for one either way.
+      if (message['error'] case final Map<Object?, Object?> error) {
+        response.completeError(
+          CodexRequestError(
+            '${error['message'] ?? 'the request failed'}',
+            code: error['code'] as int?,
+          ),
+        );
+        return;
+      }
       final result = (message['result'] as Map?)?.cast<String, Object?>();
-      _responses.remove(message['id'])?.complete(result ?? const {});
+      response.complete(result ?? const {});
       return;
     }
     if (message.containsKey('id')) {
@@ -268,7 +330,9 @@ class CodexKernel
     }
     switch (method) {
       case 'turn/started':
-        _serverTurn = (params!['turn'] as Map)['id'] as String;
+        final id = (params!['turn'] as Map)['id'] as String;
+        _serverTurn = id;
+        if (!_serverTurns.contains(id)) _serverTurns.add(id);
       case 'turn/completed':
         final turn = params!['turn'] as Map;
         if (turn['id'] != _serverTurn) return;
@@ -280,6 +344,56 @@ class CodexKernel
         _itemStarted((params!['item'] as Map).cast<String, Object?>());
       case 'item/completed':
         _itemCompleted((params!['item'] as Map).cast<String, Object?>());
+      case 'item/commandExecution/outputDelta':
+        // What a command prints as it prints it, not only at the end.
+        final id = params!['itemId'] as String;
+        final item = _commands[id];
+        if (item == null) return;
+        final output =
+            '${item['aggregatedOutput'] ?? ''}'
+            '${params['delta'] ?? ''}';
+        item['aggregatedOutput'] = output;
+        emit(ItemUpserted(nextSeq, id, _commandItem(item)));
+      case 'turn/plan/updated':
+        // The model's own plan: the same list the todo panel shows.
+        final plan = params!['plan'] as List? ?? const [];
+        emit(
+          TodosReported(nextSeq, [
+            for (final raw in plan)
+              if (raw is Map)
+                TodoEntry('${raw['step'] ?? ''}', switch (raw['status']) {
+                  'inProgress' => TodoStatus.inProgress,
+                  'completed' => TodoStatus.completed,
+                  _ => TodoStatus.pending,
+                }),
+          ]),
+        );
+      case 'thread/compacted':
+        emit(
+          ItemUpserted(
+            nextSeq,
+            'compaction:${params!['turnId']}',
+            const NoticeItem(
+              NoticeKind.compaction,
+              'The conversation was summarized to free the context.',
+            ),
+          ),
+        );
+      case 'serverRequest/resolved':
+        // Answered somewhere else (a timeout, another view): close it here.
+        final id = params!['requestId'];
+        if (_approvals.remove('approval:$id') == null) return;
+        emit(InteractionResolved(nextSeq, 'approval:$id'));
+      case 'warning' || 'configWarning' || 'guardianWarning':
+        final said = params!['message'] ?? params['text'];
+        final text = said is String && said.isNotEmpty ? said : '$params';
+        emit(
+          ItemUpserted(
+            nextSeq,
+            'warning:$nextSeq',
+            NoticeItem(NoticeKind.warning, text),
+          ),
+        );
       case 'item/reasoning/summaryTextDelta':
         final id = params!['itemId'] as String;
         final buffer = _reasoning[id];
@@ -317,36 +431,80 @@ class CodexKernel
     }
   }
 
+  /// Every request the server can make while a turn runs has an answer:
+  /// one left unanswered stops the turn where it stands.
   void _serverRequest(
     Object? rpcId,
     String method,
     Map<String, Object?> params,
   ) {
-    final (title, preview) = switch (method) {
-      'item/commandExecution/requestApproval' => (
-        'Run command',
-        CommandPreview('${params['command']}') as ApprovalPreview?,
-      ),
-      'item/fileChange/requestApproval' => ('Apply changes', null),
-      _ => (null, null),
-    };
-    if (title == null) return;
-    final id = 'approval:$rpcId';
-    _approvals[id] = rpcId;
-    emit(
-      InteractionRequested(
-        nextSeq,
-        ApprovalRequest(
-          id: id,
-          title: title,
-          toolName: method.split('/')[1],
-          reason: params['reason'] as String?,
-          preview: preview,
-          alwaysAllowLabel: 'Approve for this session',
-        ),
-      ),
-    );
+    switch (method) {
+      case 'item/commandExecution/requestApproval' ||
+          'item/fileChange/requestApproval':
+        final title = method == 'item/commandExecution/requestApproval'
+            ? 'Run command'
+            : 'Apply changes';
+        final preview = method == 'item/commandExecution/requestApproval'
+            ? CommandPreview('${params['command']}') as ApprovalPreview?
+            : null;
+        final amendment = [
+          for (final token
+              in params['proposedExecpolicyAmendment'] as List? ?? const [])
+            '$token',
+        ];
+        final id = 'approval:$rpcId';
+        _approvals[id] = (
+          id: rpcId,
+          amendment: amendment.isEmpty ? null : amendment,
+        );
+        emit(
+          InteractionRequested(
+            nextSeq,
+            ApprovalRequest(
+              id: id,
+              title: title,
+              toolName: method.split('/')[1],
+              reason: params['reason'] as String?,
+              preview: preview,
+              // What "always allow" would allow, when the server said.
+              alwaysAllowLabel: amendment.isEmpty
+                  ? 'Approve for this session'
+                  : 'Always allow ${amendment.join(' ')}',
+            ),
+          ),
+        );
+      case 'item/permissions/requestApproval':
+        // More than the turn was given: not offered from here. The model
+        // is told, and carries on without it.
+        _refuse(rpcId, 'BaoCode does not widen permissions mid-turn.');
+      case 'item/tool/requestUserInput':
+        _refuse(rpcId, 'BaoCode cannot put that question right now.');
+      case 'mcpServer/elicitation/request':
+        _transport.write({
+          'id': rpcId,
+          'result': {'action': 'decline'},
+        });
+      case 'item/tool/call':
+        _transport.write({
+          'id': rpcId,
+          'result': {'contentItems': const [], 'success': false},
+        });
+      case 'execCommandApproval' || 'applyPatchApproval':
+        // The older turn API's approval: a request it made is refused
+        // rather than left waiting.
+        _transport.write({
+          'id': rpcId,
+          'result': {'decision': 'denied'},
+        });
+      default:
+        _refuse(rpcId, 'BaoCode does not handle $method.');
+    }
   }
+
+  void _refuse(Object? rpcId, String message) => _transport.write({
+    'id': rpcId,
+    'error': {'code': -32601, 'message': message},
+  });
 
   void _itemStarted(Map<String, Object?> item) {
     final id = item['id'] as String;
@@ -554,4 +712,16 @@ class CodexKernel
       ),
     );
   }
+}
+
+/// What the server answered a request with: a JSON-RPC error, which the
+/// protocol's own shapes say is an answer like any other.
+class CodexRequestError implements Exception {
+  const CodexRequestError(this.message, {this.code});
+
+  final String message;
+  final int? code;
+
+  @override
+  String toString() => code == null ? message : '$message (code $code)';
 }
