@@ -846,6 +846,15 @@ void main() {
       );
       expect(launch.hasSecrets, isFalse);
       expect(launch.settings, {
+        // The browser tools are asked about before they run (see
+        // ClaudeLaunch.settings).
+        'permissions': {
+          'ask': [
+            'mcp__baocode__browser_evaluate',
+            'mcp__baocode__browser_intercept',
+            'mcp__baocode__browser_watch',
+          ],
+        },
         'env': {'ANTHROPIC_BASE_URL': 'http://127.0.0.1:1', 'X': 'y'},
       });
       const keyed = ClaudeLaunch(
