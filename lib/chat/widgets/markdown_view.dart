@@ -56,13 +56,31 @@ class MarkdownView extends StatefulWidget {
   /// read (see the IDE's markdown preview). The chat's has [tags] too: a
   /// block between tags as a section that folds ([TagBlockSyntax]).
   static md.Document document({bool tags = false}) => md.Document(
-    extensionSet: md.ExtensionSet.gitHubFlavored,
+    extensionSet: _extensions,
     blockSyntaxes: [...blockSyntaxes, if (tags) const TagBlockSyntax()],
     inlineSyntaxes: inlineSyntaxes,
     encodeHtml: false,
   );
 
   static final _document = document(tags: true);
+
+  /// GitHub's, but struck through only between `~~`: a single `~` is how
+  /// a range is written (`10-12~10-16`), and two of them on a line would
+  /// strike out what is between.
+  static final _extensions = md.ExtensionSet(
+    md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+    [
+      for (final syntax in md.ExtensionSet.gitHubFlavored.inlineSyntaxes)
+        if (syntax is! md.StrikethroughSyntax) syntax,
+      md.DelimiterSyntax(
+        '~+',
+        requiresDelimiterRun: true,
+        allowIntraWord: true,
+        startCharacter: 0x7E, // ~
+        tags: [md.DelimiterTag('del', 2)],
+      ),
+    ],
+  );
 
   @override
   State<MarkdownView> createState() => _MarkdownViewState();
