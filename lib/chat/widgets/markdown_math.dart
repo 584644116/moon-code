@@ -3,6 +3,7 @@ import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import '../../theme/app_theme.dart';
+import 'will_change_paint.dart';
 
 /// TeX in markdown, as `math` elements (their `display` attribute `block`
 /// or `inline`), for [MathView] to render.
@@ -11,20 +12,8 @@ import '../../theme/app_theme.dart';
 class MathBlockSyntax extends md.BlockSyntax {
   const MathBlockSyntax();
 
-  /// What closes the math block [line] opens; null when it opens none, or
-  /// closes on the line it opens on. For text not yet parsed (see
-  /// `MarkdownView`): a block still open is text not to cut.
-  static String? opens(String line) {
-    final match = _pattern.firstMatch(line);
-    if (match == null) return null;
-    final close = match[1] == r'$$' ? r'$$' : r'\]';
-    return match[2]!.trimRight().endsWith(close) ? null : close;
-  }
-
-  static final _pattern = RegExp(r'^ {0,3}(\$\$|\\\[)(.*)$');
-
   @override
-  RegExp get pattern => _pattern;
+  RegExp get pattern => RegExp(r'^ {0,3}(\$\$|\\\[)(.*)$');
 
   @override
   md.Node parse(md.BlockParser parser) {
@@ -102,7 +91,7 @@ class MathView extends StatelessWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: math,
+      child: WillChangePaint(child: math),
     );
   }
 }
