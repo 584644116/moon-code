@@ -130,10 +130,9 @@ class ChatMinimap extends StatefulWidget {
   static const _columnGap = 20.0;
   static const _maxColumnGap = 32.0;
 
-  /// The margin it takes either side of a conversation's column, from the
-  /// conversation's edges: a column with a minimap leaves it clear while it
-  /// can (see [ChatColumn.room]), the other side as much, to stay in the
-  /// middle.
+  /// The margin it takes left of a conversation's column, from the
+  /// conversation's edge: a column with a minimap leaves it clear while it
+  /// can (see [ChatColumn.room]); at the right it reaches the margin.
   static const room = _edgeGap + _narrow + _columnGap;
 
   /// The least a column keeps of its width to leave [room]; narrower than
