@@ -3091,6 +3091,7 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Edit'**
   String get sidePanelEdit;
+
   /// Under a /command's description: opens its file (a skill's SKILL.md, a command's markdown) in the side panel.
   ///
   /// In en, this message translates to:

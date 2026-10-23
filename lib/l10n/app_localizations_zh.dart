@@ -1633,6 +1633,8 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get sidePanelEdit => '编辑';
+
+  @override
   String get commandOpenDetails => '查看详情';
 
   @override

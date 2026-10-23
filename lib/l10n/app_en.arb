@@ -749,6 +749,7 @@
   "sidePanelEdit": "Edit",
   "@sidePanelEdit": {
     "description": "Shows a markdown file's text in the side panel, to edit."
+  },
   "commandOpenDetails": "Open details",
   "@commandOpenDetails": {
     "description": "Under a /command's description: opens its file (a skill's SKILL.md, a command's markdown) in the side panel."

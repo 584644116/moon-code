@@ -1673,6 +1673,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sidePanelEdit => 'Edit';
+
+  @override
   String get commandOpenDetails => 'Open details';
 
   @override
