@@ -52,6 +52,7 @@ class _Step {
     this.detail,
     this.risk,
     this.reversible,
+    this.why,
   });
 
   final String prompt;
@@ -65,6 +66,9 @@ class _Step {
   /// What the call is about, for an approval.
   final ApprovalRisk? risk;
   final bool? reversible;
+
+  /// What in the call made it [risk], in words.
+  final String? why;
 }
 
 class _InteractionPanelState extends State<InteractionPanel>
@@ -144,6 +148,7 @@ class _InteractionPanelState extends State<InteractionPanel>
       :final alwaysAllowLabel,
       :final risk,
       :final reversible,
+      :final why,
     ) =>
       [
         _Step(
@@ -151,6 +156,7 @@ class _InteractionPanelState extends State<InteractionPanel>
           detail: _ApprovalPreview(preview),
           risk: risk,
           reversible: reversible,
+          why: why,
           rows: [
             _Row(l10n.interactionAllowOnce),
             if (alwaysAllowLabel != null) _Row(alwaysAllowLabel),
@@ -507,7 +513,11 @@ class _InteractionPanelState extends State<InteractionPanel>
                 if (step.risk case final risk?)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                    child: _RiskChip(risk, reversible: step.reversible),
+                    child: _RiskChip(
+                      risk,
+                      reversible: step.reversible,
+                      why: step.why,
+                    ),
                   ),
                 if (step.prompt.isNotEmpty || step.header.isNotEmpty)
                   Padding(
@@ -631,10 +641,13 @@ class _HeaderChip extends StatelessWidget {
 }
 
 class _RiskChip extends StatelessWidget {
-  const _RiskChip(this.risk, {this.reversible});
+  const _RiskChip(this.risk, {this.reversible, this.why});
 
   final ApprovalRisk risk;
   final bool? reversible;
+
+  /// What in the call made it this, when the kernel says.
+  final String? why;
 
   @override
   Widget build(BuildContext context) {
@@ -660,23 +673,45 @@ class _RiskChip extends StatelessWidget {
       false => ' · ${l10n.interactionIrreversible}',
       null => '',
     };
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          '$label$suffix',
-          style: TextStyle(
-            color: color,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        '$label$suffix',
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
         ),
       ),
+    );
+    if (why == null || why!.isEmpty) {
+      return Align(alignment: Alignment.centerLeft, child: chip);
+    }
+    // The label says what; this says what in the call said so, beside it:
+    // the chip is a word, the reason is the evidence.
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        chip,
+        const SizedBox(width: 8),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              why!,
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 11.5,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

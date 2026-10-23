@@ -546,6 +546,7 @@ class ApprovalRequest extends InteractionRequest {
     this.risk,
     this.reversible,
     this.source,
+    this.why,
   });
 
   final String toolName;
@@ -553,6 +554,10 @@ class ApprovalRequest extends InteractionRequest {
   /// Why it asks, when the kernel says.
   final String? reason;
   final ApprovalPreview? preview;
+
+  /// What in the call makes it [risk], in words, when something did: the
+  /// evidence beside the label rather than the label alone.
+  final String? why;
 
   /// What "always allow" would allow, when the kernel offers it (e.g.
   /// "Auto-accept edits"); null for no such option.

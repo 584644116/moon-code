@@ -21,6 +21,7 @@ class ApprovalAudit {
       'tool': tool,
       'risk': risk.risk.name,
       'source': risk.source,
+      if (risk.why != null) 'why': risk.why,
       if (reason != null && reason.isNotEmpty) 'reason': reason,
       'input': _preview(tool, input),
     });

@@ -1351,6 +1351,7 @@ class AgentLoop {
             'risk': risk.risk.name,
             if (risk.reversible != null) 'reversible': risk.reversible,
             'source': risk.source,
+            'why': ?risk.why,
             if (!isMain) 'agent_id': run.agentId,
           },
           // A question to the user is the turn's point: it waits as long

@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
-import 'package:bao_agent/bao_agent.dart' show approvalRiskFor;
+import 'package:bao_agent/bao_agent.dart'
+    show approvalRiskFor, isBlanketBashRule;
 import 'package:bao_remote/claude.dart' show ClaudeHistoryPage;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -16,7 +17,9 @@ import '../../models/model_provider.dart';
 import '../../models/model_providers.dart';
 import '../../models/model_runtime.dart';
 import '../../network/network_proxy.dart';
+import '../../platform/app_platform.dart';
 import '../../remote/remote_location.dart';
+import '../../settings/response_language.dart';
 import '../../settings/user_settings.dart';
 import '../../workspace/editor_launcher.dart' show openExternal;
 import '../agent_kernel.dart';
@@ -24,8 +27,9 @@ import '../commit_attribution.dart';
 import '../kernel_event.dart';
 import '../kernel_types.dart';
 import '../prompt_suggestions.dart';
-import '../transcript.dart';
 import '../queued_messages.dart';
+import '../thinking_display.dart';
+import '../transcript.dart';
 import 'claude_auto_rules.dart';
 import 'claude_classifier.dart';
 import 'claude_code_transport.dart';
@@ -587,6 +591,8 @@ class ClaudeCodeKernel
               ? effort
               : null,
           thinking: custom != null && direct && effort == 'none' ? false : null,
+          thinkingDisplay: ThinkingDisplay.now().name,
+          language: ResponseLanguage.now()?.cliName,
           autocompact: _autocompact,
           promptSuggestions: _launchedSuggestions,
           attribution: CommitAttribution.current(),
@@ -1417,8 +1423,7 @@ class ClaudeCodeKernel
       resources: [
         for (final resource in raw['resources'] as List? ?? const [])
           if (resource is Map)
-            if (resource['name'] ?? resource['uri'] case final name?)
-              '$name',
+            if (resource['name'] ?? resource['uri'] case final name?) '$name',
       ],
       prompts: [
         for (final prompt in raw['prompts'] as List? ?? const [])
@@ -1576,7 +1581,13 @@ class ClaudeCodeKernel
   ) async {
     final tool = request['tool_name'] as String? ?? 'Tool';
     final input = (request['input'] as Map?)?.cast<String, Object?>() ?? {};
-    final suggestions = request['permission_suggestions'] as List? ?? const [];
+    // Whatever rule the CLI offers as "always allow", one that would allow
+    // every command (`Bash(bash:*)`) is not offered: it is said as the one
+    // command it was asked for instead.
+    final suggestions = [
+      for (final raw in request['permission_suggestions'] as List? ?? const [])
+        if (!_blanketRule(raw)) raw,
+    ];
     // The plan is put to the user without waiting on them: its card
     // awaits, the turn ends, and their next message starts it (see
     // startBuilding) or says what should change. The CLI stays in Plan.
@@ -1683,16 +1694,42 @@ class ClaudeCodeKernel
           id: requestId,
           title: _approvalTitle(tool, request),
           toolName: tool,
-          reason: _clean(request['decision_reason'] as String?),
+          reason:
+              _clean(request['decision_reason'] as String?) ??
+              _outsideWhy(request),
           preview: _preview(tool, input),
           alwaysAllowLabel: _describeRules(suggestions),
           risk: risk.risk,
           reversible: risk.reversible,
           source: risk.source,
+          why: risk.why,
         );
     }
     _permissions[requestId] = _Permission(input, suggestions, questions);
     emit(InteractionRequested(nextSeq, interaction));
+  }
+
+  /// Whether [suggestion] is a rule that would allow every command: an
+  /// `addRules` whose whole point would be given away by one more word
+  /// (`Bash(bash:*)`, `Bash(sudo:*)`, `Bash(*)`). `setMode` and
+  /// `addDirectories` are left alone: they are not shell rules.
+  static bool _blanketRule(Object? suggestion) {
+    if (suggestion is! Map) return false;
+    if (suggestion['type'] != 'addRules' &&
+        suggestion['type'] != 'replaceRules') {
+      return false;
+    }
+    final rules = suggestion['rules'] as List? ?? const [];
+    if (rules.isEmpty) return false;
+    for (final raw in rules) {
+      if (raw is! Map) continue;
+      final tool = '${raw['toolName'] ?? ''}';
+      if (tool != 'Bash') return false;
+      final content = raw['ruleContent'];
+      if (content is! String || content.trim().isEmpty) return true;
+      if (!isBlanketBashRule('Bash($content)')) return false;
+    }
+    return true;
   }
 
   static String _approvalTitle(String tool, Map<String, Object?> request) {
@@ -1786,6 +1823,14 @@ class ClaudeCodeKernel
 
   static String? _clean(String? text) =>
       text?.replaceAll(RegExp(r'\x1B\[[0-9;]*m'), '').trim();
+
+  /// Why the CLI asks, when it says which path is out of reach and nothing
+  /// more: the sentence it would have sent, made here.
+  static String? _outsideWhy(Map<String, Object?> request) {
+    final path = _clean(request['blocked_path'] as String?);
+    if (path == null || path.isEmpty) return null;
+    return '$path is outside the folders this session works in.';
+  }
 
   // --- Output -------------------------------------------------------------------------
 
@@ -3289,17 +3334,31 @@ class ClaudeCodeKernel
   /// Plan.
   String get _mode => _work == 'plan' ? 'plan' : _cliApproval;
 
-  /// The CLI's mode for the approvals picked. Full access is not the
-  /// CLI's bypassPermissions, which it refuses as root and cannot switch
-  /// to unless started allowing it: it accepts edits, and what it asks
-  /// about otherwise is approved in [_permission]. Auto is the CLI's own
-  /// only where its classifier runs on the model; elsewhere the CLI only
-  /// asks, and [_permission] classifies.
+  /// The CLI's mode for the approvals picked. Auto is the CLI's own only
+  /// where its classifier runs on the model; elsewhere the CLI only asks,
+  /// and [_permission] classifies.
+  ///
+  /// Full access is the CLI's own bypassPermissions where it takes it, and
+  /// Accept edits where it does not: the CLI refuses bypass when started
+  /// as root (`setup.ts`: not on Windows, where it is left out), and
+  /// settings or an account's own gate can turn it off. Where it is
+  /// refused, the CLI only asks about what it accepts no edit for, and
+  /// [_permission] approves that.
   String get _cliApproval => switch (_approval) {
+    'bypassPermissions' when _bypasses => 'bypassPermissions',
     'bypassPermissions' => 'acceptEdits',
     'auto' when !_classifies => 'default',
     _ => _approval,
   };
+
+  /// Whether the CLI is started in a way that leaves its bypassPermissions
+  /// open. Windows: there is no root to be, so its check does not apply
+  /// (`setup.ts` skips `win32`), and the CLI takes bypass as it is.
+  ///
+  /// Elsewhere it stays Accept edits: a root session's CLI exits on being
+  /// given bypass, and telling whether this one is root costs more than
+  /// the round trip it would save.
+  bool get _bypasses => AppPlatform.isWindows;
 
   /// What the CLI would still ask in full access: safety checks requiring
   /// manual approval (also inside compound commands), explicit ask rules,
