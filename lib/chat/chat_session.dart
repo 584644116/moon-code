@@ -880,9 +880,13 @@ class ChatSession extends ChangeNotifier implements ChatFeed {
     final cwd = kernelContext.cwd;
     if (cwd == null) return path;
     final paths = RemoteLocation.pathsOf(cwd);
-    return paths.isAbsolute(path)
-        ? path
-        : paths.join(RemoteLocation.pathOf(cwd), path);
+    // Normalized: a file named the same way twice — `/p/a.dart`, then
+    // `a.dart` from `/p` — is one file, not two.
+    return paths.normalize(
+      paths.isAbsolute(path)
+          ? path
+          : paths.join(RemoteLocation.pathOf(cwd), path),
+    );
   }
 
   Iterable<({int seq, FileChange change, String? turnId})> get _pendingEdits {

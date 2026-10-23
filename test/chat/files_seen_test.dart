@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:path/path.dart' as p;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:baocode/chat/chat_models.dart';
@@ -55,7 +57,8 @@ void main() {
     );
     live.add(const ItemUpserted(2, 'say', AssistantTextItem('a')));
     final files = session.filesSeen;
-    expect(files, ['/p/a.dart']);
+    // The paths are the host's: Windows' own separators.
+    expect(files, [p.normalize(p.join('/p', 'a.dart'))]);
     live.add(const ItemUpserted(3, 'say', AssistantTextItem('ab')));
     live.add(
       const ItemUpserted(
@@ -68,6 +71,9 @@ void main() {
     live.add(
       const FileEdited(5, FileChange(path: 'b.dart', added: 1, removed: 0)),
     );
-    expect(session.filesSeen, ['/p/a.dart', '/p/b.dart']);
+    expect(session.filesSeen, [
+      p.normalize(p.join('/p', 'a.dart')),
+      p.normalize(p.join('/p', 'b.dart')),
+    ]);
   });
 }
