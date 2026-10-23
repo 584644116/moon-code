@@ -30,6 +30,55 @@
   <h1>Changelog</h1>
   <p class="subtitle">What changed in each version of BaoCode.</p>
 
+  <section class="release" id="v1.5.1">
+    <h2 class="plain"><a href="#v1.5.1">1.5.1</a></h2>
+    <p>Long sessions stay quick</p>
+    <p>Most of this release does one thing: keep a conversation that has run for hundreds of turns as fast and as accurate as it was at the start. Old tool results are put away and fetched back when needed, a full context folds its middle first and keeps the newest exchange, and a subagent's context is kept apart from the conversation's. Alongside that: session export, approvals that say what they are about, and stricter command safety.</p>
+    <p>New</p>
+    <ul>
+    <li>Export a session: a ZIP of the transcript, the subagents' transcripts and the files kept beside the session, from the chat or with /export in the composer, saved wherever you pick. A file too large, or one past what an export may hold, is left out and counted.</li>
+    <li>Approvals say what they are about: each request carries a risk label (read, write, destructive, credential, network), whether the change can be undone, and where the tool comes from. Destructive and credential ones add why — that a drive's root, a system folder or the home directory is being removed, or that a key or password file is being touched. What was asked and decided goes to an audit log.</li>
+    <li>Browser tools ask even in full access: reading a signed-in page's cookies or localStorage, or intercepting and changing its traffic, is confirmed one call at a time whatever the mode.</li>
+    <li>See what an MCP server offers: a server's row opens to its tools, resources and prompts, and shows its last error whatever its status — enough to tell why it is not working without leaving the chat.</li>
+    <li>Bring in what another conversation said: a message naming a saved conversation (as <code>[Session id: title]</code>, which the composer inserts) carries that conversation's newest messages, marked as background rather than instructions. At most three sources, 8000 characters each.</li>
+    <li>What the turn changed, and what it delivered: files handed over show as a card, and the activity strip lists the files the last turn changed apart from what earlier turns left, with their line counts.</li>
+    <li>The phone sees how full the context is: a session update may carry the window, what it holds, where compaction starts and whether it has happened. Older desktops send none, and phones that do not know the field ignore it.</li>
+    </ul>
+    <p>Improved</p>
+    <ul>
+    <li>Context management for long sessions, reworked:
+    <ul>
+    <li>Old tool results are trimmed before they are cleared: one longer than 8K characters first keeps only its head and tail, which is often enough; only when it is not are earlier groups cleared. A resumed conversation applies the same cuts.</li>
+    <li>Compaction leaves room for the answer: the threshold reserves the model's answer (at most 21K) and 13K for the request, never compacting below half the window. After a summary the newest exchange is kept verbatim, a call always with its results.</li>
+    <li>The model can fold, search and restore its own context with tools the chat does not show — only a notice. Folding rewrites the range it covers, so the prompt cache past it stays.</li>
+    <li>Reminders at the 3rd, 5th and 8th identical call.</li>
+    <li>Tools have a deadline, WebFetch 90 seconds; a large Bash result is kept whole until the context machinery offloads it, with both ends in the placeholder.</li>
+    </ul>
+    </li>
+    <li>A subagent's context is its own: each run owns its usage, todos, read files and compaction counter, and its summary no longer enters the parent's context.</li>
+    <li>Failures are told apart: rate limit, overload, context overflow, auth and certificate each say what to do. Small jobs — summaries, titles, classifiers — give up on an overload at once rather than retrying for minutes.</li>
+    <li>An empty answer is asked again: a stream that never said anything is its own kind of failure, retried twice rather than spending the whole budget; a turn that ends with no text and no tool call is retried twice, then warned about.</li>
+    <li>Compaction ratio and headroom can be set globally or per model, and prompt-too-long compaction retries are configurable (default 1).</li>
+    <li>Dangerous commands are judged more strictly: git hard resets, cleans and forced pushes, find -delete, rsync --delete, Windows recursive deletes, and commands wrapped in sudo, env, timeout or xargs. PowerShell's abbreviated parameters (-fo is -Force), <code>&amp; { }</code> call blocks and <code>$( )</code> subexpressions are read through, and <code>iex (iwr …)</code> — fetched and run — is recognised and offered no always-allow rule.</li>
+    <li>Credential folders and keys are protected paths.</li>
+    <li>A resumed session seeds its read state from the transcript; a host may seed one with seed_read_state.</li>
+    <li>A tool call's input is no longer kept once its result is in: a Write's whole file, an Edit's two strings. Only a background command's, a subagent's and a plan's are read again.</li>
+    <li>Search starts from the conversations that can match, through an in-memory index; a query it cannot narrow is scanned as before, so no hit is lost.</li>
+    <li>Auto mode works on another provider's model: where Claude Code's own classifier does not run, BaoCode judges the action with the provider's small model, and the CLI is told to ask.</li>
+    <li>A resumed session no longer overwrites the approval picked here, and the mode is re-sent when the model changes.</li>
+    <li>Auto mode warns about allow rules that would bypass it, and a rule that would allow every command (Bash(bash:*)) is no longer offered as always-allow.</li>
+    <li>Enhance works in an empty project: with nothing to name there, the model used to write a plan instead of the message and be turned down as too long, without a second try. It is now asked again without the project.</li>
+    </ul>
+    <p>Fixed</p>
+    <ul>
+    <li>Search and session listings stay quick on very long transcripts (only the ends are read).</li>
+    <li>A subagent's card keeps its latest 200 steps and says how many it left out.</li>
+    <li>A proxy turned on or off mid-session reaches the CLI at once.</li>
+    <li>Compaction stops after three failures in a row instead of spinning.</li>
+    <li>Full access is really full access on Windows: there is no root to be there, so the CLI is no longer needlessly held at Accept edits.</li>
+    </ul>
+  </section>
+
   <section class="release" id="v1.5.0">
     <h2 class="plain"><a href="#v1.5.0">1.5.0</a></h2>
     <p>Easy SSH</p>
