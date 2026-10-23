@@ -93,8 +93,42 @@ void main() {
       expect(ShellCommand.prefix('npm run build -- --prod'), 'npm run build');
       expect(ShellCommand.prefix('python3 -m pytest -q'), 'python3 -m pytest');
       expect(ShellCommand.prefix('git --no-pager log'), 'git');
-      expect(ShellCommand.prefix('NODE_ENV=x node app.js'), 'node');
       expect(ShellCommand.prefix('make'), 'make');
+      // A rule made of these would allow any code at all, so there is
+      // none: `node:*` runs whatever a later line hands it.
+      expect(ShellCommand.prefix('NODE_ENV=x node app.js'), isEmpty);
+      expect(ShellCommand.prefix('node -e "x"'), isEmpty);
+      expect(ShellCommand.prefix('python -c "x"'), isEmpty);
+      // A shell told to run one plain command is that command.
+      expect(ShellCommand.prefix('bash -c "npm test"'), 'npm test');
+    });
+
+    test('a rule that would allow every command is told apart', () {
+      for (final rule in [
+        'Bash',
+        'Bash(*)',
+        'Bash()',
+        'Bash(bash:*)',
+        'Bash(sh:*)',
+        'Bash(sudo:*)',
+        'Bash(env:*)',
+        'Bash(xargs:*)',
+        'Bash(python:*)',
+        'Bash(node:*)',
+        'Bash(rm:*)',
+      ]) {
+        expect(isBlanketBashRule(rule), isTrue, reason: rule);
+      }
+      for (final rule in [
+        'Bash(npm test:*)',
+        'Bash(git commit:*)',
+        'Bash(bash -c "npm test":*)',
+        'Read',
+        'Edit(//Users/me/x/**)',
+        'Bash(flutter test)',
+      ]) {
+        expect(isBlanketBashRule(rule), isFalse, reason: rule);
+      }
     });
 
     test('what only reads', () {

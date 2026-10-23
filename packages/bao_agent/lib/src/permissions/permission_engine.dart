@@ -241,8 +241,8 @@ class PermissionEngine {
         reasonType: 'safetyCheck',
         classifierApprovable: false,
         message:
-            'This command can destroy data that cannot be recovered, or '
-            'runs with elevated rights.',
+            'This command can destroy data that cannot be recovered, run '
+            'with elevated rights, or hand a link to the system to open.',
       );
     }
     if (_content('Bash', 'allow').any((rule) => matches(rule, command)) &&
@@ -294,19 +294,34 @@ class PermissionEngine {
         ],
       );
     }
-    final prefixes = <String>{
-      for (final part in unapproved) ShellCommand.prefix(part),
-    }.where((prefix) => prefix.isNotEmpty).take(5).toList();
+    // A rule to offer for "always allow": its prefix where one says
+    // something narrower than "anything" (`Bash(sudo:*)` and `Bash(bash:*)`
+    // say nothing), and otherwise this one command.
+    final rules = <String>{};
+    for (final part in unapproved) {
+      final prefix = ShellCommand.prefix(part);
+      if (prefix.isEmpty) {
+        // No prefix of it would be narrower than every command there is:
+        // the one command is the rule, where it can be written as one.
+        if (!parsed.hasSubstitution &&
+            !part.contains('\n') &&
+            !part.contains('*') &&
+            !part.contains('(') &&
+            !part.contains(')')) {
+          rules.add('Bash($part)');
+        }
+        continue;
+      }
+      rules.add(
+        // A line too odd to make a prefix of: the line itself.
+        parsed.hasSubstitution || prefix.contains('\n')
+            ? 'Bash($command)'
+            : 'Bash($prefix:*)',
+      );
+    }
     return PermissionAsk(
       suggestions: [
-        if (prefixes.isNotEmpty)
-          addRulesSuggestion([
-            for (final prefix in prefixes)
-              // A line too odd to make a prefix of: the line itself.
-              parsed.hasSubstitution || prefix.contains('\n')
-                  ? 'Bash($command)'
-                  : 'Bash($prefix:*)',
-          ]),
+        if (rules.isNotEmpty) addRulesSuggestion(rules.take(5).toList()),
       ],
     );
   }

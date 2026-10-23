@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'windows_dangerous.dart';
+
 /// A shell command line, taken apart as far as permissions need: the
 /// simple commands it is made of, and what in it could hide another
 /// command or write a file.
@@ -311,10 +315,49 @@ class ShellCommand {
   /// The words a rule for [command] (one simple command) is best made of:
   /// the program, and its subcommand where it has them (`git commit`,
   /// `npm run build`).
-  static String prefix(String command) {
-    final words = withoutAssignments(tokenize(command));
-    if (words.isEmpty) return command.trim();
+  ///
+  /// Empty when no rule made of it could be offered: a shell or an
+  /// interpreter run this way would allow any command at all (`bash:*`),
+  /// and a shell told to run one plain command is taken as that command
+  /// (`bash -c "npm test"` as `npm test`).
+  static String prefix(String command) => _prefix(command.trim(), 0);
+
+  static String _prefix(String command, int depth) {
+    if (depth > 4) return '';
+    final parsed = ShellCommand.parse(command);
+    final one = parsed.commands.isEmpty
+        ? command.trim()
+        : parsed.commands.first;
+    // A wrapper with nothing after it runs nothing at all.
+    final words = _unwrap(withoutAssignments(tokenize(one)));
+    if (words.isEmpty) return '';
     final first = words.first;
+    final shell = _programName(first);
+    if (_shellPrograms.contains(shell)) {
+      final script = scriptOf(words);
+      if (script == null) return '';
+      final inner = ShellCommand.parse(script);
+      if (inner.commands.length != 1) return '';
+      // PowerShell's script is read as PowerShell: `& { rm -fo … }` is
+      // `Remove-Item -Force`, and `rm` alone would name the POSIX program.
+      final single = inner.commands.single;
+      return _prefix(
+        shell == 'powershell' || shell == 'pwsh'
+            ? _asPowerShell(withoutAssignments(tokenize(single))).join(' ')
+            : single,
+        depth + 1,
+      );
+    }
+    final program = _programName(first);
+    // `python -m pytest` runs a named module, which is a thing to allow;
+    // `python -c "…"` runs whatever it was handed, which is not.
+    if (const {'python', 'python3', 'py', 'pypy', 'pypy3'}.contains(program)) {
+      if (words.length > 2 && words[1] == '-m') {
+        return '$first -m ${words[2]}';
+      }
+      return '';
+    }
+    if (_unprefixable.contains(program)) return '';
     if (_hasSubcommands.contains(first) && words.length > 1) {
       final second = words[1];
       if ((first == 'python' || first == 'python3') && second == '-m') {
@@ -332,6 +375,102 @@ class ShellCommand {
       return '$first $second';
     }
     return first;
+  }
+
+  /// The script [words] (one simple command) is a shell told to run:
+  /// `bash -c "…"`, `sh -lc "…"`, `cmd /c …`, `powershell -Command …`, its
+  /// `-EncodedCommand` decoded. Null when it is not one (a shell reading
+  /// its input, a script file, an interactive session).
+  static String? scriptOf(List<String> words) {
+    if (words.isEmpty) return null;
+    final program = _programName(words.first);
+    final args = words.sublist(1);
+    switch (program) {
+      case 'sh' ||
+          'bash' ||
+          'zsh' ||
+          'dash' ||
+          'ksh' ||
+          'fish' ||
+          'csh' ||
+          'tcsh':
+        return _posixScript(args);
+      case 'busybox':
+        // `busybox sh -c …`
+        if (args.isEmpty || args.first.startsWith('-')) return null;
+        return scriptOf(args);
+      case 'cmd':
+        return _flaggedScript(args, const {'/c', '/k', '-c'});
+      case 'powershell' || 'pwsh':
+        return _powerShellScript(args);
+    }
+    return null;
+  }
+
+  /// The text after the first of [flags] (`cmd /c …`).
+  static String? _flaggedScript(List<String> args, Set<String> flags) {
+    for (var i = 0; i < args.length; i++) {
+      if (flags.contains(args[i].toLowerCase())) {
+        return i + 1 < args.length ? args.sublist(i + 1).join(' ') : null;
+      }
+    }
+    return null;
+  }
+
+  /// The script after `-c` (`-c`, `-lc`, `-ic`…), its options' values
+  /// stepped over.
+  static String? _posixScript(List<String> args) {
+    for (var i = 0; i < args.length; i++) {
+      final arg = args[i];
+      // The options end here: what follows is a script file, not one.
+      if (arg == '--') return null;
+      // Short options whose value is the word after them.
+      if (const {'-o', '+o', '-O', '+O'}.contains(arg)) {
+        i++;
+        continue;
+      }
+      if (arg.length > 1 && arg.startsWith('-') && !arg.startsWith('--')) {
+        if (arg.substring(1).contains('c')) {
+          return i + 1 < args.length ? args.sublist(i + 1).join(' ') : null;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// The script after `-Command` / `-c`, or `-EncodedCommand` decoded.
+  ///
+  /// Both may be written as short as PowerShell resolves them (`-com`,
+  /// `-c`, `-enc`): a parameter is any prefix of its name that no other
+  /// parameter of the same program starts with.
+  static String? _powerShellScript(List<String> args) {
+    for (var i = 0; i < args.length; i++) {
+      final arg = args[i];
+      if (isPowerShellFlag(arg, 'command')) {
+        final colon = arg.indexOf(':');
+        if (colon >= 0) return arg.substring(colon + 1);
+        return i + 1 < args.length ? args.sublist(i + 1).join(' ') : null;
+      }
+      if (isPowerShellFlag(arg, 'encodedcommand')) {
+        if (i + 1 >= args.length) return null;
+        return _decodePowerShell(args[i + 1]);
+      }
+    }
+    return null;
+  }
+
+  /// `-EncodedCommand`'s payload: base64 of UTF-16LE.
+  static String? _decodePowerShell(String encoded) {
+    try {
+      final bytes = base64Decode(encoded);
+      final units = <int>[
+        for (var i = 0; i + 1 < bytes.length; i += 2)
+          bytes[i] | (bytes[i + 1] << 8),
+      ];
+      return String.fromCharCodes(units);
+    } on Object {
+      return null;
+    }
   }
 
   static const _hasSubcommands = {
@@ -681,40 +820,402 @@ bool _readOnlyGit(List<String> args) {
 }
 
 /// Whether [words] is a command that destroys what cannot be got back
-/// wholesale (`rm -rf /`, `git reset --hard`, `find -delete`): asked about
-/// in every mode, and never approved by the auto classifier.
-bool isDangerousWords(List<String> words, {required String home}) {
+/// wholesale (`rm -rf /`, `git reset --hard`, `find -delete`), or starts
+/// something of Windows' own that does: asked about in every mode, and
+/// never approved by the auto classifier.
+///
+/// A shell told to run a script is weighed by what the script runs, so
+/// `bash -c "rm -rf /"` is what `rm -rf /` is: the script is parsed as
+/// the command line it is, as far as `bash -c`, `cmd /c` and
+/// `powershell -Command` are concerned.
+bool isDangerousWords(List<String> words, {required String home}) =>
+    _dangerKind(words, home, 0) != null;
+
+/// What makes [words] dangerous, when something does: the reason an
+/// approval gives for asking, rather than the label alone.
+///
+/// The innermost one wins — `bash -c "rm -rf /"` is dangerous because of
+/// the `rm`, not because of the `bash` — so the sentence a person reads
+/// names the command that does the harm.
+DangerKind? dangerKindOf(List<String> words, {required String home}) =>
+    _dangerKind(words, home, 0);
+
+/// The kinds of harm a command can do that no later look can undo.
+enum DangerKind {
+  /// It removes what is there wholesale: a drive's root, a system folder,
+  /// the home directory.
+  wipesAll,
+
+  /// It deletes without the recycle bin or a prompt: `rm -r`, `del /f`,
+  /// `Remove-Item -Force`.
+  forcedDelete,
+
+  /// It hands a link to the system to open, which downloads and runs what
+  /// is behind it.
+  opensLink,
+
+  /// It runs as another user, with what that user may do.
+  elevated,
+
+  /// It writes straight to a disk.
+  disk,
+
+  /// It discards work git has and cannot give back: a hard reset, a clean
+  /// of untracked files, a force push.
+  git,
+
+  /// It runs code fetched from somewhere else (`iex (iwr https://…)`),
+  /// which nothing here can read.
+  runsCode,
+}
+
+DangerKind? _dangerKind(List<String> words, String home, int depth) {
+  if (words.isEmpty || depth > 8) return null;
+  words = _unwrap(words);
+  if (words.isEmpty) return null;
+  final outer = _programName(words.first);
+  final script = ShellCommand.scriptOf(words);
+  if (script != null) {
+    final parsed = ShellCommand.parse(script);
+    if (parsed.unbalanced) return null;
+    // A PowerShell script is read with its own spelling: `& { … }` and
+    // `$( … )` group commands, and `rm`, `del`, `rd` are aliases of
+    // `Remove-Item` whose flags are PowerShell's, not a POSIX program's.
+    final powerShell = outer == 'powershell' || outer == 'pwsh';
+    for (final inner in parsed.words) {
+      final kind = _dangerKind(
+        powerShell ? _asPowerShell(inner) : inner,
+        home,
+        depth + 1,
+      );
+      if (kind != null) return kind;
+    }
+    return null;
+  }
+  if (launchesUrl(words)) return DangerKind.opensLink;
+  if (forcedDeletes(words)) return DangerKind.forcedDelete;
+  final program = _programName(words.first);
+  final args = words.sublist(1);
+  // `iex (iwr https://…)`: what it runs is whatever came back over the
+  // network, and nothing here can read it.
+  if (_runsRemoteCode.contains(program)) return DangerKind.runsCode;
+  if (program == 'sudo' || program == 'doas' || program == 'pkexec') {
+    return DangerKind.elevated;
+  }
+  if (program == 'mkfs' || program.startsWith('mkfs.') || program == 'dd') {
+    return words.any((w) => w.startsWith('of=/dev/') || program != 'dd')
+        ? DangerKind.disk
+        : null;
+  }
+  if (program == 'rm') {
+    return _removesEverything(args, home) ? DangerKind.wipesAll : null;
+  }
+  if (program == 'git') {
+    return _gitDestroys(args) ? DangerKind.git : null;
+  }
+  if (program == 'find') {
+    return args.contains('-delete') ? DangerKind.forcedDelete : null;
+  }
+  if (program == 'rsync') {
+    return args.any((w) => w == '--delete' || w.startsWith('--delete-'))
+        ? DangerKind.forcedDelete
+        : null;
+  }
+  if (program == 'del' || program == 'erase') {
+    return args.any((w) {
+          final flag = w.toLowerCase();
+          return flag == '/s' || flag == '/f';
+        })
+        ? DangerKind.forcedDelete
+        : null;
+  }
+  if (program == 'rd' || program == 'rmdir') {
+    return args.any((w) => w.toLowerCase() == '/s')
+        ? DangerKind.forcedDelete
+        : null;
+  }
+  if (program == 'robocopy') {
+    return args.any((w) => w.toLowerCase() == '/mir')
+        ? DangerKind.forcedDelete
+        : null;
+  }
+  if (const {'remove-item', 'ri'}.contains(program)) {
+    // A forced delete, or a recursive one: what cannot be got back. Either
+    // may be written as short as PowerShell resolves it (`-fo`, `-r`).
+    final forced = args.any((w) => isPowerShellFlag(w, 'force'));
+    final recursive = args.any((w) => isPowerShellFlag(w, 'recurse'));
+    return forced || recursive ? DangerKind.forcedDelete : null;
+  }
+  return null;
+}
+
+/// Whether [rule] (`Bash(bash:*)`) would allow any command at all: a shell
+/// or interpreter told what to run, `Bash(*)`, `Bash(rm:*)`.
+///
+/// A rule like this reads as one narrow thing and is every command there
+/// is, so it is not offered as "always allow" — the one command it was
+/// asked for is.
+bool isBlanketBashRule(String rule) {
+  final open = rule.indexOf('(');
+  if (open < 0 || !rule.endsWith(')')) {
+    // The tool as a whole: every command.
+    return rule.trim() == 'Bash';
+  }
+  if (rule.substring(0, open).trim() != 'Bash') return false;
+  var content = rule.substring(open + 1, rule.length - 1).trim();
+  if (content.isEmpty) return true;
+  // `Bash(npm test:*)` means "npm test and what follows it": the `:*` is
+  // the rule's own syntax, not a wildcard the command may use.
+  if (content.endsWith(':*')) {
+    content = content.substring(0, content.length - 2).trim();
+  }
+  if (content.isEmpty || content.contains('*')) return true;
+  return ShellCommand.prefix(content).isEmpty;
+}
+
+/// Whether [words] removes more than one thing at once, so that what it
+/// removes cannot be put back by hand: `rm -r`, `del /s`,
+/// `Remove-Item -Recurse`, `robocopy /MIR`.
+bool isRecursiveDelete(List<String> words) {
   if (words.isEmpty) return false;
   words = _unwrap(words);
   if (words.isEmpty) return false;
-  final program = words.first.split('/').last;
+  final script = ShellCommand.scriptOf(words);
+  if (script != null) {
+    return ShellCommand.parse(script).words.any(isRecursiveDelete);
+  }
+  final program = _programName(words.first);
   final args = words.sublist(1);
-  if (program == 'sudo' || program == 'doas') return true;
-  if (program == 'mkfs' || program.startsWith('mkfs.') || program == 'dd') {
-    return words.any((w) => w.startsWith('of=/dev/') || program != 'dd');
-  }
-  if (program == 'rm') return _removesEverything(args, home);
-  if (program == 'git') return _gitDestroys(args);
-  if (program == 'find') return args.contains('-delete');
-  if (program == 'rsync') {
-    return args.any((w) => w == '--delete' || w.startsWith('--delete-'));
-  }
-  if (program == 'del' || program == 'erase') {
-    return args.any((w) => w.toLowerCase() == '/s');
-  }
-  if (program == 'rd' || program == 'rmdir') {
-    return args.any((w) => w.toLowerCase() == '/s');
-  }
-  if (program == 'robocopy') {
-    return args.any((w) => w.toLowerCase() == '/mir');
-  }
-  if (program.toLowerCase() == 'remove-item') {
-    return args.any((w) => w.toLowerCase() == '-recurse');
+  final lower = [for (final arg in args) arg.toLowerCase()];
+  switch (program) {
+    case 'rm':
+      final flags = lower.where((w) => w.startsWith('-')).join();
+      return flags.contains('r') || lower.contains('--recursive');
+    case 'del' || 'erase' || 'rd' || 'rmdir':
+      return lower.contains('/s');
+    case 'robocopy':
+      return lower.contains('/mir');
+    case 'remove-item' || 'ri':
+      return lower.contains('-recurse');
+    case 'find':
+      return args.contains('-delete');
   }
   return false;
 }
 
+/// [path] in words: the program's name, without its folder or `.exe`.
+String _programName(String word) {
+  var name = word.split(RegExp(r'[\\/]')).last.toLowerCase();
+  // A Windows drive as it is written: `C:cmd.exe`.
+  if (name.length > 2 && name[1] == ':' && RegExp('[a-z]').hasMatch(name[0])) {
+    name = name.substring(2);
+  }
+  for (final suffix in const ['.exe', '.cmd', '.bat', '.com']) {
+    if (name.endsWith(suffix)) {
+      return name.substring(0, name.length - suffix.length);
+    }
+  }
+  return name;
+}
+
+/// Programs that run code they are handed from somewhere else, which
+/// nothing here can read: PowerShell's `eval` and its download-and-run
+/// pair.
+const _runsRemoteCode = {
+  'iex',
+  'invoke-expression',
+  'invoke-command',
+  'icm',
+  'iwr',
+  'invoke-webrequest',
+  'irm',
+  'invoke-restmethod',
+  'start-job',
+  'start-threadjob',
+  'add-type',
+};
+
+/// Programs that run what they are given, so that a rule for one prefix
+/// (`Bash(bash:*)`, `Bash(sudo:*)`) would allow any command at all.
+const _unprefixable = {
+  // Shells.
+  'sh',
+  'bash',
+  'zsh',
+  'dash',
+  'ksh',
+  'fish',
+  'csh',
+  'tcsh',
+  'cmd',
+  'powershell',
+  'pwsh',
+  'busybox',
+  // What runs its arguments as a command.
+  'env',
+  'xargs',
+  'nice',
+  'stdbuf',
+  'nohup',
+  'timeout',
+  'time',
+  'setsid',
+  'ionice',
+  'chrt',
+  'watch',
+  'parallel',
+  'sudo',
+  'doas',
+  'pkexec',
+  'su',
+  // Interpreters given code to run.
+  'python',
+  'python3',
+  'pythonw',
+  'py',
+  'pyw',
+  'pypy',
+  'pypy3',
+  'node',
+  'nodejs',
+  'deno',
+  'bun',
+  'npx',
+  'bunx',
+  'perl',
+  'ruby',
+  'php',
+  'lua',
+  'julia',
+  'rscript',
+  'osascript',
+  // PowerShell's own ways of running code it is handed: `iex` is `eval`,
+  // and the rest fetch and run a script by name.
+  'iex',
+  'invoke-expression',
+  'invoke-command',
+  'icm',
+  'invoke-webrequest',
+  'iwr',
+  'invoke-restmethod',
+  'irm',
+  'start-job',
+  'start-threadjob',
+  'add-type',
+  'new-object',
+  'set-item',
+  'si',
+  'copy-item',
+  'cpi',
+  'move-item',
+  'mi',
+  'new-item',
+  'ni',
+  'set-content',
+  'sc',
+  // What cannot be got back.
+  'rm',
+  'del',
+  'erase',
+  'rd',
+  'rmdir',
+  'remove-item',
+  'ri',
+  // Windows' own launchers, which run whatever they are pointed at.
+  'start-process',
+  'start',
+  'saps',
+  'invoke-item',
+  'ii',
+  'mshta',
+  'rundll32',
+  'explorer',
+  'wscript',
+  'cscript',
+  'regsvr32',
+  'shred',
+  'dd',
+  'mkfs',
+  'wipefs',
+  'diskpart',
+  'format',
+  'bcdedit',
+  'vssadmin',
+  'shutdown',
+  'reboot',
+  'halt',
+  'poweroff',
+};
+
+/// The shells whose script `scriptOf` reads.
+const _shellPrograms = {
+  'sh',
+  'bash',
+  'zsh',
+  'dash',
+  'ksh',
+  'fish',
+  'csh',
+  'tcsh',
+  'busybox',
+  'cmd',
+  'powershell',
+  'pwsh',
+};
+
 /// Whether `rm` [args] would remove a home, a root or everything.
+/// [words], one command of a PowerShell script, as the cmdlet it is: `rm`
+/// written out as `Remove-Item`, `& { … }` unwrapped to what it groups,
+/// `$( … )` to what is inside it.
+///
+/// PowerShell reads `rm -r -fo` as `Remove-Item -Recurse -Force`, which no
+/// POSIX reading of `rm` gives: `-fo` is not two flags, and `-r` is a
+/// parameter of a different program.
+List<String> _asPowerShell(List<String> words) {
+  if (words.isEmpty) return words;
+  var program = _programName(words.first);
+  // `& { Remove-Item … }`: the call operator, then a block. What it runs is
+  // the block's own first command.
+  if (program == '&' || program == '.') {
+    return _asPowerShell(words.sublist(1));
+  }
+  // A block's own braces: what is inside is the command.
+  if (program == '{' || program == '}') {
+    return _asPowerShell(words.sublist(1));
+  }
+  // `$(Remove-Item …)`: a subexpression, which runs as its own command.
+  if (program.startsWith(r'$(')) {
+    return _asPowerShell([program.substring(2), ...words.skip(1)]);
+  }
+  final alias = _powerShellAliases[program];
+  if (alias != null) program = alias;
+  final args = [
+    for (final arg in words.skip(1))
+      if (!arg.startsWith(r'$(') || arg.endsWith(')')) arg,
+  ];
+  return [program, ...args];
+}
+
+/// PowerShell's aliases of the cmdlets that delete, which it lets be
+/// written as short as `rm -r -fo`.
+const _powerShellAliases = {
+  'rm': 'remove-item',
+  'ri': 'remove-item',
+  'del': 'remove-item',
+  'erase': 'remove-item',
+  'rd': 'remove-item',
+  'rmdir': 'remove-item',
+  'ni': 'new-item',
+  'si': 'set-item',
+  'sc': 'set-content',
+  'cpi': 'copy-item',
+  'mi': 'move-item',
+  'iex': 'invoke-expression',
+  'icm': 'invoke-command',
+  'iwr': 'invoke-webrequest',
+  'irm': 'invoke-restmethod',
+};
+
 bool _removesEverything(List<String> args, String home) {
   final flags = args.where((w) => w.startsWith('-')).join();
   final recursive =
@@ -723,10 +1224,8 @@ bool _removesEverything(List<String> args, String home) {
       args.contains('--recursive');
   if (!recursive) return false;
   for (final target in args.where((w) => !w.startsWith('-'))) {
-    final t = target.replaceAll(RegExp(r'/+$'), '');
+    final t = target.replaceAll(RegExp(r'[\\/]+$'), '');
     if (t.isEmpty ||
-        t == '/' ||
-        t == '/*' ||
         t == '~' ||
         t == r'$HOME' ||
         t == r'${HOME}' ||
@@ -737,9 +1236,36 @@ bool _removesEverything(List<String> args, String home) {
         t == '..') {
       return true;
     }
+    // A root, or a system folder: `/`, `/*`, `C:`, `C:\*`, `/usr`, …
+    final path = t.replaceAll(r'\', '/');
+    if (RegExp(r'^/\*?$').hasMatch(path)) return true;
+    if (RegExp(r'^[A-Za-z]:/?\*?$').hasMatch(path)) return true;
+    if (_systemFolders.contains(path.toLowerCase())) return true;
   }
   return false;
 }
+
+/// Folders whose removal from the top takes the machine with it.
+const _systemFolders = {
+  '/usr',
+  '/etc',
+  '/var',
+  '/bin',
+  '/sbin',
+  '/lib',
+  '/lib64',
+  '/boot',
+  '/opt',
+  '/home',
+  '/system',
+  '/library',
+  '/applications',
+  'c:/windows',
+  'c:/users',
+  'c:/program files',
+  'c:/program files (x86)',
+  'c:/programdata',
+};
 
 /// Whether a `git` call rewrites or throws away work that cannot be got
 /// back: a hard reset, a clean, a forced push or checkout, a forced
@@ -770,17 +1296,25 @@ bool _gitDestroys(List<String> args) {
   return false;
 }
 
-/// [words] with wrappers taken off (`env`, `nohup`, `time`, `command`,
-/// `builtin`, `exec`), so what they run is weighed as if it were alone.
+/// [words] with wrappers taken off (`env`, `nohup`, `time`, `nice`,
+/// `timeout`, `xargs`, `command`, `builtin`, `exec`), so what they run is
+/// weighed as if it were alone.
 List<String> _unwrap(List<String> words) {
   var result = words;
   for (var guard = 0; guard < 8; guard++) {
     if (result.isEmpty) return result;
-    final program = result.first.split('/').last;
+    final program = _programName(result.first);
     if (!const {
       'env',
       'nohup',
       'time',
+      'nice',
+      'stdbuf',
+      'setsid',
+      'ionice',
+      'chrt',
+      'timeout',
+      'xargs',
       'command',
       'builtin',
       'exec',
@@ -799,10 +1333,39 @@ List<String> _unwrap(List<String> words) {
             '--chdir',
             '-S',
             '--split-string',
+            '-n',
+            '--adjustment',
+            '-i',
+            '--input',
+            '-o',
+            '--output',
+            '-e',
+            '--error',
+            '-P',
+            '--max-procs',
+            '-I',
+            '--replace',
+            '-L',
+            '--max-lines',
+            '-s',
+            '--max-chars',
+            '-a',
+            '--arg-file',
+            '-k',
+            '--kill-after',
+            '-d',
+            '--delimiter',
           }.contains(option) &&
           i < result.length) {
         i++;
       }
+    }
+    // `timeout DURATION command`: the duration is not the command.
+    if (program == 'timeout' &&
+        i < result.length &&
+        !result[i].startsWith('-')) {
+      final duration = RegExp(r'^\d+(?:\.\d+)?[smhd]?$');
+      if (duration.hasMatch(result[i])) i++;
     }
     // `env NAME=value command`: assignments after the wrapper.
     while (i < result.length &&

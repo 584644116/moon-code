@@ -50,11 +50,53 @@ void main() {
     final network = approvalRiskFor('mcp__baocode__browser_evaluate', {});
     expect(network.risk, ApprovalRisk.network);
     expect(network.source, 'sdk');
-    final cookie = approvalRiskFor(
-      'mcp__baocode__browser_evaluate',
-      {'expression': 'document.cookie'},
-    );
+    final cookie = approvalRiskFor('mcp__baocode__browser_evaluate', {
+      'expression': 'document.cookie',
+    });
     expect(cookie.risk, ApprovalRisk.credential);
     expect(cookie.reversible, isFalse);
+  });
+
+  group('says what in the call made it that', () {
+    test('a recursive delete says the recycle bin is skipped', () {
+      expect(
+        approvalRiskFor('Bash', {'command': 'rm -rf build'}).why,
+        contains('recycle bin'),
+      );
+      expect(
+        approvalRiskFor('Bash', {
+          'command': 'Remove-Item -Recurse -Force x',
+        }).why,
+        contains('recycle bin'),
+      );
+    });
+
+    test('a credential says what kind of secret it is', () {
+      expect(
+        approvalRiskFor('Bash', {'command': 'cat ~/.ssh/id_rsa'}).why,
+        contains('secret'),
+      );
+    });
+
+    test('a link handed to the system says so', () {
+      expect(
+        approvalRiskFor('Bash', {
+          'command': 'Start-Process https://example.com/x.ps1',
+        }).why,
+        contains('link'),
+      );
+    });
+
+    test('a plain read, write or fetch says nothing more', () {
+      for (final (tool, input) in [
+        ('Read', {'file_path': 'a.txt'}),
+        ('Write', {'file_path': 'a.txt'}),
+        ('WebFetch', {'url': 'https://x'}),
+        ('Bash', {'command': 'git status'}),
+        ('Bash', {'command': 'npm test'}),
+      ]) {
+        expect(approvalRiskFor(tool, input).why, isNull, reason: tool);
+      }
+    });
   });
 }
