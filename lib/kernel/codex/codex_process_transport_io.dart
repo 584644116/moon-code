@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:path/path.dart' as p;
 
 import '../../platform/child_process_registry.dart';
 import '../../platform/data_dir.dart';
+import 'codex_model_catalog.dart';
 import 'codex_transport.dart';
 import 'local_codex_io.dart';
 
@@ -70,6 +72,10 @@ class CodexProcessTransport implements CodexTransport {
   /// The processes this run of the app started and that still run.
   static final Set<CodexProcessTransport> _live = {};
 
+  /// The catalogs written for servers to read, removed as the app quits:
+  /// they are this app's, not the user's.
+  static final Set<File> _catalogs = {};
+
   /// Ends every codex process this run started, and waits (up to
   /// [timeout] each) for them to go: done as the app quits, so a turn
   /// under way does not go on unseen, spending tokens, after the app is
@@ -82,6 +88,15 @@ class CodexProcessTransport implements CodexTransport {
     ]);
     // Their entries gone from the list before the app is.
     await registry.flush();
+    for (final file in _catalogs) {
+      try {
+        if (file.existsSync()) file.deleteSync();
+      } on FileSystemException {
+        // Left for the system to clear: a temporary file is not worth a
+        // failure on the way out.
+      }
+    }
+    _catalogs.clear();
   }
 
   /// Ends the processes an earlier run left behind; see
@@ -115,7 +130,10 @@ class CodexProcessTransport implements CodexTransport {
               'locally, and a project over SSH is not its to work in.',
         );
       }
-      final overrides = await config?.call() ?? const <String>[];
+      final overrides = [
+        ...?await config?.call(),
+        ...await _catalogOverrides(cli),
+      ];
       final process = await Process.start(
         cli.executable,
         [...overrides, ...serverArguments],
@@ -141,6 +159,46 @@ class CodexProcessTransport implements CodexTransport {
       _startError = error;
       _failed('$error');
     }
+  }
+
+  /// The catalog's `-c` override, written where Codex will read it: what
+  /// Settings → Models says each model holds, and offers, so Codex's window
+  /// and levels are the model's own rather than its fallback's.
+  Future<List<String>> _catalogOverrides(CodexCli cli) async {
+    final catalog = await CodexModelCatalog.build(
+      dump: () => _dumpCatalog(cli),
+    );
+    if (catalog == null) return const [];
+    final file = File(
+      p.join(
+        Directory.systemTemp.path,
+        'baocode-codex-catalog-${DateTime.now().microsecondsSinceEpoch}.json',
+      ),
+    );
+    // Read back by Codex as UTF-8, which jsonEncode's escapes survive in.
+    await file.writeAsString(catalog, encoding: utf8);
+    _catalogs.add(file);
+    final path = file.path.replaceAll(r'\', '/');
+    return ['-c', 'model_catalog_json="$path"'];
+  }
+
+  /// What Codex says its own catalog is: its prompt, its models' metadata.
+  static Future<String> _dumpCatalog(CodexCli cli) async {
+    final result = await Process.run(
+      cli.executable,
+      ['debug', 'models'],
+      environment: cli.environment,
+      includeParentEnvironment: Platform.isWindows,
+      runInShell: cli.throughShell,
+      // Its own output is UTF-8 whatever the machine's code page is: its
+      // prompt has punctuation a code page would mangle.
+      stdoutEncoding: utf8,
+      stderrEncoding: utf8,
+    );
+    if (result.exitCode != 0) {
+      throw StateError('codex debug models: ${result.stderr}');
+    }
+    return result.stdout as String;
   }
 
   /// What both streams are read with, and not strict about it: a line that

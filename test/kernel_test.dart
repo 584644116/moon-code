@@ -5938,6 +5938,70 @@ exec /usr/bin/env "\$@"
       expect(kernel.effort.selected, 'low');
     });
 
+    test('the approval picked is the policy and the sandbox the server is '
+        'told', () async {
+      kernel.model.select('gpt-5.5');
+      kernel.mode.select('agent');
+
+      for (final (picked, policy, sandbox) in [
+        ('ask', 'on-request', 'readOnly'),
+        ('acceptEdits', 'on-request', 'workspaceWrite'),
+        ('fullAccess', 'never', 'dangerFullAccess'),
+      ]) {
+        kernel.permission.select(picked);
+        expect(kernel.permission.selected, picked);
+        kernel.send(KernelTurn(id: 't-$picked', text: 'hi'));
+        await pumpEventQueue();
+        final turnStart = server.written.last['params'] as Map;
+        expect(turnStart['approvalPolicy'], policy);
+        expect(turnStart['sandboxPolicy'], {'type': sandbox});
+      }
+
+      // Ask is read-only whatever the approvals are: it discusses, it does
+      // not act.
+      kernel.mode.select('ask');
+      kernel.permission.select('fullAccess');
+      kernel.send(const KernelTurn(id: 't-discuss', text: 'hi'));
+      await pumpEventQueue();
+      final turnStart = server.written.last['params'] as Map;
+      expect(turnStart['approvalPolicy'], 'never');
+      expect(turnStart['sandboxPolicy'], {'type': 'readOnly'});
+    });
+
+    test('the window the conversation gets is the model\'s, on the thread',
+        () async {
+      late ModelProviders previous;
+      previous = ModelProviders.current;
+      ModelProviders.current = ModelProviders.memory(
+        providers: [
+          ModelProvider(
+            id: 'up',
+            name: 'Up',
+            models: const [
+              ProviderModel(id: 'big', contexts: [200000, 1000000]),
+            ],
+          ),
+        ],
+      );
+      addTearDown(() => ModelProviders.current = previous);
+
+      kernel.model.select('up/big');
+      // Offered as picked, and read back as the window in effect.
+      expect(kernel.contextSize.optionsFor('up/big').map((o) => o.id), [
+        '200000',
+        '1000000',
+      ]);
+      kernel.contextSize.select('up/big', '1000000');
+      expect(kernel.contextWindow, 1000000);
+
+      kernel.send(const KernelTurn(id: 't1', text: 'hi'));
+      await pumpEventQueue();
+      final start = server.written.firstWhere((m) => m['method'] == 'thread/start');
+      expect((start['params'] as Map)['config'], {
+        'model_context_window': 1000000,
+      });
+    });
+
     test('translates items, and asks leave to run a command', () async {
       kernel.model.select('gpt-5.5');
       kernel.mode.select('ask');

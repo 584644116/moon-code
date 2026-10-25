@@ -21,7 +21,9 @@ class CodexKernel
         AgentKernel,
         SelectsModel,
         SelectsMode,
+        SelectsPermission,
         SelectsEffort,
+        SelectsContextSize,
         ProvidesCommands,
         ReportsContext,
         RewindsConversation,
@@ -106,6 +108,52 @@ class CodexKernel
     ),
   ];
 
+  /// Its approval policy and sandbox, as one pick each: what [SelectsPermission]
+  /// offers. Codex keeps them apart, but they are picked together here — a
+  /// policy without a sandbox to apply it in says little.
+  static const _permissions = [
+    KernelOption(
+      'ask',
+      'Ask for approval',
+      Icons.front_hand_outlined,
+      'Ask before edits and commands',
+    ),
+    KernelOption(
+      'acceptEdits',
+      'Accept edits',
+      Icons.edit_note_rounded,
+      'Edit the workspace freely, ask before commands',
+    ),
+    KernelOption(
+      'fullAccess',
+      'Full access',
+      Icons.gpp_maybe_outlined,
+      'No checks: edits and commands run without asking',
+      caution: true,
+    ),
+  ];
+
+  @override
+  late final KernelChoiceSource permission = LocalChoice(
+    _permissions,
+    onChanged: (_) => emitInfoChanged(),
+  );
+
+  /// The approval policy [permission]'s pick asks the server for.
+  String get _approvalPolicy => switch (permission.selected) {
+    'fullAccess' => 'never',
+    _ => 'on-request',
+  };
+
+  /// The sandbox [permission]'s pick asks the server for. The server's own
+  /// spelling is camelCase here (`dangerFullAccess`, `workspaceWrite`,
+  /// `readOnly`), whatever the config file's keys look like.
+  String get _sandbox => switch (permission.selected) {
+    'fullAccess' => 'dangerFullAccess',
+    'acceptEdits' => 'workspaceWrite',
+    _ => 'readOnly',
+  };
+
   @override
   final List<KernelCommand> commands = const [
     KernelCommand(
@@ -127,8 +175,41 @@ class CodexKernel
     KernelCommand('new', 'Start a new chat', Icons.add_comment_outlined),
   ];
 
+  /// The conversation's room: what Settings → Models says the upstream model
+  /// holds, or Codex's own for a model it has no metadata for. It is set on
+  /// the thread when it starts — the catalog's `max_context_window` is what
+  /// Codex will not go past, and the proxy's catalog carries each model's.
   @override
-  int get contextWindow => 272000;
+  late final ModelSetting contextSize = _ContextSetting(
+    selected: () => _context,
+    selectedFor: (model) => _pickedContexts[model] ?? _context,
+    select: (model, id) {
+      _pickedContexts[model] = id;
+      _context = id;
+      emitInfoChanged();
+    },
+  );
+
+  String? _context;
+  final Map<String, String> _pickedContexts = {};
+
+  /// The window in effect: as picked, else what the model holds, else
+  /// Codex's own for a model it knows nothing about.
+  int get _contextTokens =>
+      parseTokens(_context ?? '') ??
+      modelWindow(model.selected ?? '') ??
+      272000;
+
+  /// What [ref] (Codex's `<provider>/<model>`) holds, as Settings → Models
+  /// says; null when it says nothing.
+  static int? modelWindow(String ref) =>
+      switch (ModelProviders.current.resolve('@$ref')) {
+        (_, final info) => info.contextOptions.lastOrNull,
+        null => null,
+      };
+
+  @override
+  int get contextWindow => _contextTokens;
 
   /// How much it thinks before answering: as picked, else as the model's
   /// own. Codex's levels are its own (`none` through `persistent`), and the
@@ -226,9 +307,14 @@ class CodexKernel
       if (_threadId == null) {
         final started = await _request('thread/start', {
           'model': model.selected,
+          // Read once, when the thread starts: what the conversation fills
+          // before Codex compacts it.
+          'config': {'model_context_window': _contextTokens},
         });
         _threadId = (started['thread'] as Map)['id'] as String;
       }
+      // Ask is read-only whatever the approvals say: it discusses, it does
+      // not act.
       final readOnly = mode.selected == 'ask';
       final started = await _request('turn/start', {
         'threadId': _threadId,
@@ -240,8 +326,8 @@ class CodexKernel
         // Its thinking, as the level picked; the proxy reads it back as
         // Claude's thinking budget for the upstream.
         'effort': ?effort.selected,
-        'approvalPolicy': readOnly ? 'never' : 'on-request',
-        'sandboxPolicy': {'type': readOnly ? 'readOnly' : 'workspaceWrite'},
+        'approvalPolicy': readOnly ? 'never' : _approvalPolicy,
+        'sandboxPolicy': {'type': readOnly ? 'readOnly' : _sandbox},
       });
       final serverId = (started['turn'] as Map)['id'] as String;
       _serverTurn ??= serverId;
@@ -752,6 +838,47 @@ class CodexKernel
       ),
     );
   }
+}
+
+/// The contexts a model is offered, and the one in effect: what Settings →
+/// Models says it holds. Codex takes the window on the thread (`config`'s
+/// `model_context_window`), and will not go past the catalog's
+/// `max_context_window` for it.
+class _ContextSetting implements ModelSetting {
+  _ContextSetting({
+    required this._selected,
+    required this._selectedFor,
+    required this._select,
+  });
+
+  final String? Function() _selected;
+  final String? Function(String model) _selectedFor;
+  final void Function(String model, String id) _select;
+
+  @override
+  List<KernelOption> optionsFor(String model) {
+    final windows = switch (ModelProviders.current.resolve('@$model')) {
+      (_, final info) => info.contextOptions,
+      null => const <int>[],
+    };
+    // One is not a choice: the model holds what it holds.
+    return [
+      for (final tokens in windows)
+        KernelOption('$tokens', formatTokens(tokens), Icons.notes_rounded, ''),
+    ];
+  }
+
+  @override
+  String? get selected => _selected();
+
+  @override
+  String? selectedFor(String model) => _selectedFor(model);
+
+  @override
+  void select(String model, String id) => _select(model, id);
+
+  @override
+  bool get toggle => false;
 }
 
 /// The thinking levels a model is offered, and the one in effect. Codex
