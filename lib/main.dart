@@ -47,8 +47,10 @@ import 'kernel/claude_code/process_transport.dart';
 import 'kernel/claude_code/turn_stats_stub.dart'
     if (dart.library.io) 'kernel/claude_code/turn_stats_io.dart'
     show turnStatsIn;
+import 'kernel/codex/codex_process_transport.dart';
 import 'kernel/commit_attribution.dart';
 import 'kernel/default_permission.dart';
+import 'kernel/engine_setting.dart';
 import 'kernel/prompt_suggestions.dart';
 import 'kernel/thinking_display.dart';
 import 'chat/composer/composer_polish.dart'
@@ -130,6 +132,11 @@ import 'workspace/preference_store.dart';
 import 'workspace/window_controls.dart';
 import 'workspace/workspace.dart';
 
+/// The Claude Code core [engine] runs: its own, or the CLI's for Codex,
+/// which is not a Claude Code core at all — Claude Code's sessions run on
+/// the CLI then, as a session cannot be on Codex and Claude Code at once.
+ClaudeCore _coreOf(AgentEngine engine) => engine.core ?? ClaudeCore.cli;
+
 Future<void> main(List<String> arguments) async {
   // All the app keeps is in its data folder: found first, once. One the
   // user set that cannot be used (a drive gone) is reported before the app
@@ -149,6 +156,7 @@ Future<void> main(List<String> arguments) async {
     EventLog.current = EventLog(DataDirectory.current.logsDir);
   }
   unawaited(reapClaudeProcesses());
+  unawaited(reapCodexProcesses());
   unawaited(reapLspProcesses());
   unawaited(reapPtyProcesses());
   WidgetsFlutterBinding.ensureInitialized();
@@ -218,13 +226,34 @@ Future<void> main(List<String> arguments) async {
     // agent starts.
     ClaudePathSetting.current = () =>
         ClaudePathSetting.parse(files.settings[ClaudePathSetting.settingKey]);
-    // Settings → General → Claude Code: the core sessions run on (BaoCode's
-    // own, or the CLI), read as each agent starts. Unset, the CLI.
-    ClaudeCore.current = () =>
-        ClaudeCore.parse(files.settings[ClaudeCore.settingKey]);
+    // Settings → General → Core: the engine sessions run on (BaoCode's own
+    // core, the Claude Code CLI, or Codex), read as each agent starts.
+    // Unset, the CLI. The core Claude Code runs is the engine's, for the
+    // two of that kernel.
+    AgentEngine.current = () =>
+        AgentEngine.parse(files.settings[AgentEngine.settingKey]);
+    AgentEngine.changes = files.settings;
+    AgentEngine.pick = (engine) =>
+        files.settings.update(AgentEngine.settingKey, engine.name);
+    // A setting kept before the engine was one (`claudeCode.core`) is read
+    // as the engine it named.
+    ClaudeCore.current = () => _coreOf(
+      AgentEngine.parse(
+        files.settings[AgentEngine.settingKey] ??
+            switch (files.settings[ClaudeCore.settingKey]) {
+              'builtin' => AgentEngine.claudeBuiltin.name,
+              _ => null,
+            },
+      ),
+    );
     ClaudeCore.changes = files.settings;
-    ClaudeCore.pick = (core) =>
-        files.settings.update(ClaudeCore.settingKey, core.name);
+    ClaudeCore.pick = (core) => files.settings.update(
+      AgentEngine.settingKey,
+      (core == ClaudeCore.builtin
+              ? AgentEngine.claudeBuiltin
+              : AgentEngine.claudeCli)
+          .name,
+    );
     // Settings → Models: the upstreams, kept in settings.json.
     ModelProviders.current = ModelProviders.settings(files.settings);
     // Claude Code's own models as it last listed them: in the picker
@@ -726,6 +755,7 @@ class _BaoCodeAppState extends State<BaoCodeApp> {
       }
       await Future.wait([
         stopClaudeProcesses(),
+        stopCodexProcesses(),
         RemoteClaudeTransport.stopAll(),
         stopModelProxy(),
         stopLspProcesses(),

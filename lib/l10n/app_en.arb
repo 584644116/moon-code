@@ -2413,7 +2413,7 @@
   "@generalSettingsClaudeCore": {
     "description": "Settings → General → Claude Code row: what runs Claude Code sessions, BaoCode's built-in core (written in Dart) or the Claude Code CLI."
   },
-  "generalSettingsClaudeCoreDescription": "Claude Code CLI: Anthropic's own program, with this machine's sign-in and setup; pick it to use a Claude subscription. Built-in: comes with BaoCode, and uses only the models added in Settings → Models. The CLI is the default, downloaded for you if this machine has none. Changes apply to new sessions.",
+  "generalSettingsClaudeCoreDescription": "Claude Code CLI: Anthropic's own program, with this machine's sign-in and setup; pick it to use a Claude subscription. Built-in: comes with BaoCode, and uses only the models added in Settings → Models. Codex: OpenAI's coding agent, on the same models. The CLI is the default, downloaded for you if this machine has none. Changes apply to new sessions.",
   "generalSettingsClaudeCoreBuiltin": "Built-in",
   "@generalSettingsClaudeCoreBuiltin": {
     "description": "Claude Code core choice: BaoCode's own agent core, written in Dart and run inside the app."
@@ -2421,6 +2421,10 @@
   "generalSettingsClaudeCoreCli": "Claude Code CLI",
   "@generalSettingsClaudeCoreCli": {
     "description": "Claude Code core choice: Anthropic's Claude Code command-line program, run as a process."
+  },
+  "generalSettingsClaudeCoreCodex": "Codex",
+  "@generalSettingsClaudeCoreCodex": {
+    "description": "Core choice: OpenAI's Codex, run as its own process."
   },
   "generalSettingsQueuedMessages": "Messages Sent While Working",
   "generalSettingsQueuedMessagesDescription": "When a message sent while the agent is still working is taken up. Applies to messages sent after a change; Claude Code only for now.",

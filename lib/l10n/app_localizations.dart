@@ -6095,7 +6095,7 @@ abstract class AppLocalizations {
   /// No description provided for @generalSettingsClaudeCoreDescription.
   ///
   /// In en, this message translates to:
-  /// **'Claude Code CLI: Anthropic\'s own program, with this machine\'s sign-in and setup; pick it to use a Claude subscription. Built-in: comes with BaoCode, and uses only the models added in Settings → Models. The CLI is the default, downloaded for you if this machine has none. Changes apply to new sessions.'**
+  /// **'Claude Code CLI: Anthropic\'s own program, with this machine\'s sign-in and setup; pick it to use a Claude subscription. Built-in: comes with BaoCode, and uses only the models added in Settings → Models. Codex: OpenAI\'s coding agent, on the same models. The CLI is the default, downloaded for you if this machine has none. Changes apply to new sessions.'**
   String get generalSettingsClaudeCoreDescription;
 
   /// Claude Code core choice: BaoCode's own agent core, written in Dart and run inside the app.
@@ -6109,6 +6109,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Claude Code CLI'**
   String get generalSettingsClaudeCoreCli;
+
+  /// Core choice: OpenAI's Codex, run as its own process.
+  ///
+  /// In en, this message translates to:
+  /// **'Codex'**
+  String get generalSettingsClaudeCoreCodex;
 
   /// No description provided for @generalSettingsQueuedMessages.
   ///

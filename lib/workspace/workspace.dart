@@ -16,6 +16,7 @@ import '../icons/icon_library.dart';
 import '../icons/project_icon.dart';
 import '../kernel/agent_kernel.dart';
 import '../kernel/default_permission.dart';
+import '../kernel/engine_setting.dart';
 import '../kernel/kernel_registry.dart';
 import '../kernel/kernel_types.dart';
 import '../l10n/l10n.dart';
@@ -2518,7 +2519,11 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
 
   /// A new, empty agent in [project], listed here but not shown.
   AgentThread _newThread(Project project) {
-    final kernel = _preferredKernel;
+    // Settings → General → Core's pick, when this workspace has that
+    // kernel; the last kernel used otherwise.
+    final kernel =
+        kernels.where((k) => k.id == AgentEngine.current().kernelId).firstOrNull ??
+        _preferredKernel;
     final settings = {
       ..._preferredSettings,
       // Settings → Models' pick, if any, over the last one.

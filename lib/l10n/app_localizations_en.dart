@@ -3602,13 +3602,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get generalSettingsClaudeCoreDescription =>
-      'Claude Code CLI: Anthropic\'s own program, with this machine\'s sign-in and setup; pick it to use a Claude subscription. Built-in: comes with BaoCode, and uses only the models added in Settings → Models. The CLI is the default, downloaded for you if this machine has none. Changes apply to new sessions.';
+      'Claude Code CLI: Anthropic\'s own program, with this machine\'s sign-in and setup; pick it to use a Claude subscription. Built-in: comes with BaoCode, and uses only the models added in Settings → Models. Codex: OpenAI\'s coding agent, on the same models. The CLI is the default, downloaded for you if this machine has none. Changes apply to new sessions.';
 
   @override
   String get generalSettingsClaudeCoreBuiltin => 'Built-in';
 
   @override
   String get generalSettingsClaudeCoreCli => 'Claude Code CLI';
+
+  @override
+  String get generalSettingsClaudeCoreCodex => 'Codex';
 
   @override
   String get generalSettingsQueuedMessages => 'Messages Sent While Working';

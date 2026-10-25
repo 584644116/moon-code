@@ -8,7 +8,7 @@ import '../../ide/ide_agent_changes.dart';
 import '../../ide/ide_button.dart';
 import '../../ide/ide_menu.dart';
 import '../../ide/ide_notifications.dart' show IdeSeverity;
-import '../../kernel/claude_code/claude_core_setting.dart';
+import '../../kernel/engine_setting.dart';
 import '../../kernel/claude_code/claude_path_setting.dart';
 import '../../kernel/commit_attribution.dart';
 import '../../kernel/default_permission.dart';
@@ -448,16 +448,18 @@ class GeneralSettingsPage extends StatelessWidget {
                       ),
                       _choiceRow(
                         context,
-                        key: ClaudeCore.settingKey,
+                        key: AgentEngine.settingKey,
                         label: l10n.generalSettingsClaudeCore,
                         description: l10n.generalSettingsClaudeCoreDescription,
                         values: {
-                          ClaudeCore.cli.name:
+                          AgentEngine.claudeCli.name:
                               l10n.generalSettingsClaudeCoreCli,
-                          ClaudeCore.builtin.name:
+                          AgentEngine.claudeBuiltin.name:
                               l10n.generalSettingsClaudeCoreBuiltin,
+                          AgentEngine.codex.name:
+                              l10n.generalSettingsClaudeCoreCodex,
                         },
-                        fallback: ClaudeCore.fallback.name,
+                        fallback: AgentEngine.fallback.name,
                       ),
                       _ClaudePathSetting(
                         path: ClaudePathSetting.parse(

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/widgets.dart';
 
 import 'kernel_event.dart';
@@ -406,12 +407,36 @@ mixin KernelEventSource {
 /// A [KernelChoiceSource] over a list the kernel keeps, for kernels that
 /// hold the choice themselves.
 class LocalChoice implements KernelChoiceSource {
-  LocalChoice(this.options, {this._selected, this.onChanged});
+  LocalChoice(List<KernelOption> options, {this._selected, this.onChanged})
+    : _options = options,
+      _fresh = null;
 
-  @override
-  List<KernelOption> options;
+  /// A list worked out as it is asked for, for one that follows settings
+  /// that change while the kernel runs.
+  LocalChoice.fresh(
+    List<KernelOption> Function() options, {
+    this._selected,
+    this.onChanged,
+  }) : _options = const [],
+       _fresh = options;
+
+  final List<KernelOption> _options;
+  final List<KernelOption> Function()? _fresh;
   String? _selected;
   final void Function(String id)? onChanged;
+
+  /// The list as it is now: worked out again when it is fresh, kept while
+  /// the same either way, so pickers keep their identity.
+  List<KernelOption> _cache = const [];
+
+  @override
+  List<KernelOption> get options {
+    final fresh = _fresh;
+    if (fresh == null) return _options;
+    final now = fresh();
+    if (listEquals(now, _cache)) return _cache;
+    return _cache = now;
+  }
 
   @override
   String? get selected => _selected ?? options.firstOrNull?.id;
