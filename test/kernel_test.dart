@@ -5894,6 +5894,50 @@ exec /usr/bin/env "\$@"
     void notify(String method, Map<String, Object?> params) =>
         server.push({'method': method, 'params': params});
 
+    test('the thinking level picked is on the turn, and the model offers '
+        'its own levels', () async {
+      late ModelProviders previous;
+      previous = ModelProviders.current;
+      ModelProviders.current = ModelProviders.memory(
+        providers: [
+          ModelProvider(
+            id: 'up',
+            name: 'Up',
+            models: const [
+              ProviderModel(id: 'big', efforts: ['low', 'high']),
+              ProviderModel(id: 'small'),
+            ],
+          ),
+        ],
+      );
+      addTearDown(() => ModelProviders.current = previous);
+
+      // What Settings → Models says the model offers, as the picker's list.
+      expect(
+        kernel.effort.optionsFor('up/big').map((o) => o.id),
+        ['low', 'high'],
+      );
+      expect(kernel.effort.selectedFor('up/big'), isNull);
+
+      kernel.model.select('up/big');
+      kernel.effort.select('up/big', 'high');
+      expect(kernel.effort.selected, 'high');
+      expect(kernel.effort.selectedFor('up/big'), 'high');
+
+      kernel.send(const KernelTurn(id: 't1', text: 'hi'));
+      await pumpEventQueue();
+      expect((server.written.last['params'] as Map)['effort'], 'high');
+    });
+
+    test('the level picked for a model is kept apart from another\'s', () {
+      kernel.effort.select('up/big', 'high');
+      expect(kernel.effort.selectedFor('up/small'), 'high');
+      kernel.effort.select('up/small', 'low');
+      expect(kernel.effort.selectedFor('up/big'), 'high');
+      expect(kernel.effort.selectedFor('up/small'), 'low');
+      expect(kernel.effort.selected, 'low');
+    });
+
     test('translates items, and asks leave to run a command', () async {
       kernel.model.select('gpt-5.5');
       kernel.mode.select('ask');

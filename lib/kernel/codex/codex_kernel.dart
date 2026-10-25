@@ -21,12 +21,20 @@ class CodexKernel
         AgentKernel,
         SelectsModel,
         SelectsMode,
+        SelectsEffort,
         ProvidesCommands,
         ReportsContext,
         RewindsConversation,
         AcceptsImages {
-  CodexKernel(this.descriptor, this._transport) {
+  CodexKernel(this.descriptor, this._transport, {Map<String, String> settings = const {}}) {
     _subscription = _transport.messages.listen(_receive);
+    _effort = settings[KernelChoiceKind.effort.name];
+    final efforts = '${KernelChoiceKind.effort.name}@';
+    for (final MapEntry(:key, :value) in settings.entries) {
+      if (key.startsWith(efforts)) {
+        _pickedEfforts[key.substring(efforts.length)] = value;
+      }
+    }
   }
 
   @override
@@ -122,6 +130,23 @@ class CodexKernel
   @override
   int get contextWindow => 272000;
 
+  /// How much it thinks before answering: as picked, else as the model's
+  /// own. Codex's levels are its own (`none` through `persistent`), and the
+  /// proxy reads one back as Claude's thinking budget.
+  @override
+  late final ModelSetting effort = _EffortSetting(
+    selected: () => _effort,
+    selectedFor: (model) => _pickedEfforts[model] ?? _effort,
+    select: (model, id) {
+      _pickedEfforts[model] = id;
+      _effort = id;
+      emitInfoChanged();
+    },
+  );
+
+  String? _effort;
+  final Map<String, String> _pickedEfforts = {};
+
   int _requests = 0;
   final Map<Object, Completer<Map<String, Object?>>> _responses = {};
   bool _initialized = false;
@@ -212,6 +237,9 @@ class CodexKernel
           for (final note in turn.notes) {'type': 'text', 'text': note},
         ],
         'model': model.selected,
+        // Its thinking, as the level picked; the proxy reads it back as
+        // Claude's thinking budget for the upstream.
+        'effort': ?effort.selected,
         'approvalPolicy': readOnly ? 'never' : 'on-request',
         'sandboxPolicy': {'type': readOnly ? 'readOnly' : 'workspaceWrite'},
       });
@@ -724,6 +752,62 @@ class CodexKernel
       ),
     );
   }
+}
+
+/// The thinking levels a model is offered, and the one in effect. Codex
+/// takes an effort of its own (`turn/start`'s `effort`), which the proxy
+/// reads back as Claude's thinking budget, so what an upstream model offers
+/// is what Settings → Models says it does.
+class _EffortSetting implements ModelSetting {
+  _EffortSetting({
+    required this._selected,
+    required this._selectedFor,
+    required this._select,
+  });
+
+  final String? Function() _selected;
+  final String? Function(String model) _selectedFor;
+  final void Function(String model, String id) _select;
+
+  @override
+  List<KernelOption> optionsFor(String model) {
+    // The model's own levels, as Settings → Models has them: the id here is
+    // Codex's (`<provider>/<model>`), which a model ref adds an `@` to.
+    final levels = switch (ModelProviders.current.resolve('@$model')) {
+      (_, final info) => info.effortLevels,
+      null => const <String>[],
+    };
+    return [
+      for (final level in levels)
+        KernelOption(
+          level,
+          effortLabel(level),
+          Icons.speed_rounded,
+          switch (level) {
+            'none' => 'No thinking',
+            'minimal' => 'Least thinking',
+            'low' => 'Fastest, least thinking',
+            'medium' => 'Balanced',
+            'high' => 'Thinks more',
+            'xhigh' => 'Thinks a lot more',
+            'max' => 'Most thinking',
+            _ => '',
+          },
+        ),
+    ];
+  }
+
+  @override
+  String? get selected => _selected();
+
+  @override
+  String? selectedFor(String model) => _selectedFor(model);
+
+  @override
+  void select(String model, String id) => _select(model, id);
+
+  @override
+  bool get toggle => false;
 }
 
 /// What the server answered a request with: a JSON-RPC error, which the

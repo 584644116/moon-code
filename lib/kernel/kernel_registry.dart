@@ -44,6 +44,7 @@ abstract final class KernelRegistry {
     create: (context) => CodexKernel(
       codex,
       CodexProcessTransport(cwd: context.cwd, config: _codexConfig),
+      settings: context.settings,
     ),
     catalog: CodexCatalog(),
   );
