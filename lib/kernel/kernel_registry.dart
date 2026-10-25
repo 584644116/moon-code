@@ -56,6 +56,9 @@ abstract final class KernelRegistry {
   /// app's proxy, as the Responses API, with the token the proxy takes.
   /// None if the proxy cannot start, which leaves Codex on its own
   /// configuration (its own upstream, its own account).
+  @visibleForTesting
+  static Future<List<String>> codexConfig() => _codexConfig();
+
   static Future<List<String>> _codexConfig() async {
     final ProxyEndpoint endpoint;
     try {
@@ -81,6 +84,11 @@ abstract final class KernelRegistry {
       '-c',
       'model_providers.$_proxyProvider.experimental_bearer_token='
           '${value(endpoint.token)}',
+      // Approval requests are this app's to ask, as they are for Claude
+      // Code's own tools. Codex's automatic review would otherwise ask for a
+      // model of its own, `codex-auto-review`, which no upstream here has.
+      '-c',
+      'approvals_reviewer=${value('user')}',
     ];
   }
 
