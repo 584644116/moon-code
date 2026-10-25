@@ -114,6 +114,7 @@ void main() {
     );
     proxy = ModelProxy(
       provider: (id) => id == provider.id ? provider : null,
+      providerIds: () => [provider.id],
       key: (_) async => 'sk-upstream',
       onError: (_, error) => errors.add(error),
       findProxy: (_) => 'DIRECT',
@@ -823,6 +824,193 @@ void main() {
       }
       expect(anthropic.requests, isEmpty);
       expect(upstream.requests, isEmpty);
+    });
+  });
+
+  group("Codex's Responses API, on an upstream that speaks Claude's", () {
+    late FakeUpstream claude;
+    late ModelProxy codex;
+    late ModelProvider an;
+
+    setUp(() async {
+      claude = await FakeUpstream.start();
+      an = ModelProvider(
+        id: 'an',
+        name: 'Claude',
+        protocol: ProviderProtocol.anthropic,
+        baseUrl: claude.base,
+        models: const [ProviderModel(id: 'gpt-5')],
+      );
+      codex = ModelProxy(
+        provider: (id) => id == an.id ? an : null,
+        providerIds: () => [an.id],
+        key: (_) async => 'sk-an',
+        onError: (_, error) => errors.add(error),
+        findProxy: (_) => 'DIRECT',
+        token: 'tok',
+      );
+    });
+
+    tearDown(() async {
+      await codex.close();
+      await claude.close();
+    });
+
+    Future<Uri> responses() async =>
+        Uri.parse('${(await codex.responsesEndpoint()).baseUrl}/responses');
+
+    test(
+      "a turn goes out as Claude's and comes back as the Responses API's, "
+      'event by event',
+      () async {
+      claude.reply = (_) => (
+        200,
+        [
+          'event: message_start',
+          'data: {"type":"message_start","message":{"id":"m1",'
+              '"usage":{"input_tokens":9}}}',
+          '',
+          'event: content_block_start',
+          'data: {"type":"content_block_start","index":0,'
+              '"content_block":{"type":"text","text":""}}',
+          '',
+          'event: content_block_delta',
+          'data: {"type":"content_block_delta","index":0,'
+              '"delta":{"type":"text_delta","text":"Reading it."}}',
+          '',
+          'event: content_block_stop',
+          'data: {"type":"content_block_stop","index":0}',
+          '',
+          'event: message_delta',
+          'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},'
+              '"usage":{"output_tokens":3}}',
+          '',
+          'event: message_stop',
+          'data: {"type":"message_stop"}',
+          '',
+        ],
+      );
+      final answer = await post(
+        await responses(),
+        {
+          'model': 'an/gpt-5',
+          'stream': true,
+          'input': [
+            {
+              'type': 'message',
+              'role': 'user',
+              'content': [
+                {'type': 'input_text', 'text': 'read a.txt'},
+              ],
+            },
+          ],
+        },
+        headers: {'authorization': 'Bearer tok'},
+      );
+      expect(answer.status, 200);
+      final sent = claude.requests.single;
+      expect(sent.path, '/v1/messages');
+      final body = sent.body! as Map;
+      expect(body['model'], 'gpt-5');
+      expect(body['stream'], isTrue);
+      expect(
+        (body['messages'] as List).single,
+        containsPair('role', 'user'),
+      );
+
+      final kinds = [for (final event in answer.data) event['type']];
+      expect(kinds.first, 'response.created');
+      expect(kinds, contains('response.output_item.added'));
+      expect(kinds, contains('response.output_text.delta'));
+      expect(kinds, contains('response.output_item.done'));
+      expect(kinds.last, 'response.completed');
+      final done = answer.data.lastWhere(
+        (e) => e['type'] == 'response.output_item.done',
+      );
+      final item = done['item']! as Map;
+      expect(item['type'], 'message');
+      expect((item['content'] as List).single, {
+        'type': 'output_text',
+        'text': 'Reading it.',
+        'annotations': <Object?>[],
+      });
+      final completed = answer.data.last['response']! as Map;
+      expect(completed['status'], 'completed');
+      expect(completed['usage'], containsPair('input_tokens', 9));
+      expect(completed['usage'], containsPair('output_tokens', 3));
+    });
+
+    test('a bare model name is the first upstream that lists it', () async {
+      claude.reply = (_) => (
+        200,
+        [
+          'event: message_start',
+          'data: {"type":"message_start","message":{"id":"m1"}}',
+          '',
+          'event: message_stop',
+          'data: {"type":"message_stop"}',
+          '',
+        ],
+      );
+      final answer = await post(
+        await responses(),
+        {
+          'model': 'gpt-5',
+          'stream': true,
+          'input': 'read a.txt',
+        },
+        headers: {'authorization': 'Bearer tok'},
+      );
+      expect(answer.status, 200);
+      expect((claude.requests.single.body! as Map)['model'], 'gpt-5');
+    });
+
+    test('a turn that does not stream comes back as one response', () async {
+      claude.reply = (_) => (
+        200,
+        [
+          '{"id":"m1","type":"message","role":"assistant","content":['
+              '{"type":"text","text":"Reading it."}],'
+              '"usage":{"input_tokens":9,"output_tokens":3}}',
+        ],
+      );
+      final answer = await post(
+        await responses(),
+        {
+          'model': 'an/gpt-5',
+          'input': 'read a.txt',
+        },
+        headers: {'authorization': 'Bearer tok'},
+      );
+      expect(answer.status, 200);
+      final response = jsonDecode(answer.text) as Map;
+      expect(response['object'], 'response');
+      expect(response['status'], 'completed');
+      final output = response['output']! as List;
+      expect((output.single as Map)['type'], 'message');
+      expect(response['usage'], containsPair('total_tokens', 12));
+    });
+
+    test('a model no upstream lists, and a request that is not this '
+        'proxy\'s, are turned away', () async {
+      final unknown = await post(
+        await responses(),
+        {
+          'model': 'gone/gpt-5',
+          'input': 'hi',
+        },
+        headers: {'authorization': 'Bearer tok'},
+      );
+      expect(unknown.status, 404);
+      final stranger = await post(
+        await responses(),
+        {
+          'model': 'an/gpt-5',
+          'input': 'hi',
+        },
+      );
+      expect(stranger.status, 401);
+      expect(claude.requests, isEmpty);
     });
   });
 }

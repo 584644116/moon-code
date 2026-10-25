@@ -4,6 +4,7 @@
 
 import 'codex/codex_service.dart';
 import 'image_api.dart';
+import 'launch_environment.dart';
 import 'model_provider.dart';
 import 'model_runtime_stub.dart'
     if (dart.library.io) 'model_runtime_io.dart'
@@ -24,6 +25,11 @@ Future<Map<String, String>> providerLaunchEnvironment(
   ModelProvider provider,
   String model,
 ) => platform.providerLaunchEnvironment(provider, model);
+
+/// Where a Codex kernel's turns go: the local proxy's Responses API, its
+/// model naming the upstream, and the token it takes.
+Future<ProxyEndpoint> codexResponsesEndpoint() =>
+    platform.codexResponsesEndpoint();
 
 /// [request]'s pictures, made by [model] (an image model) of [provider]:
 /// the bytes of each (fetched where it answered with a link). Throws

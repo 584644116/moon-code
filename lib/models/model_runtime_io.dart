@@ -27,6 +27,9 @@ CodexService get codexService => _codex;
 /// The app's proxy, over [ModelProviders.current].
 final ModelProxy _proxy = ModelProxy(
   provider: (id) => ModelProviders.current.provider(id),
+  providerIds: () => [
+    for (final provider in ModelProviders.current.providers) provider.id,
+  ],
   key: (id) => ModelProviders.current.key(id),
   onError: (id, error) => ModelProviders.current.reportError(id, error),
   findProxy: (url) => NetworkProxy.instance.findProxy(url),
@@ -180,6 +183,8 @@ Future<Map<String, String>> providerLaunchEnvironment(
     noProxy: route.direct ? null : route.noProxy,
   );
 }
+
+Future<ProxyEndpoint> codexResponsesEndpoint() => _proxy.responsesEndpoint();
 
 Future<void> stopModelProxy() async {
   _codex.close();

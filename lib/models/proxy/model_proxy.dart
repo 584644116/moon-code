@@ -12,10 +12,12 @@ import '../codex/codex_service.dart';
 import '../launch_environment.dart';
 import '../model_provider.dart';
 import '../upstream.dart';
+import 'translate/claude_to_responses_response.dart';
 import 'translate/openai_chat_request.dart';
 import 'translate/openai_chat_response.dart';
 import 'translate/responses_request.dart';
 import 'translate/responses_response.dart';
+import 'translate/responses_to_claude_request.dart';
 import 'translate/thinking.dart';
 
 /// Anthropic's Messages API on this machine, in front of the upstreams
@@ -46,10 +48,17 @@ class ModelProxy {
     this._onError,
     this._findProxy,
     this._codex,
+    this._providerIds = _noIds,
     @visibleForTesting String? token,
   }) : token = token ?? _newToken();
 
   final ModelProvider? Function(String id) _provider;
+
+  /// Every upstream's id, in the order Settings → Models lists them: a
+  /// request naming a bare model is the first one that has it.
+  final List<String> Function() _providerIds;
+
+  static List<String> _noIds() => const [];
 
   /// The ChatGPT (Codex) providers' accounts.
   final CodexAccounts? _codex;
@@ -82,6 +91,14 @@ class ModelProxy {
           'http://127.0.0.1:${server.port}/p/${Uri.encodeComponent(providerId)}',
       token: token,
     );
+  }
+
+  /// Where Codex's own requests go: the Responses API, its model naming
+  /// the upstream (`<provider>/<model>`). Its `base_url` is this, and it
+  /// asks for `/responses` of it.
+  Future<ProxyEndpoint> responsesEndpoint() async {
+    final server = await (_server ??= _bind());
+    return (baseUrl: 'http://127.0.0.1:${server.port}/v1', token: token);
   }
 
   Future<HttpServer> _bind() async {
@@ -134,6 +151,14 @@ class ModelProxy {
         return await _fail(response, 401, 'Not this proxy\'s token');
       }
       final segments = request.uri.pathSegments;
+      // Codex's own: the Responses API, its model naming the upstream as
+      // Claude Code's does (`<provider>/<model>`).
+      if (request.method == 'POST' &&
+          segments.length == 2 &&
+          segments[0] == 'v1' &&
+          segments[1] == 'responses') {
+        return await _handleResponses(request);
+      }
       if (request.method != 'POST' ||
           segments.length < 4 ||
           segments[0] != 'p' ||
@@ -193,6 +218,167 @@ class ModelProxy {
       debugPrint('Model proxy: $error');
       await _fail(response, 502, '$error');
     }
+  }
+
+  /// A Responses API request, as Codex sends it: its model names an
+  /// upstream of Settings → Models (`<provider>/<model>`, or a bare model
+  /// name for the first upstream listing one), and the turn is Claude's
+  /// on the way out and back, so every upstream is reached the one way.
+  Future<void> _handleResponses(HttpRequest request) async {
+    final response = request.response;
+    try {
+      final decoded = jsonDecode(await utf8.decodeStream(request));
+      if (decoded is! Map<String, Object?>) {
+        return await _fail(response, 400, 'The request is not a JSON object');
+      }
+      final provider = _providerForResponses('${decoded['model'] ?? ''}');
+      if (provider == null) {
+        return await _fail(
+          response,
+          404,
+          'No upstream for ${decoded['model']}',
+        );
+      }
+      final (upstream, model) = provider;
+      // The turn as Claude's, sent back through this proxy's own endpoint:
+      // the one place an upstream's protocol is spoken.
+      final claude = convertResponsesRequestToClaude(model, decoded);
+      final stream = claude['stream'] == true;
+      final url = Uri.parse(
+        'http://127.0.0.1:${(await (_server ??= _bind())).port}'
+        '/p/${Uri.encodeComponent(upstream.id)}/v1/messages',
+      );
+      final client = await _upstream();
+      final out = await client.postUrl(url);
+      out.headers
+        ..contentType = ContentType.json
+        ..set(HttpHeaders.authorizationHeader, 'Bearer $token')
+        ..set(
+          HttpHeaders.acceptHeader,
+          stream ? 'text/event-stream' : 'application/json',
+        );
+      out.add(utf8.encode(jsonEncode(claude)));
+      final answer = await out.close();
+      if (answer.statusCode >= 400) {
+        return await _fail(
+          response,
+          answer.statusCode,
+          await utf8.decodeStream(answer),
+        );
+      }
+      final lines = answer
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .transform(const LineSplitter());
+      if (!stream) {
+        final text = await lines.join('\n');
+        return await _json(
+          response,
+          200,
+          _claudeMessageToResponses(model, text),
+        );
+      }
+      // As it comes: Codex shows a turn while it is being written.
+      _startEvents(response);
+      final translator = ClaudeToResponsesTranslator(model);
+      await for (final line in lines) {
+        for (final frame in translator.convert(line)) {
+          response.write(frame);
+        }
+        await response.flush();
+      }
+      for (final frame in translator.finish()) {
+        response.write(frame);
+      }
+      return await response.close();
+    } on FormatException catch (error) {
+      await _fail(response, 400, 'The request is not JSON: ${error.message}');
+    } on Object catch (error) {
+      debugPrint('Model proxy (responses): $error');
+      await _fail(response, 502, '$error');
+    }
+  }
+
+  /// The upstream and model [value] names, as Codex's model is written:
+  /// `<provider>/<model>` where that is an upstream's id and it lists the
+  /// model, or else a bare model name that some upstream lists.
+  (ModelProvider, String)? _providerForResponses(String value) {
+    final model = value.trim();
+    if (model.isEmpty) return null;
+    final slash = model.indexOf('/');
+    if (slash > 0) {
+      final named = _provider(model.substring(0, slash));
+      final rest = model.substring(slash + 1);
+      if (named != null && rest.isNotEmpty) return (named, rest);
+    }
+    // A bare model name: the first upstream that has it.
+    for (final id in _providerIds()) {
+      final provider = _provider(id);
+      if (provider == null) continue;
+      if (provider.model(model) != null) return (provider, model);
+    }
+    return null;
+  }
+
+  /// A Claude message as the Responses API's own, for a request that did
+  /// not stream: the same turn, said the other way.
+  Map<String, Object?> _claudeMessageToResponses(String model, String text) {
+    final message = jsonDecode(text);
+    final body = message is Map<String, Object?> ? message : const {};
+    final usage = body['usage'];
+    final input = usage is Map ? (usage['input_tokens'] as num?) ?? 0 : 0;
+    final output = usage is Map ? (usage['output_tokens'] as num?) ?? 0 : 0;
+    final items = <Map<String, Object?>>[];
+    final content = body['content'];
+    for (final block in content is List ? content : const []) {
+      if (block is! Map) continue;
+      final index = items.length;
+      switch (block['type']) {
+        case 'text':
+          items.add({
+            'type': 'message',
+            'id': 'msg_$index',
+            'role': 'assistant',
+            'status': 'completed',
+            'content': [
+              {
+                'type': 'output_text',
+                'text': '${block['text'] ?? ''}',
+                'annotations': const [],
+              },
+            ],
+          });
+        case 'thinking':
+          items.add({
+            'type': 'reasoning',
+            'id': 'rs_$index',
+            'summary': [
+              {'type': 'summary_text', 'text': '${block['thinking'] ?? ''}'},
+            ],
+          });
+        case 'tool_use':
+          items.add({
+            'type': 'function_call',
+            'id': 'fc_$index',
+            'call_id': '${block['id'] ?? ''}',
+            'name': '${block['name'] ?? ''}',
+            'arguments': jsonEncode(block['input'] ?? const {}),
+            'status': 'completed',
+          });
+      }
+    }
+    return {
+      'id': 'resp_${DateTime.now().microsecondsSinceEpoch}',
+      'object': 'response',
+      'created_at': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      'model': model,
+      'status': 'completed',
+      'output': items,
+      'usage': {
+        'input_tokens': input,
+        'output_tokens': output,
+        'total_tokens': input + output,
+      },
+    };
   }
 
   Future<void> _forward(
