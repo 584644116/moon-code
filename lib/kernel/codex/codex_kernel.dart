@@ -4,8 +4,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../chat/chat_models.dart';
-import '../../models/model_provider.dart';
-import '../../models/model_providers.dart';
 import '../agent_kernel.dart';
 import '../kernel_event.dart';
 import '../kernel_types.dart';
@@ -45,8 +43,8 @@ class CodexKernel
   late final StreamSubscription<Map<String, Object?>> _subscription;
 
   @override
-  late final KernelChoiceSource model = LocalChoice.fresh(
-    _modelsOf,
+  late final KernelChoiceSource model = LocalChoice(
+    _models,
     onChanged: (_) => emitInfoChanged(),
   );
 
@@ -74,22 +72,15 @@ class CodexKernel
   @override
   void restart() {}
 
-  /// The models on offer: every model turned on in Settings → Models, on
-  /// any upstream, named as Codex is told them (`<provider>/<model>`); the
-  /// proxy reads that name to find the upstream.
-  static List<KernelOption> _modelsOf() => [
-    for (final provider in ModelProviders.current.enabled)
-      for (final model in provider.enabledModels)
-        KernelOption(
-          '${provider.id}/${model.id}',
-          model.displayName,
-          Icons.bolt_rounded,
-          [
-            provider.name,
-            model.id,
-            if (model.contextWindow case final tokens?) formatTokens(tokens),
-          ].join(' · '),
-        ),
+  static const _models = [
+    KernelOption(
+      'gpt-5.5-codex',
+      'GPT-5.5 Codex',
+      Icons.bolt_rounded,
+      'Tuned for coding',
+    ),
+    KernelOption('gpt-5.5', 'GPT-5.5', Icons.bolt_rounded, 'General purpose'),
+    KernelOption('gpt-5.5-mini', 'GPT-5.5 mini', Icons.bolt_rounded, 'Fastest'),
   ];
 
   /// Modes are its approval and sandbox policies.
@@ -538,9 +529,6 @@ class CodexKernel
       case 'warning' || 'configWarning' || 'guardianWarning':
         final said = params!['message'] ?? params['text'];
         final text = said is String && said.isNotEmpty ? said : '$params';
-        // Every upstream model is one Codex has no metadata for: it says so
-        // each thread, and its fallback is what the turn runs on either way.
-        if (text.startsWith('Model metadata for `')) return;
         emit(
           ItemUpserted(
             nextSeq,
