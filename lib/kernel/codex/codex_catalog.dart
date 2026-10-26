@@ -53,7 +53,7 @@ class CodexCatalog implements SessionCatalog {
       transport,
       'initialize',
       const {
-        'clientInfo': {'name': 'baocode', 'title': 'BaoCode', 'version': '1.0.0'},
+        'clientInfo': {'name': 'baocode', 'title': 'MoonCode', 'version': '1.0.0'},
         'capabilities': {'experimentalApi': false},
       },
     );
@@ -103,6 +103,12 @@ class CodexCatalog implements SessionCatalog {
     do {
       final page = await _request('thread/list', {
         'cwd': ?cwd,
+        // Every provider's threads, not the one this server runs on: Codex
+        // filters by its own provider when the list is left out, so a
+        // session begun on another upstream (the app names a provider per
+        // thread) would vanish from the history the moment the app's
+        // provider changed. Empty asks for all of them.
+        'modelProviders': const <String>[],
         // The protocol's own names, not the responses': its enums are
         // snake_case, and a value it does not know is a rejected request.
         'sortKey': 'updated_at',

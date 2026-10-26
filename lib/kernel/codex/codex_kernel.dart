@@ -122,7 +122,17 @@ class CodexKernel
       'acceptEdits',
       'Accept edits',
       Icons.edit_note_rounded,
-      'Edit the workspace freely, ask before commands',
+      'Edit files freely, ask before commands',
+    ),
+    // Codex's own reviewer, as Claude Code's `auto`: a subagent weighs the
+    // request and approves or refuses it, so the user is asked only about
+    // what it will not decide. It runs on this session's model unless the
+    // catalog has a review model of its own.
+    KernelOption(
+      'auto',
+      'Approve for me',
+      Icons.shield_outlined,
+      'Run what is safe, block what looks risky',
     ),
     KernelOption(
       'fullAccess',
@@ -145,12 +155,23 @@ class CodexKernel
     _ => 'on-request',
   };
 
+  /// Who reviews an approval the policy leaves open. `auto` is Codex's own
+  /// reviewer: a subagent weighs the request and approves or refuses it, so
+  /// the user is asked only about what it will not decide. It runs on this
+  /// session's model where the catalog has no review model of its own.
+  String get _approvalsReviewer => switch (permission.selected) {
+    'auto' => 'auto_review',
+    _ => 'user',
+  };
+
   /// The sandbox [permission]'s pick asks the server for. The server's own
   /// spelling is camelCase here (`dangerFullAccess`, `workspaceWrite`,
   /// `readOnly`), whatever the config file's keys look like.
   String get _sandbox => switch (permission.selected) {
     'fullAccess' => 'dangerFullAccess',
-    'acceptEdits' => 'workspaceWrite',
+    // Both let the workspace be written: what differs is who is asked when
+    // a command would go further — the user, or Codex's own reviewer.
+    'acceptEdits' || 'auto' => 'workspaceWrite',
     _ => 'readOnly',
   };
 
@@ -181,8 +202,9 @@ class CodexKernel
   /// Codex will not go past, and the proxy's catalog carries each model's.
   @override
   late final ModelSetting contextSize = _ContextSetting(
-    selected: () => _context,
-    selectedFor: (model) => _pickedContexts[model] ?? _context,
+    selected: () => '$_contextTokens',
+    // As it stands for [model]: picked, else the window it starts with.
+    selectedFor: (model) => _pickedContexts[model] ?? _windowFor(model),
     select: (model, id) {
       _pickedContexts[model] = id;
       _context = id;
@@ -193,18 +215,23 @@ class CodexKernel
   String? _context;
   final Map<String, String> _pickedContexts = {};
 
-  /// The window in effect: as picked, else what the model holds, else
-  /// Codex's own for a model it knows nothing about.
+  /// The window in effect: as picked, else the one the model starts with,
+  /// else Codex's own for a model it knows nothing about.
   int get _contextTokens =>
       parseTokens(_context ?? '') ??
       modelWindow(model.selected ?? '') ??
       272000;
 
-  /// What [ref] (Codex's `<provider>/<model>`) holds, as Settings → Models
-  /// says; null when it says nothing.
+  /// [model]'s window as it stands: picked, else the one it starts with.
+  static String _windowFor(String model) =>
+      '${modelWindow(model) ?? 272000}';
+
+  /// The window [ref] (Codex's `<provider>/<model>`) starts with, as
+  /// Settings → Models has it; null when it says nothing. Not its largest:
+  /// that one is picked on purpose, as it is on Claude Code.
   static int? modelWindow(String ref) =>
       switch (ModelProviders.current.resolve('@$ref')) {
-        (_, final info) => info.contextOptions.lastOrNull,
+        (_, final info) => info.initialContext,
         null => null,
       };
 
@@ -296,7 +323,7 @@ class CodexKernel
         await _request('initialize', {
           'clientInfo': {
             'name': 'baocode',
-            'title': 'BaoCode',
+            'title': 'MoonCode',
             'version': '1.0.0',
           },
           // Nothing here is experimental: what this adapter reads is the
@@ -327,6 +354,7 @@ class CodexKernel
         // Claude's thinking budget for the upstream.
         'effort': ?effort.selected,
         'approvalPolicy': readOnly ? 'never' : _approvalPolicy,
+        'approvalsReviewer': readOnly ? 'user' : _approvalsReviewer,
         'sandboxPolicy': {'type': readOnly ? 'readOnly' : _sandbox},
       });
       final serverId = (started['turn'] as Map)['id'] as String;
@@ -567,9 +595,11 @@ class CodexKernel
     switch (method) {
       case 'item/commandExecution/requestApproval' ||
           'item/fileChange/requestApproval':
+        // The title as what it asks, not as words: the UI says it in the
+        // reader's language (ApprovalRequest's titleKey).
         final title = method == 'item/commandExecution/requestApproval'
-            ? 'Run command'
-            : 'Apply changes';
+            ? ApprovalTitle.runCommand
+            : ApprovalTitle.applyChanges;
         final preview = method == 'item/commandExecution/requestApproval'
             ? CommandPreview('${params['command']}') as ApprovalPreview?
             : null;
@@ -588,23 +618,32 @@ class CodexKernel
             nextSeq,
             ApprovalRequest(
               id: id,
-              title: title,
+              // The kernel's own words, for a card that cannot localize.
+              title: title == ApprovalTitle.runCommand
+                  ? 'Run command'
+                  : 'Apply changes',
+              titleKey: title,
               toolName: method.split('/')[1],
               reason: params['reason'] as String?,
               preview: preview,
-              // What "always allow" would allow, when the server said.
+              // What "always allow" would allow, when the server said: the
+              // card words it in the reader's language.
               alwaysAllowLabel: amendment.isEmpty
                   ? 'Approve for this session'
                   : 'Always allow ${amendment.join(' ')}',
+              alwaysAllowRule: amendment.isEmpty
+                  ? null
+                  : amendment.join(' '),
+              alwaysAllowForSession: amendment.isEmpty,
             ),
           ),
         );
       case 'item/permissions/requestApproval':
         // More than the turn was given: not offered from here. The model
         // is told, and carries on without it.
-        _refuse(rpcId, 'BaoCode does not widen permissions mid-turn.');
+        _refuse(rpcId, 'MoonCode does not widen permissions mid-turn.');
       case 'item/tool/requestUserInput':
-        _refuse(rpcId, 'BaoCode cannot put that question right now.');
+        _refuse(rpcId, 'MoonCode cannot put that question right now.');
       case 'mcpServer/elicitation/request':
         _transport.write({
           'id': rpcId,
@@ -623,7 +662,7 @@ class CodexKernel
           'result': {'decision': 'denied'},
         });
       default:
-        _refuse(rpcId, 'BaoCode does not handle $method.');
+        _refuse(rpcId, 'MoonCode does not handle $method.');
     }
   }
 

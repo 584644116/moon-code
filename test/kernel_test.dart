@@ -5943,10 +5943,13 @@ exec /usr/bin/env "\$@"
       kernel.model.select('gpt-5.5');
       kernel.mode.select('agent');
 
-      for (final (picked, policy, sandbox) in [
-        ('ask', 'on-request', 'readOnly'),
-        ('acceptEdits', 'on-request', 'workspaceWrite'),
-        ('fullAccess', 'never', 'dangerFullAccess'),
+      for (final (picked, policy, sandbox, reviewer) in [
+        ('ask', 'on-request', 'readOnly', 'user'),
+        ('acceptEdits', 'on-request', 'workspaceWrite', 'user'),
+        // Approve for me: the policy still asks, but Codex's own reviewer
+        // answers, so the user is asked only what it will not decide.
+        ('auto', 'on-request', 'workspaceWrite', 'auto_review'),
+        ('fullAccess', 'never', 'dangerFullAccess', 'user'),
       ]) {
         kernel.permission.select(picked);
         expect(kernel.permission.selected, picked);
@@ -5954,6 +5957,7 @@ exec /usr/bin/env "\$@"
         await pumpEventQueue();
         final turnStart = server.written.last['params'] as Map;
         expect(turnStart['approvalPolicy'], policy);
+        expect(turnStart['approvalsReviewer'], reviewer);
         expect(turnStart['sandboxPolicy'], {'type': sandbox});
       }
 
@@ -5965,6 +5969,8 @@ exec /usr/bin/env "\$@"
       await pumpEventQueue();
       final turnStart = server.written.last['params'] as Map;
       expect(turnStart['approvalPolicy'], 'never');
+      // Nothing is left for a reviewer to decide.
+      expect(turnStart['approvalsReviewer'], 'user');
       expect(turnStart['sandboxPolicy'], {'type': 'readOnly'});
     });
 
@@ -5991,6 +5997,9 @@ exec /usr/bin/env "\$@"
         '200000',
         '1000000',
       ]);
+      // Nothing picked: the window the model starts with, not its largest.
+      expect(kernel.contextSize.selectedFor('up/big'), '200000');
+      expect(kernel.contextWindow, 200000);
       kernel.contextSize.select('up/big', '1000000');
       expect(kernel.contextWindow, 1000000);
 
@@ -6046,6 +6055,13 @@ exec /usr/bin/env "\$@"
           events.whereType<InteractionRequested>().single.request
               as ApprovalRequest;
       expect((approval.preview as CommandPreview).command, 'flutter test');
+      // What it asks, as a name the card says in the reader's language;
+      // the kernel's own words stay for a card that cannot localize.
+      expect(approval.titleKey, ApprovalTitle.runCommand);
+      expect(approval.title, 'Run command');
+      // No rule proposed: allowing it is for this session alone.
+      expect(approval.alwaysAllowForSession, isTrue);
+      expect(approval.alwaysAllowRule, isNull);
       kernel
         ..answer(
           'approval:7',
@@ -6257,6 +6273,9 @@ exec /usr/bin/env "\$@"
           events.whereType<InteractionRequested>().single.request
               as ApprovalRequest;
       expect(approval.alwaysAllowLabel, 'Always allow flutter test');
+      // The rule beside it, which the card words itself.
+      expect(approval.alwaysAllowRule, 'flutter test');
+      expect(approval.alwaysAllowForSession, isFalse);
       kernel.answer(
         approval.id,
         const ApprovalAnswer(ApprovalDecision.allowAlways),

@@ -58,12 +58,15 @@ void main() {
     expect(server.written[1]['method'], 'thread/list');
     expect(server.written[1]['params'], {
       'cwd': '/w',
+      // Every provider's, not the server's own (see the test below).
+      'modelProviders': <String>[],
       'sortKey': 'updated_at',
       'sortDirection': 'desc',
     });
     // The next page follows the cursor the last one gave.
     expect(server.written[2]['params'], {
       'cwd': '/w',
+      'modelProviders': <String>[],
       'sortKey': 'updated_at',
       'sortDirection': 'desc',
       'cursor': 'page-2',
@@ -107,6 +110,19 @@ void main() {
     // The one after starts another server.
     final projects = await catalog.projects();
     expect(projects.single.sessions.single.id, 'b');
+  });
+
+  test('every provider\'s threads are asked for, not the server\'s own', () async {
+    // Codex filters by the provider the server runs on when the list is
+    // left out: a session begun on another upstream (the app names one per
+    // thread) would drop out of the history the moment that changed.
+    final server = _FakeServer()
+      ..pages.add([_thread('a', cwd: '/w', updatedAt: 1)]);
+    await _catalog(server).sessionsIn('/w');
+    final listing = server.written.firstWhere(
+      (message) => message['method'] == 'thread/list',
+    );
+    expect((listing['params'] as Map)['modelProviders'], isEmpty);
   });
 
   test('nothing installed lists nothing, without starting anything', () async {

@@ -5,6 +5,7 @@ import 'package:bao_remote/local.dart'
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart' as p;
 
+import '../../platform/bundled_tools.dart';
 import 'codex_transport.dart';
 
 /// Where the `codex` CLI is, and the environment to run it in.
@@ -58,7 +59,7 @@ abstract final class LocalCodex {
     // Claude's environment lookup, which is the user's shell's: an app
     // opened from the Finder or the Start menu gets a bare PATH, and the
     // codex the user runs is where their rc file put it.
-    final environment = await ClaudeEnvironment.of();
+    final environment = _withBundledTools(await ClaudeEnvironment.of());
     for (final candidate in (candidatesOverride ?? _candidates)(environment)) {
       if (File(candidate).existsSync()) return CodexCli(candidate, environment);
     }
@@ -67,6 +68,21 @@ abstract final class LocalCodex {
       detail: 'Install it (`npm install -g @openai/codex`, or `brew install '
           'codex`), then try again.',
     );
+  }
+
+  /// [environment] with the tools this app keeps for itself on its `PATH`:
+  /// ripgrep, so that a command Codex's model writes (`rg --files`) is found
+  /// the way its own prompts expect. Only when there is one to add.
+  static Map<String, String> _withBundledTools(Map<String, String> environment) {
+    final directory = BundledTools.directory;
+    if (!Directory(directory).existsSync()) return environment;
+    final separator = Platform.isWindows ? ';' : ':';
+    final path = environment['PATH'] ?? '';
+    if (path.split(separator).contains(directory)) return environment;
+    return {
+      ...environment,
+      'PATH': path.isEmpty ? directory : '$directory$separator$path',
+    };
   }
 
   /// Where the CLI usually is: the PATH first, then npm's global bin — its

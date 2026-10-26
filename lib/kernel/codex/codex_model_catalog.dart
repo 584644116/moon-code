@@ -65,10 +65,16 @@ abstract final class CodexModelCatalog {
           'service_tiers': const [
             {'id': 'priority', 'name': 'Fast', 'description': '2x speed'},
           ],
-          // The window, and the ceiling Codex will not raise it past: what
-          // Settings → Models says the model holds.
-          'context_window': windows.lastOrNull,
+          // The window it starts with, and the ceiling Codex will not raise
+          // a picked one past: as Settings → Models has them.
+          'context_window': model.initialContext,
           'max_context_window': windows.lastOrNull,
+          // Not Responses Lite: that mode declares tools in the conversation
+          // (`additional_tools`) and nests them in namespaces, and takes a
+          // freeform tool's answer as `custom_tool_call` — shapes this app's
+          // proxy speaks, but only as a whole. Its own tools arrive the
+          // ordinary way, in `tools`.
+          'use_responses_lite': false,
         });
       }
     }

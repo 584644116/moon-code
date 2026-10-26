@@ -19,6 +19,9 @@ const _template = {
       ],
       'context_window': 272000,
       'max_context_window': 872000,
+      // Codex's own models declare their tools in the conversation
+      // (Responses Lite); a model of this app's does not.
+      'use_responses_lite': true,
       'service_tiers': [
         {'id': 'priority', 'name': 'Fast', 'description': '2x speed'},
       ],
@@ -77,9 +80,12 @@ void main() {
     final models =
         ((jsonDecode((await build())!) as Map)['models'] as List)
             .cast<Map<String, Object?>>();
-    // The one it would not raise a picked window past.
-    expect(models.first['context_window'], 1000000);
+    // The one it starts with, and the ceiling a picked one is held to.
+    expect(models.first['context_window'], 200000);
     expect(models.first['max_context_window'], 1000000);
+    // Its tools arrive in `tools`, not as `additional_tools` items: the
+    // proxy speaks both shapes, but the plain one is what it does whole.
+    expect(models.first['use_responses_lite'], isFalse);
     // What the model offers, in the picker's order.
     expect(models.first['supported_reasoning_levels'], [
       {'effort': 'low', 'description': 'Fastest, least thinking'},
