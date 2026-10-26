@@ -235,19 +235,16 @@ Future<void> main(List<String> arguments) async {
   if (servers.isEmpty) {
     stdout
       ..writeln()
-      ..writeln('The app downloads the remote server published:')
-      ..writeln('  https://dl.baocode.dev/releases/remote/$remoteVersion/');
+      ..writeln('No remote server builds were found for $remoteVersion: the')
+      ..writeln('app asks for one at the address its own build names, and')
+      ..writeln('none is published here.');
   } else {
     stdout
       ..writeln()
-      ..writeln('Upload the remote server\'s builds, which the app downloads')
-      ..writeln('(their folder is named by the build: the macOS one\'s, if it')
-      ..writeln('differs, goes beside it; or publish them with a server-* tag')
-      ..writeln('and package with --remote-release):')
-      ..writeln(
-        '  ${downloads.path}\\*  ->  '
-        'https://dl.baocode.dev/releases/remote/$remoteVersion/',
-      );
+      ..writeln('The remote server builds are beside the installer:')
+      ..writeln('  ${downloads.path}')
+      ..writeln('Publish them where the app asks for them, or build one on')
+      ..writeln('the machine that serves it (tool/build_remote_server.dart).');
   }
   stdout.writeln();
   stdout.writeln(
