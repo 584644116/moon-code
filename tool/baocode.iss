@@ -35,7 +35,12 @@
 ; Base of the identity Windows uses for the installed app. It must not change
 ; between versions, or an upgrade installs beside the old one instead of over
 ; it.
-AppId={{6fdd732b-95c6-4c37-af6f-ff574358deb5}
+;
+; Its own, not the one it was forked from: Setup finds the old install by this
+; AppId and takes its folder, so the old identity put this app in that
+; program's folder and over it — the two could not both be installed, and the
+; old one's icon cache went on covering this one's mark.
+AppId={{f1d13051-450f-4027-a8a0-aa86be107021}
 AppName=MoonCode
 AppVersion={#VersionNumber}
 AppPublisher=MoonCode
