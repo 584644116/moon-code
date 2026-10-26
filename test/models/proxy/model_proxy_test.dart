@@ -555,6 +555,24 @@ void main() {
       expect(promptCacheKey(request(jsonEncode({'device_id': 'd'}))), isNull);
     });
 
+    test('#307 falls back on the session header for a user_id the user set',
+        () {
+      final key = promptCacheKey(
+        request(jsonEncode({'device_id': 'd', 'session_id': session})),
+      );
+      expect(promptCacheKey(request('abcdefghijk'), header: session), key);
+      expect(promptCacheKey(const {}, header: session), key);
+      // The body's own session is taken over the header.
+      expect(
+        promptCacheKey(
+          request(jsonEncode({'session_id': session})),
+          header: 'other',
+        ),
+        key,
+      );
+      expect(sessionId(request('abcdefghijk'), header: ' '), isNull);
+    });
+
     for (final protocol in [
       ProviderProtocol.openaiChat,
       ProviderProtocol.openaiResponses,

@@ -110,15 +110,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   flutter::DartProject project(L"data");
 
-  // Drawn by Skia, as on macOS (FLTEnableImpeller in its Info.plist), not by
-  // Impeller, Flutter's default here since 3.47: through ANGLE, Impeller
-  // took several times as long to draw the chat's frames, and the UI thread
-  // twice as long to build them (the upstream's tool/perf, 2026-10).
-  // BAOCODE_IMPELLER=1 brings it back, to compare.
+  // Drawn by Impeller, Flutter's default here since 3.47. Skia was tried
+  // (faster frames in tool/perf, 2026-10) and left a white strip along the
+  // window's sides and bottom; MOONCODE_SKIA=1 brings it back, to compare.
   project.set_impeller_switch(
-      ::GetEnvironmentVariableW(L"BAOCODE_IMPELLER", nullptr, 0) > 0
-          ? flutter::ImpellerSwitch::Enabled
-          : flutter::ImpellerSwitch::Disabled);
+      ::GetEnvironmentVariableW(L"MOONCODE_SKIA", nullptr, 0) > 0
+          ? flutter::ImpellerSwitch::Disabled
+          : flutter::ImpellerSwitch::Enabled);
 
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();
