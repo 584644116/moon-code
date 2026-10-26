@@ -12,16 +12,22 @@ import 'powershell_io.dart';
 /// on now. A rule written for Public while the machine is on a Private
 /// network does not count, which is the whole point of asking.
 ///
-/// Asking rule by rule (`$r | Get-NetFirewallApplicationFilter`) costs a
-/// query per rule; with a few hundred of them that is minutes, not seconds.
-/// The filters are asked for once and the rules they name looked up
-/// together, which is the same answer for a fraction of the work.
+/// Asking every rule for its application filter (`$r |
+/// Get-NetFirewallApplicationFilter`) costs a query per rule; with a few
+/// hundred of them that is minutes, not seconds. The filters are asked
+/// for on their own, by the program and the port, and each one's rule
+/// taken in the same pipe — the same answer for a fraction of the work.
 Future<FirewallState> checkFirewall(int port) async {
   if (!Platform.isWindows) return FirewallState.unknown;
+  // A filter's `Name` is empty on this system and its rule is named by
+  // `InstanceID`; asking `-Name @($names)` of what `Name` said raised, so
+  // every answer was 'blocked' whatever the rules said. The filters are
+  // asked by the program and the port instead, their rules taken in the
+  // pipe, which is the one query each that takes an argument.
   final script =
       '''
 \$exe = '${_quoted(Platform.resolvedExecutable)}'
-\$port = $port
+\$port = '$port'
 # The profiles the machine is on now: Domain 1, Private 2, Public 4. Asked
 # of the firewall itself; `Get-NetConnectionProfile` is a query of its own.
 \$bits = 0
@@ -31,26 +37,24 @@ if (-not \$bits) { 'unknown'; exit }
 if (\$bits -band 1) { \$covers += 'Domain' }
 if (\$bits -band 2) { \$covers += 'Private' }
 if (\$bits -band 4) { \$covers += 'Public' }
-\$names = New-Object 'System.Collections.Generic.HashSet[string]'
-foreach (\$f in @(Get-NetFirewallApplicationFilter -ErrorAction SilentlyContinue)) {
-  if (\$f.Name -and \$f.Program -eq \$exe) { [void]\$names.Add(\$f.Name) }
-}
-foreach (\$f in @(Get-NetFirewallPortFilter -ErrorAction SilentlyContinue)) {
-  if (-not \$f.Name) { continue }
-  if (("\$(\$f.LocalPorts)" -split ',' | ForEach-Object { \$_.Trim() }) -contains "\$port") {
-    [void]\$names.Add(\$f.Name)
-  }
-}
+# The whole filter is written out each time now: a \$letsIn scriptblock
+# passed as `Where-Object \$letsIn` is taken for a property name and
+# matches nothing, which reads as 'blocked' again.
+\$byProgram = @(Get-NetFirewallApplicationFilter -Program \$exe -ErrorAction SilentlyContinue |
+  Get-NetFirewallRule -ErrorAction SilentlyContinue |
+  Where-Object { "\$(\$_.Direction)" -eq 'Inbound' -and "\$(\$_.Action)" -eq 'Allow' -and "\$(\$_.Enabled)" -eq 'True' })
+\$byPort = @(Get-NetFirewallPortFilter -All -ErrorAction SilentlyContinue |
+  Where-Object { ("\$(\$_.LocalPorts)" -split ',' | ForEach-Object { \$_.Trim() }) -contains \$port } |
+  Get-NetFirewallRule -ErrorAction SilentlyContinue |
+  Where-Object { "\$(\$_.Direction)" -eq 'Inbound' -and "\$(\$_.Action)" -eq 'Allow' -and "\$(\$_.Enabled)" -eq 'True' })
 \$open = \$false
-if (\$names.Count -gt 0) {
-  foreach (\$r in @(Get-NetFirewallRule -Name @(\$names) -Direction Inbound -Action Allow -Enabled True -ErrorAction SilentlyContinue)) {
-    \$profile = "\$(\$r.Profile)"
-    if (\$profile -eq 'Any') { \$open = \$true; break }
-    foreach (\$one in (\$profile -split ',')) {
-      if (\$covers -contains \$one.Trim()) { \$open = \$true; break }
-    }
-    if (\$open) { break }
+foreach (\$r in @(\$byProgram + \$byPort)) {
+  \$profile = "\$(\$r.Profile)"
+  if (\$profile -eq 'Any') { \$open = \$true; break }
+  foreach (\$one in (\$profile -split ',')) {
+    if (\$covers -contains \$one.Trim()) { \$open = \$true; break }
   }
+  if (\$open) { break }
 }
 "open=\$open"
 ''';
@@ -77,8 +81,12 @@ if (\$names.Count -gt 0) {
 Future<bool> allowThroughFirewall(int port) async {
   if (!Platform.isWindows) return false;
   final exe = _quoted(Platform.resolvedExecutable);
+  // A rule that is already there is left alone: the prompt is the whole
+  // cost of this, and asking for an administrator to write what is written
+  // is the terminal someone sees and nothing that needed doing.
   final inner =
       '''
+if (@(Get-NetFirewallRule -DisplayName 'MoonCode Lab' -Direction Inbound -Action Allow -Enabled True -ErrorAction SilentlyContinue).Count -ge 2) { exit 0 }
 Remove-NetFirewallRule -DisplayName 'MoonCode Lab' -ErrorAction SilentlyContinue
 foreach (\$protocol in 'TCP', 'UDP') {
   New-NetFirewallRule -DisplayName 'MoonCode Lab' -Direction Inbound -Action Allow `
