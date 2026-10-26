@@ -6,7 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'kernel_event.dart';
 import 'kernel_types.dart';
 
-/// An agent runtime (Claude Code, Codex, …) behind one interface: the
+/// An agent runtime (Claude Code, …) behind one interface: the
 /// Target of its adapter. What else it can do, it declares by implementing
 /// the capability interfaces below; the UI shows only what is declared.
 abstract interface class AgentKernel {

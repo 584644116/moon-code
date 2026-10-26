@@ -108,10 +108,6 @@ abstract final class MockScript {
       '修改已完成：\n- 输入框使用 `QuillEditor`，随内容增高\n- 支持 `@` 提及和 `/` 命令\n'
       '- 测试正在后台运行，结束后会更新状态';
 
-  static const codexSummary = '修改已完成：\n- 输入框随内容增高，最多 8 行\n- `flutter test` 已通过';
-
-  static const codexDeclined = '好的，先不运行测试。改动已经写入，你可以稍后自己运行 `flutter test`。';
-
   /// Where the plan is kept, as Claude Code names it.
   static const planPath = '/tmp/.claude/plans/growing-input.md';
 
