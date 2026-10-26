@@ -3472,7 +3472,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get generalSettingsClaudeCoreDescription =>
-      'Claude Code CLI：Anthropic 官方程序，沿用本机的登录和配置，用 Claude 订阅请选它。内置：MoonCode 自带，只用 设置 → 模型 里添加的模型。Codex：OpenAI 的编程智能体，同样用这些模型。默认用 CLI，本机没有时会自动下载。改动对新开的会话生效。';
+      'Claude Code CLI：Anthropic 官方程序，沿用本机的登录和配置，用 Claude 订阅请选它。内置：MoonCode 自带，只用 设置 → 模型 里添加的模型。默认用 CLI，本机没有时会自动下载。改动对新开的会话生效。';
 
   @override
   String get generalSettingsClaudeCoreBuiltin => '内置';
@@ -3481,8 +3481,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get generalSettingsClaudeCoreCli => 'Claude Code CLI';
 
   @override
-  String get generalSettingsClaudeCoreCodex => 'Codex';
-
   @override
   String get generalSettingsQueuedMessages => '工作中发送的消息';
 

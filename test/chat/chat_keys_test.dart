@@ -385,35 +385,6 @@ void main() {
     expect(input.focusNode.hasFocus, isTrue);
   });
 
-  testWidgets('Ctrl+Enter allows the tool the agent asks for', (tester) async {
-    final session = await pumpChat(
-      tester,
-      kernel: MockKernels.codex,
-      historyCount: 0,
-    );
-    // Codex asks before it runs the tests.
-    session.send(const ComposerMessage(text: 'fix the composer'));
-    for (var i = 0; i < 400 && session.isStreaming; i++) {
-      switch (session.pendingInteraction) {
-        case ApprovalRequest():
-          break;
-        case QuestionRequest():
-          session.answer(const QuestionAnswer([], skipped: true));
-        case null:
-      }
-      if (session.pendingInteraction is ApprovalRequest) break;
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    final request = session.pendingInteraction;
-    expect(request, isA<ApprovalRequest>());
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byType(InteractionPanel), findsOneWidget);
-
-    await press(tester, LogicalKeyboardKey.enter, control: true);
-    expect(session.pendingInteraction, isNot(same(request)));
-    await stopTurn(tester, session);
-  });
-
   group('a prompt\'s options', () {
     const request = QuestionRequest(
       id: 'q',

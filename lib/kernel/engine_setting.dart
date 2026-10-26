@@ -7,9 +7,9 @@ import 'claude_code/claude_core_setting.dart';
 /// is made of.
 ///
 /// Claude Code has two: MoonCode's own core, written in Dart, and the CLI.
-/// Codex has its own, a process of its own. A new agent starts on the
-/// kernel of the engine picked; the ones already running keep theirs, as
-/// a conversation cannot change kernel once it has started.
+/// A new agent starts on the kernel of the engine picked; the ones already
+/// running keep theirs, as a conversation cannot change kernel once it has
+/// started.
 enum AgentEngine {
   /// The Claude Code CLI, as a process: downloaded the first time where
   /// the machine has none (see LocalClaude).
@@ -19,20 +19,15 @@ enum AgentEngine {
   /// protocol, files and settings as the CLI, in the app itself. It runs
   /// on the upstreams of Settings → Models alone, never on a model the
   /// machine's Claude Code setup names.
-  claudeBuiltin('claude-code', ClaudeCore.builtin),
-
-  /// Codex, OpenAI's coding agent, as its own process. It runs on the
-  /// upstreams of Settings → Models, as the others do.
-  codex('codex', null);
+  claudeBuiltin('claude-code', ClaudeCore.builtin);
 
   const AgentEngine(this.kernelId, this.core);
 
   /// The id of the kernel it makes ([KernelRegistry]'s).
   final String kernelId;
 
-  /// The Claude Code core it picks, for the two of that kernel; null for
-  /// the kernels of their own.
-  final ClaudeCore? core;
+  /// The Claude Code core it picks: the CLI's, or the app's own.
+  final ClaudeCore core;
 
   static const settingKey = 'agent.engine';
 

@@ -62,7 +62,7 @@ Future<ChatSession> _open(
   );
   final session = ChatSession(
     kernel: descriptor,
-    kernels: [descriptor, ...MockKernels.all.skip(1)],
+    kernels: [descriptor],
     kernelContext: KernelContext(
       cwd: '/p',
       resume: SessionRecord(

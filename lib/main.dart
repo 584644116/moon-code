@@ -46,7 +46,6 @@ import 'kernel/claude_code/process_transport.dart';
 import 'kernel/claude_code/turn_stats_stub.dart'
     if (dart.library.io) 'kernel/claude_code/turn_stats_io.dart'
     show turnStatsIn;
-import 'kernel/codex/codex_process_transport.dart';
 import 'kernel/commit_attribution.dart';
 import 'kernel/default_permission.dart';
 import 'kernel/engine_setting.dart';
@@ -130,10 +129,8 @@ import 'workspace/preference_store.dart';
 import 'workspace/window_controls.dart';
 import 'workspace/workspace.dart';
 
-/// The Claude Code core [engine] runs: its own, or the CLI's for Codex,
-/// which is not a Claude Code core at all — Claude Code's sessions run on
-/// the CLI then, as a session cannot be on Codex and Claude Code at once.
-ClaudeCore _coreOf(AgentEngine engine) => engine.core ?? ClaudeCore.cli;
+/// The Claude Code core [engine] runs: the CLI's, or the app's own.
+ClaudeCore _coreOf(AgentEngine engine) => engine.core;
 
 Future<void> main(List<String> arguments) async {
   // All the app keeps is in its data folder: found first, once. One the
@@ -167,7 +164,6 @@ Future<void> main(List<String> arguments) async {
     EventLog.current = EventLog(DataDirectory.current.logsDir);
   }
   unawaited(reapClaudeProcesses());
-  unawaited(reapCodexProcesses());
   unawaited(reapLspProcesses());
   unawaited(reapPtyProcesses());
   // ripgrep, fetched once into the app's own folder where the system has
@@ -251,7 +247,7 @@ Future<void> main(List<String> arguments) async {
     ClaudePathSetting.current = () =>
         ClaudePathSetting.parse(files.settings[ClaudePathSetting.settingKey]);
     // Settings → General → Core: the engine sessions run on (MoonCode's own
-    // core, the Claude Code CLI, or Codex), read as each agent starts.
+    // core, or the Claude Code CLI), read as each agent starts.
     // Unset, the CLI. The core Claude Code runs is the engine's, for the
     // two of that kernel.
     AgentEngine.current = () =>
@@ -760,7 +756,6 @@ class _BaoCodeAppState extends State<BaoCodeApp> {
       }
       await Future.wait([
         stopClaudeProcesses(),
-        stopCodexProcesses(),
         RemoteClaudeTransport.stopAll(),
         stopModelProxy(),
         stopLspProcesses(),

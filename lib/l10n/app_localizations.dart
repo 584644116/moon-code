@@ -6138,7 +6138,6 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Codex'**
-  String get generalSettingsClaudeCoreCodex;
 
   /// No description provided for @generalSettingsQueuedMessages.
   ///

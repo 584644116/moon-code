@@ -456,8 +456,6 @@ class GeneralSettingsPage extends StatelessWidget {
                               l10n.generalSettingsClaudeCoreCli,
                           AgentEngine.claudeBuiltin.name:
                               l10n.generalSettingsClaudeCoreBuiltin,
-                          AgentEngine.codex.name:
-                              l10n.generalSettingsClaudeCoreCodex,
                         },
                         fallback: AgentEngine.fallback.name,
                       ),

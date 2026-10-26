@@ -277,112 +277,7 @@ void main() {
     expect(find.textContaining('hello again'), findsWidgets);
   });
 
-  testWidgets('a new agent picks its kernel until it starts', (tester) async {
-    tester.view.physicalSize = const Size(1400, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    final workspace = Workspace.mock();
-    await tester.pumpWidget(BaoCodeApp(workspace: workspace));
-    await tester.pump();
-    await tester.tap(
-      find.descendant(
-        of: find.byType(Sidebar),
-        matching: find.text('New Chat'),
-      ),
-    );
-    await tester.pump();
 
-    // Claude Code by default, with its models and modes.
-    expect(picker('Claude Code'), findsOneWidget);
-    expect(picker('Opus 5.5'), findsNothing);
-    expect(picker('Auto'), findsOneWidget);
-
-    await tester.tap(picker('Claude Code'));
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text('Codex').last);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-    final thread = workspace.selected;
-    expect(thread.kernel, MockKernels.codex);
-    expect(picker('Codex'), findsOneWidget);
-    expect(picker('GPT-5.5 Codex'), findsOneWidget);
-
-    // Codex has no Plan mode.
-    await tester.tap(picker('Agent'));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Read-only: answer questions'), findsOneWidget);
-    expect(find.text('Plan'), findsNothing);
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await tester.pump(const Duration(milliseconds: 300));
-
-    // Started, the kernel is fixed: no longer offered.
-    thread.session.send(const ComposerMessage(text: '看一下输入框'));
-    await tester.pump();
-    expect(picker('Codex'), findsNothing);
-
-    // The next new agent starts with it.
-    await tester.tap(
-      find.descendant(
-        of: find.byType(Sidebar),
-        matching: find.text('New Chat'),
-      ),
-    );
-    await tester.pump();
-    expect(workspace.selected, isNot(thread));
-    expect(workspace.selected.kernel, MockKernels.codex);
-
-    thread.session.stop();
-    await tester.pump(const Duration(seconds: 1));
-  });
-
-  testWidgets('a Codex agent asks leave, and has no undo or tasks', (
-    tester,
-  ) async {
-    final session = await pumpSession(tester, MockKernels.codex);
-    session.send(const ComposerMessage(text: '把输入框改成随内容增高'));
-    await runWhile(tester, () => session.pendingInteraction == null);
-    expect(find.byType(InteractionPanel), findsOneWidget);
-    expect(find.text('Run command'), findsOneWidget);
-    expect(find.text('Allow once'), findsOneWidget);
-    expect(find.text('Approve for this session'), findsOneWidget);
-
-    await tester.tap(find.text('Allow once'));
-    await tester.pump();
-    expect(find.byType(InteractionPanel), findsNothing);
-    await runWhile(tester, () => session.isStreaming);
-
-    expect(find.byType(ActivityStrip), findsOneWidget);
-    expect(find.text('3 files changed'), findsOneWidget);
-    expect(find.text('Keep all'), findsOneWidget);
-    expect(find.text('Undo all'), findsNothing);
-    expect(find.textContaining('Running ·'), findsNothing);
-    // Done, its work folds before its answer: open it.
-    expect(find.byType(CommandStep), findsNothing);
-    await tester.tap(find.textContaining('Worked for', findRichText: true));
-    // It opens over a moment.
-    await tester.pump();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    // Its command, one line until opened.
-    final command = find.byType(CommandStep);
-    expect(command, findsOneWidget);
-    expect(find.textContaining('All tests passed'), findsNothing);
-    await tester.tap(
-      find.descendant(of: command, matching: find.byType(RichText)).first,
-    );
-    await tester.pump();
-    expect(find.textContaining('All tests passed'), findsOneWidget);
-
-    // Its context comes as a total, without a breakdown.
-    await tester.tap(find.byTooltip('Context usage'));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byType(ContextUsagePanel), findsOneWidget);
-    expect(find.text('Conversation'), findsNothing);
-
-    await tester.tap(find.text('Keep all'));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byType(ActivityStrip), findsNothing);
-  });
 
   testWidgets('Claude Code in Plan mode puts its plan to the user, who '
       'starts it from its card', (tester) async {
@@ -1120,9 +1015,11 @@ void main() {
     expect(session.context?.window, 200000);
   });
 
+  // 820, not 1000: with one kernel on offer there is no kernel picker, so
+  // the composer's row sits further left and the right has room at 1000.
   testWidgets('a model\'s settings open to the left when the right has no '
       'room, and leave the menu where it is', (tester) async {
-    tester.view.physicalSize = const Size(1000, 900);
+    tester.view.physicalSize = const Size(820, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await pumpSession(tester, MockKernels.claudeCode);
