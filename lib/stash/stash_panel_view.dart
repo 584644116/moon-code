@@ -158,8 +158,8 @@ class _StashPanelViewState extends State<StashPanelView> {
     await _controller.clarify(id);
   }
 
-  /// Carries the stash out in BaoCode (see [implementStash]): its project
-  /// and how asked here, the agent made shown in BaoCode's window, the
+  /// Carries the stash out in MoonCode (see [implementStash]): its project
+  /// and how asked here, the agent made shown in MoonCode's window, the
   /// panel out of its way.
   Future<void> _implement(int id, Rect anchor) async {
     await _flush();
@@ -392,7 +392,7 @@ class _TopBar extends StatelessWidget {
   /// nothing written.
   final Widget Function(bool compact)? clarify;
 
-  /// Carries it out in BaoCode, its menus under [Rect]; none while there
+  /// Carries it out in MoonCode, its menus under [Rect]; none while there
   /// is nothing written.
   final void Function(Rect anchor)? implement;
 

@@ -3,7 +3,7 @@
 
 #include <string>
 
-// Which build of the app this copy is: BaoCode's own, or BaoCode Lab, built
+// Which build of the app this copy is: MoonCode's own, or MoonCode Lab, built
 // beside it under another name (tool/build_windows_lab.dart).
 //
 // The two run at the same time, for the same user, so everything Windows
@@ -18,14 +18,14 @@
 // baocode.exe, and are the app's own.
 namespace app_identity {
 
-// Whether this is the build kept beside an installed BaoCode.
+// Whether this is the build kept beside an installed MoonCode.
 bool IsLab();
 
-// The app's name, as Windows shows it: "BaoCode" or "BaoCode Lab".
+// The app's name, as Windows shows it: "MoonCode" or "MoonCode Lab".
 const wchar_t* Name();
 
 // The key under HKEY_CURRENT_USER the app keeps its own settings in, under
-// Software\: "BaoCode" or "BaoCode Lab".
+// Software\: "MoonCode" or "MoonCode Lab".
 const wchar_t* SettingsKey();
 
 // The window property by which a copy of this build finds the one already

@@ -38,7 +38,7 @@ class StashSettings {
   /// Whether the panel shows every stash beside the one written in.
   final bool showAll;
 
-  /// Where the stashes are kept; `~/BaoCode/Stash` when null.
+  /// Where the stashes are kept; `~/MoonCode/Stash` when null.
   final String? directory;
 
   /// How the panel's list of all orders them.

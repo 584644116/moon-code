@@ -9,7 +9,7 @@ import '../../theme/codicons.dart';
 import 'interaction_panel.dart';
 
 /// Over the composer of a Claude Code chat while the core picked is
-/// BaoCode's own: the Claude Code CLI suggested, with a way to switch to
+/// MoonCode's own: the Claude Code CLI suggested, with a way to switch to
 /// it ([onSwitched] once picked, for the session to move to it). Not
 /// shown again in this run once put off. Nothing otherwise.
 class ClaudeCoreHint extends StatefulWidget {

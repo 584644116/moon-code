@@ -376,7 +376,7 @@ class _TabMenu implements ChatItemMenu {
   );
 }
 
-/// What BaoCode watches the user do (see [BrowserWatching]): the task they
+/// What MoonCode watches the user do (see [BrowserWatching]): the task they
 /// were given, their steps so far, and their buttons: done, or give up.
 class _WatchCard extends StatelessWidget {
   const _WatchCard();

@@ -147,7 +147,7 @@ class DiagnosticsUploader {
       home: home,
       windows: windows,
     );
-    final boundary = 'BaoCode${_randomToken()}';
+    final boundary = 'MoonCode${_randomToken()}';
     final body = multipartBody(boundary, {
       'v': schema,
       'version': version,
@@ -161,7 +161,7 @@ class DiagnosticsUploader {
     }, bundle.bytes);
     final client = _sending = _client()
       ..connectionTimeout = timeout
-      ..userAgent = 'BaoCode/$version ($os)';
+      ..userAgent = 'MoonCode/$version ($os)';
     try {
       final request = await client.postUrl(url).timeout(timeout);
       request.headers.contentType = ContentType(

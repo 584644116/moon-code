@@ -9,7 +9,7 @@ import '../platform/data_dir.dart';
 import '../workspace/editor_launcher.dart' show openExternal;
 import 'browser_bridge.dart';
 
-/// Where BaoCode's extension is got. The store's page is the site's to say
+/// Where MoonCode's extension is got. The store's page is the site's to say
 /// (`store` in dl.baocode.dev's releases/extension/latest.json, which
 /// .github/workflows/extension.yml writes): fetched once a run, kept in
 /// the cache for when the site does not answer, and before the first

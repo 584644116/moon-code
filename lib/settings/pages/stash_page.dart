@@ -67,7 +67,7 @@ class _StashSettingsPageState extends State<StashSettingsPage> {
             SettingsRow(
               label: l10n.stashSettingsDirectory,
               description: [
-                current.directory ?? root ?? '~/BaoCode/Stash',
+                current.directory ?? root ?? '~/MoonCode/Stash',
                 if (current.directory != null && current.directory != root)
                   l10n.stashSettingsDirectoryRestart,
               ].join('\n'),

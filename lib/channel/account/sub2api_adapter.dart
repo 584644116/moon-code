@@ -188,7 +188,7 @@ class Sub2ApiAdapter extends AccountAdapter {
   @override
   Future<AccountKey> create(String name, {AccountGroup? group}) async {
     // A key without a group reaches no models: without one picked, the
-    // first group the user may use, Anthropic's first (BaoCode speaks it
+    // first group the user may use, Anthropic's first (MoonCode speaks it
     // best).
     if (group == null) {
       final groups = await this.groups();

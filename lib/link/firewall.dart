@@ -42,11 +42,11 @@ abstract final class LinkFirewall {
   /// The commands a user can run themselves, in an administrator's
   /// terminal, when the prompt was not theirs to answer.
   static List<String> commandsFor(int port) => [
-    'netsh advfirewall firewall delete rule name="BaoCode Lab"',
-    'netsh advfirewall firewall add rule name="BaoCode Lab" '
+    'netsh advfirewall firewall delete rule name="MoonCode Lab"',
+    'netsh advfirewall firewall add rule name="MoonCode Lab" '
         'dir=in action=allow program="${_executable()}" '
         'enable=yes profile=domain,private,public protocol=TCP',
-    'netsh advfirewall firewall add rule name="BaoCode Lab" '
+    'netsh advfirewall firewall add rule name="MoonCode Lab" '
         'dir=in action=allow program="${_executable()}" '
         'enable=yes profile=domain,private,public protocol=UDP',
   ];

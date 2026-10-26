@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'dart:ui' show AppExitResponse, AppExitType;
+import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show ServicesBinding;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:path/path.dart' as p;
@@ -67,9 +66,12 @@ import 'models/model_providers.dart';
 import 'models/model_runtime.dart';
 import 'models/model_welcome.dart';
 import 'network/network_proxy.dart';
-import 'notifications/attention_host.dart';
 import 'notifications/attention_settings.dart';
+import 'dart:io' show Platform;
+
+import 'platform/adopt_former_data.dart';
 import 'platform/app_identity.dart';
+import 'platform/bundled_tools.dart';
 import 'platform/memory_budget.dart';
 import 'platform/app_platform.dart';
 import 'platform/data_dir.dart';
@@ -114,10 +116,6 @@ import 'theme/pixel_snapped_text_scaler.dart';
 import 'theme/ui_zoom.dart';
 import 'theme/workbench_theme.dart';
 import 'update/update_controller.dart';
-import 'update/update_platform.dart';
-import 'update/update_service.dart';
-import 'update/update_settings.dart';
-import 'update/update_store.dart';
 import 'update/version.dart';
 import 'window/app_windows.dart';
 import 'window/code_args.dart';
@@ -150,6 +148,19 @@ Future<void> main(List<String> arguments) async {
       WidgetsFlutterBinding.ensureInitialized();
       DataDirectory.current = await recoverDataDirectory(resolution);
     }
+    // What an older install left under the app's former name: its settings,
+    // keys and sessions, carried in once. Before anything reads them.
+    try {
+      if (await AdoptsFormerData.adopt(
+            DataDirectory.current.path,
+            environment: Platform.environment,
+          )
+          case final from?) {
+        debugPrint('Data: carried over from $from');
+      }
+    } on Object catch (error) {
+      debugPrint('Data: could not carry over: $error');
+    }
     // What goes wrong unseen from here on, kept for the user to send.
     errors = ErrorLog(DataDirectory.current.logsDir)..install();
     // And what the app went through, to read what led to it.
@@ -159,6 +170,19 @@ Future<void> main(List<String> arguments) async {
   unawaited(reapCodexProcesses());
   unawaited(reapLspProcesses());
   unawaited(reapPtyProcesses());
+  // ripgrep, fetched once into the app's own folder where the system has
+  // none: searches are quicker and take the syntax the tools describe. A
+  // failure is not the app's to stop for — it searches in Dart instead.
+  if (!kIsWeb) {
+    unawaited(
+      BundledTools.ensureRipgrep().then(
+        (path) {
+          if (path != null) debugPrint('Tools: ripgrep at $path');
+        },
+        onError: (Object error) => debugPrint('Tools: no ripgrep: $error'),
+      ),
+    );
+  }
   WidgetsFlutterBinding.ensureInitialized();
   MemoryBudget.apply();
   if (!kIsWeb) {
@@ -226,7 +250,7 @@ Future<void> main(List<String> arguments) async {
     // agent starts.
     ClaudePathSetting.current = () =>
         ClaudePathSetting.parse(files.settings[ClaudePathSetting.settingKey]);
-    // Settings → General → Core: the engine sessions run on (BaoCode's own
+    // Settings → General → Core: the engine sessions run on (MoonCode's own
     // core, the Claude Code CLI, or Codex), read as each agent starts.
     // Unset, the CLI. The core Claude Code runs is the engine's, for the
     // two of that kernel.
@@ -430,7 +454,7 @@ Future<void> main(List<String> arguments) async {
   // What shows at launch (settings.json's `workbench.mainWindow`): with
   // windows of the IDE's own, the chat's and those to open again; with
   // the IDE in the main window, its layout. Started for something (Open
-  // with BaoCode or Fast Ide, the `code` command), that alone.
+  // with MoonCode or Fast Ide, the `code` command), that alone.
   final request = AppPlatform.isMacOS
       ? await OpenRequests.launchRequest()
       : LaunchRequest.of(arguments);
@@ -540,30 +564,11 @@ Future<void> main(List<String> arguments) async {
 /// `update.mode` says, from baocode.dev, installed as the app quits. None
 /// where the build does not update itself.
 UpdateController? _startUpdates(SettingsFiles files) {
-  final platform = platformUpdates(
-    updatesDirectory: DataDirectory.current.updatesDir,
-  );
-  if (platform == null) return null;
-  final service = UpdateService(
-    current: currentAppVersion,
-    platform: platform.platform,
-    manifestUrl: platform.manifestUrl,
-    backend: platform.backend,
-    installer: platform.installer,
-    mode: () => UpdateMode.parse(files.settings[UpdateMode.settingKey]),
-    settingsChanges: files.settings,
-    store: GlobalUpdateStore(files.storage),
-  )..start();
-  return UpdateController(
-    service: service,
-    // As the Data Folder page's Quit Now goes, but asked as any quit is.
-    quit: () async {
-      if (AppPlatform.isWindows) return ChannelAttentionHost.instance.quit();
-      await ServicesBinding.instance.exitApplication(AppExitType.cancelable);
-    },
-    openUrl: (url) => openExternal('$url'),
-    openFile: openExternal,
-  );
+  // This build checks nothing upstream. The update manifest was MoonCode's
+  // own, and pointing at it would fetch that project's releases over this
+  // one; the section is not offered in Settings either
+  // (settings_dialog.dart), so nothing asks for a check.
+  return null;
 }
 
 /// The channel build's first start (lib/channel/): to set up while it is

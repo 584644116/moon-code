@@ -11,7 +11,7 @@ import 'app_platform.dart';
 import 'shell_command.dart';
 
 /// The command for the platform the app runs on: macOS's or Windows'; none
-/// for a build kept beside an installed app (BaoCode Lab), whose `code`
+/// for a build kept beside an installed app (MoonCode Lab), whose `code`
 /// command would take the installed app's place on the PATH.
 ShellCommandInstaller? platformShellCommand() {
   if (AppIdentity.isLab) return null;
@@ -43,7 +43,7 @@ Future<ProcessResult> _runProcess(
 
 /// The line a script of ours carries, by which it is told from another
 /// app's `code`.
-const shellCommandMarker = 'BaoCode shell command';
+const shellCommandMarker = 'MoonCode shell command';
 
 /// Whether the file at [path] is a script of ours: the marker in its first
 /// lines (another app's may be a large binary, so only those are read).
@@ -127,12 +127,12 @@ class MacShellCommand implements ShellCommandInstaller {
       '''
 #!/usr/bin/env bash
 # $shellCommandMarker
-# Opens files and folders in BaoCode (installed by BaoCode's "Install '${ShellCommand.name}' command in PATH").
+# Opens files and folders in MoonCode (installed by MoonCode's "Install '${ShellCommand.name}' command in PATH").
 for arg in "\$@"; do
   case "\${arg%%=*}" in
     --) break ;;
     ${CodeArgs.queryOptions.join('|')})
-      echo "${ShellCommand.name}: \$arg is not supported: BaoCode's ${ShellCommand.name} command only opens files and folders." >&2
+      echo "${ShellCommand.name}: \$arg is not supported: MoonCode's ${ShellCommand.name} command only opens files and folders." >&2
       exit 1 ;;
   esac
 done
@@ -279,7 +279,7 @@ String _said(ProcessResult result, String failure) {
 /// `%VARIABLES%`), and the machine's, as expanded.
 typedef WindowsPaths = ({String user, String machine});
 
-/// The Windows command: `code.cmd` in `%LOCALAPPDATA%\BaoCode\bin`, which
+/// The Windows command: `code.cmd` in `%LOCALAPPDATA%\MoonCode\bin`, which
 /// starts the app with what it is given (the copy already running takes
 /// it, see windows/runner/main.cpp), and that folder on the user's PATH.
 ///
@@ -304,7 +304,7 @@ class WindowsShellCommand implements ShellCommandInstaller {
 
   static String _defaultBinDirectory(Map<String, String> environment) {
     final local = environment['LOCALAPPDATA'] ?? '';
-    return local.isEmpty ? '' : p.join(local, 'BaoCode', 'bin');
+    return local.isEmpty ? '' : p.join(local, 'MoonCode', 'bin');
   }
 
   /// The folder the command goes in; empty when there is no
@@ -337,7 +337,7 @@ class WindowsShellCommand implements ShellCommandInstaller {
     'start "" "${executable.replaceAll('%', '%%')}" ${CodeArgs.windowsRequestFlag} "%CD%\\." %*',
     'exit /b 0',
     ':query',
-    'echo ${ShellCommand.name}: %~1 is not supported: BaoCode\'s ${ShellCommand.name} command only opens files and folders. 1>&2',
+    'echo ${ShellCommand.name}: %~1 is not supported: MoonCode\'s ${ShellCommand.name} command only opens files and folders. 1>&2',
     'exit /b 1',
     '',
   ].join('\r\n');
@@ -510,9 +510,9 @@ if ($value) {
   $key.DeleteValue('Path', $false)
 }
 $key.Close()
-Add-Type -Namespace BaoCode -Name Native -MemberDefinition '[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);'
+Add-Type -Namespace MoonCode -Name Native -MemberDefinition '[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);'
 $answer = [UIntPtr]::Zero
-[void][BaoCode.Native]::SendMessageTimeout([IntPtr]0xffff, 0x1A, [UIntPtr]::Zero, 'Environment', 2, 5000, [ref]$answer)
+[void][MoonCode.Native]::SendMessageTimeout([IntPtr]0xffff, 0x1A, [UIntPtr]::Zero, 'Environment', 2, 5000, [ref]$answer)
 ''',
       environment: {'BAOCODE_USER_PATH': value},
     );

@@ -186,7 +186,7 @@ Future<(String, int)> _run(
   return (await stderr, code);
 }
 
-/// [_run] on BaoCode's own core: one turn of an engine in an isolate of its
+/// [_run] on MoonCode's own core: one turn of an engine in an isolate of its
 /// own, set up as [claudeHaikuArguments] sets up the CLI, its messages
 /// given to [onLine] as the CLI prints them (only its result, unless
 /// [stream] or [message]).

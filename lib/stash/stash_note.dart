@@ -23,7 +23,7 @@ enum StashStatus {
       values.where((status) => status.name == value).firstOrNull ?? collected;
 }
 
-/// Where in BaoCode a stash was jotted down (its shortcut pressed there,
+/// Where in MoonCode a stash was jotted down (its shortcut pressed there,
 /// or an agent writing it): the project, its branch and the conversation.
 @immutable
 class StashSource {
@@ -75,7 +75,7 @@ class StashSource {
 }
 
 /// A conversation a stash is carried out in: one a message sent in named
-/// it (`[Stash #12]`), as BaoCode last saw it (see `StashThreads`).
+/// it (`[Stash #12]`), as MoonCode last saw it (see `StashThreads`).
 @immutable
 class StashThreadLink {
   const StashThreadLink({

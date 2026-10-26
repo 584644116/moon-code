@@ -9,7 +9,7 @@ import 'package:path/path.dart' as p;
 import '../platform/app_paths.dart';
 import 'stash_disk.dart';
 
-/// The stash folder on this machine: `~/BaoCode/Stash` by default.
+/// The stash folder on this machine: `~/MoonCode/Stash` by default.
 class FileStashDisk implements StashDisk {
   FileStashDisk([String? root, @visibleForTesting this._watchFolder = _watchOf])
     : root = root ?? defaultRoot;
@@ -20,7 +20,7 @@ class FileStashDisk implements StashDisk {
   final Stream<FileSystemEvent> Function(Directory folder) _watchFolder;
 
   static String get defaultRoot =>
-      p.join(AppPaths.home(Platform.environment), 'BaoCode', 'Stash');
+      p.join(AppPaths.home(Platform.environment), 'MoonCode', 'Stash');
 
   @override
   final String root;

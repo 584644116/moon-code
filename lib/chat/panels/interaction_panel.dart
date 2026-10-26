@@ -146,6 +146,8 @@ class _InteractionPanelState extends State<InteractionPanel>
       :final reason,
       :final preview,
       :final alwaysAllowLabel,
+      :final alwaysAllowRule,
+      :final alwaysAllowForSession,
       :final risk,
       :final reversible,
       :final why,
@@ -159,7 +161,14 @@ class _InteractionPanelState extends State<InteractionPanel>
           why: why,
           rows: [
             _Row(l10n.interactionAllowOnce),
-            if (alwaysAllowLabel != null) _Row(alwaysAllowLabel),
+            // The kernel's rule, when it named one: said here, so that the
+            // row reads in the reader's language rather than the kernel's.
+            if (alwaysAllowRule case final rule?)
+              _Row(l10n.interactionAlwaysAllow(rule))
+            else if (alwaysAllowForSession)
+              _Row(l10n.interactionApproveForSession)
+            else if (alwaysAllowLabel != null)
+              _Row(alwaysAllowLabel),
             _Row(l10n.interactionDeny, textHint: l10n.interactionDenyHint),
           ],
         ),
@@ -399,10 +408,19 @@ class _InteractionPanelState extends State<InteractionPanel>
     IconData icon,
     Color color,
   ) {
+    final l10n = context.l10n;
     final toggle = _collapsed
-        ? context.l10n.interactionExpand
-        : context.l10n.interactionCollapse;
+        ? l10n.interactionExpand
+        : l10n.interactionCollapse;
     final summary = step.prompt.isNotEmpty ? step.prompt : step.header;
+    // What it asks, in the reader's language when the kernel named it.
+    final title = switch (widget.request) {
+      ApprovalRequest(titleKey: ApprovalTitle.runCommand) =>
+        l10n.interactionRunCommand,
+      ApprovalRequest(titleKey: ApprovalTitle.applyChanges) =>
+        l10n.interactionApplyChanges,
+      final request => request.title,
+    };
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _toggleCollapsed,
@@ -418,7 +436,7 @@ class _InteractionPanelState extends State<InteractionPanel>
                 children: [
                   Flexible(
                     child: Text(
-                      widget.request.title,
+                      title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

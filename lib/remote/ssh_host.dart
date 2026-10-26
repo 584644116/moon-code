@@ -102,7 +102,7 @@ class SshHost extends ChangeNotifier implements ProjectHost {
   SshHostState get state => _state;
   SshHostState _state = SshHostState.idle;
 
-  /// What connecting is at (`Installing the BaoCode server…`).
+  /// What connecting is at (`Installing the MoonCode server…`).
   String? get progress => _progress;
   String? _progress;
 

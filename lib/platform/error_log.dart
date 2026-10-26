@@ -151,7 +151,7 @@ class ErrorLog {
         file.renameSync(previousPath);
       }
       _append(
-        '--- BaoCode $appVersionString · ${Platform.operatingSystem} '
+        '--- MoonCode $appVersionString · ${Platform.operatingSystem} '
         '${Platform.operatingSystemVersion} · '
         '${_clock().toIso8601String()} ---\n',
       );

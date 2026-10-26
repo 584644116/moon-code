@@ -432,7 +432,7 @@ class _InUse extends StatelessWidget {
 
 /// A key's name and its group, to make it with: the groups the site lets
 /// the user make one in, each its models at its price; Anthropic's first
-/// picked (BaoCode speaks it best). Without any read, the site picks.
+/// picked (MoonCode speaks it best). Without any read, the site picks.
 class _CreateKeyDialog extends StatefulWidget {
   const _CreateKeyDialog({required this.groups});
 

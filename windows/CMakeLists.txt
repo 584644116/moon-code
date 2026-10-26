@@ -1,19 +1,19 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
-project(baocode LANGUAGES CXX)
+project(mooncode LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "baocode")
+set(BINARY_NAME "mooncode")
 
-# BaoCode Lab (tool/build_windows_lab.dart): the same app built under another
-# name, to be installed beside a BaoCode already there and run at the same
+# MoonCode Lab (tool/build_windows_lab.dart): the same app built under another
+# name, to be installed beside a MoonCode already there and run at the same
 # time. `flutter build windows` takes no CMake definitions of ours, so the
 # build script sets BAOCODE_LAB in the environment instead. Everything
 # Windows tells the two apart by follows from the name (windows/runner/
 # app_identity.cpp) and from this define (Runner.rc).
 if(DEFINED ENV{BAOCODE_LAB})
-  set(BINARY_NAME "baocodelab")
+  set(BINARY_NAME "mooncodelab")
   set(BAOCODE_LAB TRUE)
 endif()
 

@@ -223,7 +223,7 @@ class StashController extends ChangeNotifier {
   int? get editing => _editing;
   int? _editing;
 
-  /// Where the panel was asked for (BaoCode itself or not).
+  /// Where the panel was asked for (MoonCode itself or not).
   StashCapture _capture = StashCapture.none;
 
   /// Counts the panel's showings: each is a new start for it (its text
@@ -245,7 +245,7 @@ class StashController extends ChangeNotifier {
     appEvent(
       'stash',
       'shortcut, ${shown ? 'shown' : 'hidden'}, '
-          'from ${capture.inApp ? 'BaoCode' : 'another app'}',
+          'from ${capture.inApp ? 'MoonCode' : 'another app'}',
     );
     if (!shown) {
       unawaited(present(capture));
@@ -411,7 +411,7 @@ class StashController extends ChangeNotifier {
 
   Future<int>? _creating;
 
-  /// Where a stash made now comes from: BaoCode's project, branch and
+  /// Where a stash made now comes from: MoonCode's project, branch and
   /// conversation when it was jotted down there; nothing otherwise.
   Future<StashSource> sourceOf(StashCapture capture) async {
     if (!capture.inApp) return StashSource.none;

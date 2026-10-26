@@ -6,7 +6,7 @@ import 'claude_code/claude_core_setting.dart';
 /// settings.json), the kernels a new agent may run on, by the engine each
 /// is made of.
 ///
-/// Claude Code has two: BaoCode's own core, written in Dart, and the CLI.
+/// Claude Code has two: MoonCode's own core, written in Dart, and the CLI.
 /// Codex has its own, a process of its own. A new agent starts on the
 /// kernel of the engine picked; the ones already running keep theirs, as
 /// a conversation cannot change kernel once it has started.
@@ -15,7 +15,7 @@ enum AgentEngine {
   /// the machine has none (see LocalClaude).
   claudeCli('claude-code', ClaudeCore.cli),
 
-  /// BaoCode's own core, written in Dart (package:bao_agent): the same
+  /// MoonCode's own core, written in Dart (package:bao_agent): the same
   /// protocol, files and settings as the CLI, in the app itself. It runs
   /// on the upstreams of Settings → Models alone, never on a model the
   /// machine's Claude Code setup names.

@@ -16,7 +16,7 @@ import '../tips/welcome_dialog.dart';
 import 'model_provider.dart';
 import 'model_providers.dart';
 
-/// What a session with no model to run on offers (BaoCode's own core, no
+/// What a session with no model to run on offers (MoonCode's own core, no
 /// upstream turned on): what an upstream is, three lines (any upstream, the
 /// keys kept here, switched any time), and the one thing to do: adding one,
 /// in Settings → Models, the welcome left under it. Done there, the step
@@ -248,7 +248,7 @@ class _ModelWelcomeState extends State<ModelWelcome>
 
 // --- The picture ---------------------------------------------------------------
 
-/// BaoCode's mark in a tile, the makers of models round it on a ring that
+/// MoonCode's mark in a tile, the makers of models round it on a ring that
 /// turns, each upright; a tick on the mark once there is a model.
 class _Picture extends StatelessWidget {
   const _Picture({
@@ -345,7 +345,7 @@ class _Picture extends StatelessWidget {
   }
 }
 
-/// BaoCode's mark in the accent's tile; a tick at its corner once ready.
+/// MoonCode's mark in the accent's tile; a tick at its corner once ready.
 class _Mark extends StatelessWidget {
   const _Mark({required this.ready});
 

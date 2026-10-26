@@ -1,8 +1,8 @@
-// The keybindings BaoCode comes with, written as VS Code's Default Keyboard
+// The keybindings MoonCode comes with, written as VS Code's Default Keyboard
 // Shortcuts (JSON) writes them, and the commands a keybinding may run.
 //
 // The keys are upstream's defaults for the same commands (VS Code
-// 6a598d4a13031703d483d103c1d934a36ad27971), but where BaoCode differs: ⌘J
+// 6a598d4a13031703d483d103c1d934a36ad27971), but where MoonCode differs: ⌘J
 // toggles the chat (upstream: the panel), and ⌃9 / Alt+9 opens the last
 // editor as well as the ninth.
 
@@ -44,7 +44,7 @@ const showSetupGuideCommandId = 'baocode.tips.showSetupGuide';
 /// and their notifications showing again as at a first launch.
 const resetFeatureTipsCommandId = 'baocode.tips.reset';
 
-/// Star BaoCode on GitHub: the ask StarPrompt makes after the first
+/// Star MoonCode on GitHub: the ask StarPrompt makes after the first
 /// conversations, any time.
 const starOnGitHubCommandId = 'baocode.starOnGitHub';
 
@@ -73,7 +73,7 @@ class CommandInfo {
   String get label => category == null ? title : '$category: $title';
 }
 
-/// Every command BaoCode has, by id: those a keybinding can run. One not
+/// Every command MoonCode has, by id: those a keybinding can run. One not
 /// here (another editor's, in an imported `keybindings.json`) is kept but
 /// shown as not supported.
 final Map<String, CommandInfo> commandCatalog = {
@@ -162,7 +162,7 @@ final Map<String, CommandInfo> commandCatalog = {
     ),
     const CommandInfo(
       starOnGitHubCommandId,
-      'Star BaoCode on GitHub',
+      'Star MoonCode on GitHub',
       category: 'Help',
     ),
     const CommandInfo(

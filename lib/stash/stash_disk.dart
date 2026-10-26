@@ -17,7 +17,7 @@ typedef StashFileAdded = ({String path, bool copied, int size});
 /// in `<root>/<id>/`, and `<root>/.stash.json` (the next number, and where
 /// a merged stash's number now leads).
 abstract interface class StashDisk {
-  /// `~/BaoCode/Stash`, or [root] (none on the web).
+  /// `~/MoonCode/Stash`, or [root] (none on the web).
   factory StashDisk.files([String? root]) = platform.FileStashDisk;
 
   /// The folder itself (absolute).

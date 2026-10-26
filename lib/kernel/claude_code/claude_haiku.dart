@@ -23,7 +23,7 @@ import 'claude_haiku_stub.dart'
 ///
 /// With [model] a provider's ([modelRef]), the provider is asked instead:
 /// its Haiku model, or [model] itself when it sets none (or when [exact]).
-/// BaoCode's own core has no Haiku of its own: on it, without one of a
+/// MoonCode's own core has no Haiku of its own: on it, without one of a
 /// provider's, the first upstream's is asked as automatic would.
 ///
 /// It runs where [location] is (a project's): on its host for a remote

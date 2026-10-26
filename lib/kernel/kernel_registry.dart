@@ -75,7 +75,7 @@ abstract final class KernelRegistry {
       '-c',
       'model_provider=${value(_proxyProvider)}',
       '-c',
-      'model_providers.$_proxyProvider.name=${value('BaoCode')}',
+      'model_providers.$_proxyProvider.name=${value('MoonCode')}',
       '-c',
       'model_providers.$_proxyProvider.base_url=${value(endpoint.baseUrl)}',
       '-c',
@@ -85,11 +85,10 @@ abstract final class KernelRegistry {
       '-c',
       'model_providers.$_proxyProvider.experimental_bearer_token='
           '${value(endpoint.token)}',
-      // Approval requests are this app's to ask, as they are for Claude
-      // Code's own tools. Codex's automatic review would otherwise ask for a
-      // model of its own, `codex-auto-review`, which no upstream here has.
-      '-c',
-      'approvals_reviewer=${value('user')}',
+      // Who reviews an approval is the permission pick's to say, per turn
+      // (`approvalsReviewer`): `user` for Ask and Accept edits, Codex's own
+      // reviewer for Approve for me. Not set here, which would fix it for
+      // every turn.
     ];
   }
 

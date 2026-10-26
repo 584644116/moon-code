@@ -58,7 +58,8 @@ enum SettingsCategory {
     SettingsSection.customize,
     SettingsSection.language,
     SettingsSection.keyboard,
-    SettingsSection.updates,
+    // No updates section: this build checks nothing upstream for a newer
+    // version (see UpdatesSettingsPage).
     SettingsSection.about,
   ]),
   advanced([SettingsSection.dataDirectory]);

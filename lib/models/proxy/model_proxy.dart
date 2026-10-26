@@ -13,11 +13,13 @@ import '../launch_environment.dart';
 import '../model_provider.dart';
 import '../upstream.dart';
 import 'translate/claude_to_responses_response.dart';
+import 'translate/json_value.dart';
 import 'translate/openai_chat_request.dart';
 import 'translate/openai_chat_response.dart';
 import 'translate/responses_request.dart';
 import 'translate/responses_response.dart';
 import 'translate/responses_to_claude_request.dart';
+import 'translate/responses_tools.dart';
 import 'translate/thinking.dart';
 
 /// Anthropic's Messages API on this machine, in front of the upstreams
@@ -279,7 +281,13 @@ class ModelProxy {
       }
       // As it comes: Codex shows a turn while it is being written.
       _startEvents(response);
-      final translator = ClaudeToResponsesTranslator(model);
+      // The tools the request declared: how each call comes back (a
+      // freeform one as `custom_tool_call`, a namespace's member with its
+      // namespace).
+      final translator = ClaudeToResponsesTranslator(
+        model,
+        tools: toolsByName(declaredToolsOf(JsonValue.of(decoded))),
+      );
       await for (final line in lines) {
         for (final frame in translator.convert(line)) {
           response.write(frame);

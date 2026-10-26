@@ -27,7 +27,7 @@ PlatformTelemetry? platformTelemetry() {
     url: url,
     os: os,
     arch: arch,
-    sender: IoTelemetrySender(userAgent: 'BaoCode/$currentAppVersion ($os)'),
+    sender: IoTelemetrySender(userAgent: 'MoonCode/$currentAppVersion ($os)'),
   );
 }
 
@@ -52,7 +52,7 @@ class PlatformTelemetry {
 /// A JSON POST over HTTPS.
 class IoTelemetrySender implements TelemetrySender {
   IoTelemetrySender({
-    this.userAgent = 'BaoCode',
+    this.userAgent = 'MoonCode',
     this.timeout = const Duration(seconds: 15),
     HttpClient Function()? client,
   }) : _client = client ?? HttpClient.new;

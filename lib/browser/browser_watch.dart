@@ -18,7 +18,7 @@ const _watchLimit = Duration(minutes: 30);
 /// The binding the page's listeners call.
 const _watchBinding = '__baoWatchStep';
 
-/// What the user does in a shared tab, recorded as BaoCode watches them
+/// What the user does in a shared tab, recorded as MoonCode watches them
 /// (an agent's browser_watch): the conversation shows it, and its buttons
 /// say they are done or give up.
 class BrowserWatching extends ChangeNotifier {

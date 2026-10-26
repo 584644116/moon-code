@@ -10,7 +10,7 @@ import 'editor_launcher_stub.dart'
 
 /// An app a project can be opened in, named as each platform has it.
 enum Editor {
-  /// BaoCode's own editor: the IDE layout, not an app to launch.
+  /// MoonCode's own editor: the IDE layout, not an app to launch.
   fastIde(
     'Fast Ide',
     null,
@@ -68,7 +68,7 @@ enum Editor {
   /// Whether only macOS has it.
   final bool macOSOnly;
 
-  /// Whether it is BaoCode's own ([fastIde]), shown instead of launched.
+  /// Whether it is MoonCode's own ([fastIde]), shown instead of launched.
   final bool builtIn;
 
   /// Its icon: a codicon, as the IDE's own buttons have theirs, but for the

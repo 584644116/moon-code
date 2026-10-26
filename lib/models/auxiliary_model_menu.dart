@@ -9,7 +9,7 @@ import 'model_providers.dart';
 
 /// The choices of an auxiliary model, as Settings → Models gives them:
 /// [autoLabel] first (automatic: [auto], the value it stands for), Claude
-/// Code's own Haiku (for the CLI alone: BaoCode's own core has none), then
+/// Code's own Haiku (for the CLI alone: MoonCode's own core has none), then
 /// each provider's models; [current] checked.
 List<IdeMenuEntry> auxiliaryModelEntries(
   AppLocalizations l10n,

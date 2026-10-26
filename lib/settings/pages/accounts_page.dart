@@ -162,16 +162,16 @@ Uri forgeRevokePage(ForgeAccount account) =>
       ),
     };
 
-/// Where a token for BaoCode is made on [host], what it needs checked.
+/// Where a token for MoonCode is made on [host], what it needs checked.
 Uri forgeNewTokenPage(ForgeKind kind, String host) => switch (kind) {
   ForgeKind.github => Uri.https(host, '/settings/tokens/new', {
     'scopes': 'repo,read:user',
-    'description': 'BaoCode',
+    'description': 'MoonCode',
   }),
   ForgeKind.gitlab => Uri.https(
     host,
     '/-/user_settings/personal_access_tokens',
-    {'name': 'BaoCode', 'scopes': 'api'},
+    {'name': 'MoonCode', 'scopes': 'api'},
   ),
 };
 

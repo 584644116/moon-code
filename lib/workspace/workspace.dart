@@ -750,7 +750,7 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
   }
 
   /// The agents shown each in a window of its own (Explorer's Open with
-  /// BaoCode; see AppWindows.openAgent): what [isShown] counts too.
+  /// MoonCode; see AppWindows.openAgent): what [isShown] counts too.
   Set<AgentThread> _windowAgents = const {};
 
   void showAgentWindows(Iterable<AgentThread> threads) {

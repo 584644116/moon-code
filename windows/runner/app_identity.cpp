@@ -39,27 +39,27 @@ bool IsLab() {
   return ExecutableName() == L"baocodelab";
 }
 
-const wchar_t* Name() { return IsLab() ? L"BaoCode Lab" : L"BaoCode"; }
+const wchar_t* Name() { return IsLab() ? L"MoonCode Lab" : L"MoonCode"; }
 
 const wchar_t* SettingsKey() {
-  return IsLab() ? L"Software\\BaoCode Lab" : L"Software\\BaoCode";
+  return IsLab() ? L"Software\\MoonCode Lab" : L"Software\\MoonCode";
 }
 
 const wchar_t* OpenRequestProperty() {
-  return IsLab() ? L"BaoCodeLab.OpenRequests" : L"BaoCode.OpenRequests";
+  return IsLab() ? L"MoonCodeLab.OpenRequests" : L"MoonCode.OpenRequests";
 }
 
 const wchar_t* SingleInstanceMutex() {
-  return IsLab() ? L"Local\\BaoCodeLab.SingleInstance"
-                 : L"Local\\BaoCode.SingleInstance";
+  return IsLab() ? L"Local\\MoonCodeLab.SingleInstance"
+                 : L"Local\\MoonCode.SingleInstance";
 }
 
 const wchar_t* LoginFolder() {
-  return IsLab() ? L"BaoCodeLab-Login" : L"BaoCode-Login";
+  return IsLab() ? L"MoonCodeLab-Login" : L"MoonCode-Login";
 }
 
 const wchar_t* DataFolder() {
-  return IsLab() ? L"baocodelab" : L"baocode";
+  return IsLab() ? L"mooncodelab" : L"mooncode";
 }
 
 }  // namespace app_identity

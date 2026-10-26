@@ -380,7 +380,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   /// Whether the conversation is a Claude Code one on this machine, whose
-  /// core may be BaoCode's own ([ClaudeCoreHint]).
+  /// core may be MoonCode's own ([ClaudeCoreHint]).
   bool get _localClaudeCode =>
       !kIsWeb &&
       _session.kernel.id == 'claude-code' &&
@@ -962,7 +962,7 @@ class _ChatScreenState extends State<ChatScreen>
                   // Claude Code being downloaded for this machine, or put on
                   // a remote project's host.
                   ClaudeInstallBanner(location: _session.kernelContext.cwd),
-                  // BaoCode's own core picked: the CLI suggested.
+                  // MoonCode's own core picked: the CLI suggested.
                   if (_localClaudeCode) ClaudeCoreHint(onSwitched: _movedToCli),
                   _PanelSlot(
                     child: switch (_session.pendingInteraction) {

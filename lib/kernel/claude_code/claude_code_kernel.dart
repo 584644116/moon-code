@@ -68,7 +68,7 @@ typedef ClaudeSessionForker = Future<String> Function(
 /// plan usage, if one does.
 typedef ClaudeUsageSwitch = Future<String?> Function();
 
-/// [executable], run in [cwd], refused an option BaoCode starts Claude
+/// [executable], run in [cwd], refused an option MoonCode starts Claude
 /// Code with: whether another, newer, may be started instead.
 typedef ClaudeTooOldHandler = Future<bool> Function(
   String cwd,
@@ -206,7 +206,7 @@ class ClaudeCodeKernel
   final ClaudeSessionForker? _forkSession;
   final ClaudeUsageSwitch _usageOffBy;
 
-  /// A build that refused an option BaoCode starts it with, run in a
+  /// A build that refused an option MoonCode starts it with, run in a
   /// folder: whether another, newer, may be started instead (see
   /// [_launch]). None: the user is told to update it.
   final ClaudeTooOldHandler? _rejectTooOld;
@@ -381,7 +381,7 @@ class ClaudeCodeKernel
   }
 
   /// The model asked for, as the CLI names it (e.g. `opus[1m]`), or a
-  /// provider's ([modelRef]). BaoCode's own core has no model of its own:
+  /// provider's ([modelRef]). MoonCode's own core has no model of its own:
   /// on it, one of no upstream is the first upstream's model. A provider's
   /// removed since falls back as the picker shows it: to Claude Code's own
   /// if offered there, else to the first upstream's.
@@ -2630,7 +2630,7 @@ class ClaudeCodeKernel
     );
   }
 
-  /// Whether the CLI refused an option BaoCode starts it with: one from
+  /// Whether the CLI refused an option MoonCode starts it with: one from
   /// before the option was.
   static bool _tooOld(String stderr) => stderr.contains("unknown option '--");
 
@@ -2658,7 +2658,7 @@ class ClaudeCodeKernel
 
   static String _failureMessage(String stderr, {String? remote}) {
     if (_tooOld(stderr)) {
-      return 'Claude Code is older than BaoCode needs. Update it '
+      return 'Claude Code is older than MoonCode needs. Update it '
           '(`claude update`) and try again.';
     }
     final lower = stderr.toLowerCase();
@@ -3125,7 +3125,7 @@ class ClaudeCodeKernel
     options: () {
       final providers = _providers.enabled;
       return [
-        // Shown unless turned off in Settings → Models; never on BaoCode's
+        // Shown unless turned off in Settings → Models; never on MoonCode's
         // own core, which runs on the upstreams alone.
         if (_providers.builtinOffered)
           if (_models.isEmpty)
@@ -3176,7 +3176,7 @@ class ClaudeCodeKernel
     },
     selected: () {
       if (_custom != null) return _model;
-      // BaoCode's own core with no upstream: none to run on.
+      // MoonCode's own core with no upstream: none to run on.
       if (!_providers.builtinAvailable) return null;
       return switch (_currentModel?.value) {
         final value? => _baseOf(value),
@@ -3437,7 +3437,7 @@ class ClaudeCodeKernel
 
   /// Whether the CLI's auto mode classifier runs on the model: not on
   /// another provider's, nor on one it does not support. Elsewhere auto
-  /// mode is BaoCode's (see [_permission]).
+  /// mode is MoonCode's (see [_permission]).
   bool get _classifies =>
       _custom == null && (_currentModel?.supportsAuto ?? true);
 
@@ -3531,7 +3531,7 @@ class ClaudeCodeKernel
   @override
   late final KernelChoiceSource permission = _Choice(
     // Auto is offered on every model: where the CLI's classifier does not
-    // run on the one picked, BaoCode's does (see _permission).
+    // run on the one picked, MoonCode's does (see _permission).
     options: () => _approvals,
     selected: () => _approval,
     select: (id) {

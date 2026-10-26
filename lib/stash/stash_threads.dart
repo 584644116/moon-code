@@ -7,7 +7,7 @@ import 'stash_note.dart';
 import 'stash_store.dart';
 
 /// Every `[Stash #12]` in a message: how one names a stash (its tag, one
-/// dropped in, "Implement in BaoCode"'s message alike).
+/// dropped in, "Implement in MoonCode"'s message alike).
 final stashReferencePattern = RegExp(r'\[Stash #(\d+)\]');
 
 /// The pull (merge) requests [items] link to, in what the agent said or

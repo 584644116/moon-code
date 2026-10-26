@@ -24,7 +24,7 @@ Future<String?> fetchPageTitle(String url) async {
     request.headers.set(HttpHeaders.acceptHeader, 'text/html');
     request.headers.set(
       HttpHeaders.userAgentHeader,
-      'Mozilla/5.0 (Macintosh) BaoCode',
+      'Mozilla/5.0 (Macintosh) MoonCode',
     );
     final response = await request.close().timeout(const Duration(seconds: 5));
     if (response.statusCode >= 400) return null;
@@ -139,7 +139,7 @@ Future<Uint8List?> readBytesFile(String path) async {
 
 /// Writes the Stash skill ([StashSkill]), for the stash folder [root],
 /// into Claude Code's skills on this machine: where there is none, or
-/// BaoCode's is not the same.
+/// MoonCode's is not the same.
 Future<void> installStashSkill(String root) async {
   try {
     final path = p.join(

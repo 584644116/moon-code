@@ -73,8 +73,8 @@ class DataDirectory {
   final DataDirectorySource source;
 
   /// Where the user's own files are, when this build keeps them beside
-  /// another's rather than its own: BaoCode Lab reads and writes the
-  /// installed BaoCode's `User/`, `argv.json`, `keymaps/` and `secrets/`
+  /// another's rather than its own: MoonCode Lab reads and writes the
+  /// installed MoonCode's `User/`, `argv.json`, `keymaps/` and `secrets/`
   /// (see [AppIdentity]). Null for a build that keeps its own.
   final String? shared;
 
@@ -92,7 +92,7 @@ class DataDirectory {
   String get keymapsDir => p.join(userRoot, 'keymaps');
 
   /// The providers' keys, where the system has no keychain of its own:
-  /// read as an installed BaoCode's are, so that a key added in one is
+  /// read as an installed MoonCode's are, so that a key added in one is
   /// there in the other.
   String get secretsDir => p.join(userRoot, 'secrets');
 
@@ -185,7 +185,7 @@ class DataDirectory {
 
   /// The platform's place for it: `%APPDATA%\baocode` on Windows,
   /// `~/Library/Application Support/baocode` on macOS, `~/.config/baocode`
-  /// elsewhere; BaoCode Lab's own folder beside it (`baocodelab`).
+  /// elsewhere; MoonCode Lab's own folder beside it (`baocodelab`).
   static String defaultPath(Map<String, String> environment) =>
       AppPaths.dataDir(environment, folder: AppIdentity.dataFolder);
 

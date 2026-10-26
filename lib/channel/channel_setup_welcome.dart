@@ -20,7 +20,7 @@ import 'channel_setup.dart';
 
 /// The channel build's way in ([ChannelGate]): its first start's setup,
 /// which stays till done; then its channel's welcome (channels.json): its
-/// logo beside BaoCode's, its words, and Sign In, which opens the login
+/// logo beside MoonCode's, its words, and Sign In, which opens the login
 /// window on its account site. It closes once signed in, and not before;
 /// a channel the build cannot be used with says so, and stays.
 /// [trouble], Having trouble?: the diagnostics' upload.
@@ -50,7 +50,7 @@ class _ChannelSetupWelcomeState extends State<ChannelSetupWelcome>
     duration: const Duration(milliseconds: 1300),
   )..forward();
 
-  /// The dot going from BaoCode to the browser, again and again, while it
+  /// The dot going from MoonCode to the browser, again and again, while it
   /// waits.
   late final AnimationController _travel = AnimationController(
     vsync: this,
@@ -174,7 +174,7 @@ class _ChannelSetupWelcomeState extends State<ChannelSetupWelcome>
     if (account.signedIn) {
       unawaited(account.settle());
     } else {
-      unawaited(account.signIn(title: _gate.channel?.info.name ?? 'BaoCode'));
+      unawaited(account.signIn(title: _gate.channel?.info.name ?? 'MoonCode'));
     }
   }
 
@@ -608,7 +608,7 @@ class _Link extends StatelessWidget {
 
 // --- The picture ---------------------------------------------------------------
 
-/// BaoCode's window and the browser's, fanned out, afloat, an arc between:
+/// MoonCode's window and the browser's, fanned out, afloat, an arc between:
 /// a dot going along it while it waits; once done, the arc green and a
 /// tick on the browser's page.
 class _Picture extends StatelessWidget {
@@ -656,7 +656,7 @@ class _Picture extends StatelessWidget {
             turn: .03,
             child: _MiniWindow(app: false, done: done),
           ),
-          // Over them, from the top of BaoCode's window to the browser's.
+          // Over them, from the top of MoonCode's window to the browser's.
           Positioned.fill(
             child: Opacity(
               opacity: way.value.clamp(0.0, 1.0),
@@ -698,7 +698,7 @@ class _Picture extends StatelessWidget {
   }
 }
 
-/// A window, small: BaoCode's, its sidebar and its logo; or the browser's,
+/// A window, small: MoonCode's, its sidebar and its logo; or the browser's,
 /// baocode.dev in its address bar, a tick on its page once done.
 class _MiniWindow extends StatelessWidget {
   const _MiniWindow({required this.app, this.done = false});
@@ -997,7 +997,7 @@ class _Failed extends StatelessWidget {
   }
 }
 
-/// A channel's welcome's picture: its logo and BaoCode's, side by side,
+/// A channel's welcome's picture: its logo and MoonCode's, side by side,
 /// a × between, coming in; confetti bursting out from between them, then
 /// afloat.
 class _ChannelPicture extends StatelessWidget {

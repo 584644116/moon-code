@@ -354,7 +354,7 @@ List<String> _troubles(BrowserTab tab, DateTime since) {
     ].take(6),
     for (final dialog in records.dialogs(tab))
       if (!dialog.time.isBefore(since))
-        '${dialog.describe()}${dialog.answer == 'dismissed' && dialog.by == 'BaoCode' ? ' To accept it: browser_dialog accept, then again.' : ''}',
+        '${dialog.describe()}${dialog.answer == 'dismissed' && dialog.by == 'MoonCode' ? ' To accept it: browser_dialog accept, then again.' : ''}',
     for (final download in records.downloads(tab))
       if (!download.time.isBefore(since))
         'Download: ${download.name} (${_clip(download.url, 120)}): '

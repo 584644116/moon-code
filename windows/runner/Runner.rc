@@ -53,6 +53,7 @@ END
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
 IDI_APP_ICON            ICON                    "resources\\app_icon.ico"
+IDI_TRAY_ICON           ICON                    "resources\\tray_icon.ico"
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -73,13 +74,13 @@ IDI_APP_ICON            ICON                    "resources\\app_icon.ico"
 #endif
 
 // What Windows shows for the app (Properties → Details, the task manager):
-// the build kept beside an installed BaoCode calls itself BaoCode Lab
+// the build kept beside an installed MoonCode calls itself MoonCode Lab
 // (windows/CMakeLists.txt, BAOCODE_LAB).
 #if defined(BAOCODE_LAB)
-#define APP_NAME "BaoCode Lab"
+#define APP_NAME "MoonCode Lab"
 #define APP_EXE "baocodelab.exe"
 #else
-#define APP_NAME "BaoCode"
+#define APP_NAME "MoonCode"
 #define APP_EXE "baocode.exe"
 #endif
 
@@ -100,11 +101,11 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "BaoCode" "\0"
+            VALUE "CompanyName", "MoonCode" "\0"
             VALUE "FileDescription", APP_NAME "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", APP_EXE "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 BaoCode. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 MoonCode. All rights reserved." "\0"
             VALUE "OriginalFilename", APP_EXE "\0"
             VALUE "ProductName", APP_NAME "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

@@ -141,7 +141,7 @@ class _StartupSplashState extends State<StartupSplash>
 }
 
 /// The mark on its tile: a dark square, rounded as the app's icons are,
-/// with BaoCode's logo in white — the same in every theme, as ZCode's is,
+/// with MoonCode's logo in white — the same in every theme, as ZCode's is,
 /// so the start looks the same whatever the workbench comes up as.
 class _Mark extends StatelessWidget {
   const _Mark();

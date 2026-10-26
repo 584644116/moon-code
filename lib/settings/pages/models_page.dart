@@ -222,7 +222,7 @@ class _ModelsSettingsPageState extends State<ModelsSettingsPage> {
     final l10n = context.l10n;
     if (value == null) return l10n.modelsAuxiliaryAuto;
     if (value == builtinProviderId) {
-      // Not there on BaoCode's own core: automatic in its place.
+      // Not there on MoonCode's own core: automatic in its place.
       return _providers.builtinAvailable
           ? l10n.modelsAuxiliaryBuiltin
           : l10n.modelsAuxiliaryAuto;
@@ -374,7 +374,7 @@ class _ModelsSettingsPageState extends State<ModelsSettingsPage> {
           title: l10n.modelsProviders,
           children: [
             // Claude Code as set up on this machine: the CLI's alone, not
-            // BaoCode's own core's.
+            // MoonCode's own core's.
             if (_providers.builtinAvailable)
               _ProviderRow(
                 icon: const ProviderIcon(builtinProviderId, size: 16),
@@ -387,7 +387,7 @@ class _ModelsSettingsPageState extends State<ModelsSettingsPage> {
                 onEnabled: (value) =>
                     unawaited(_providers.setBuiltinHidden(!value)),
               ),
-            // The newest at a site BaoCode lists first (one imported later
+            // The newest at a site MoonCode lists first (one imported later
             // takes the place of one before); the rest in their order.
             for (final provider in [
               ?pinned,

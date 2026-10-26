@@ -4,6 +4,7 @@
 // Settings → Models, whatever protocol they speak.
 
 import 'json_value.dart';
+import 'responses_tools.dart';
 import 'thinking.dart';
 
 /// The `instructions` and developer messages of a Responses request, as
@@ -59,6 +60,9 @@ Map<String, Object?> convertResponsesRequestToClaude(
   } else if (input.isArray) {
     for (final item in input.array) {
       switch (item.get('type').string) {
+        case 'additional_tools':
+          // A declaration, not a turn: read as tools (declaredToolsOf).
+          break;
         case 'message':
           final role = item.get('role').string;
           final texts = _messageText(item.get('content'));
@@ -119,28 +123,14 @@ Map<String, Object?> convertResponsesRequestToClaude(
   final out = <String, Object?>{'model': model, 'messages': messages};
   if (system.isNotEmpty) out['system'] = system;
 
-  final tools = root.get('tools');
-  if (tools.isArray) {
-    final converted = <Map<String, Object?>>[];
-    for (final tool in tools.array) {
-      // A hosted tool (web search and the like) is the upstream's to
-      // provide, not this app's to send.
-      if (tool.get('type').string != 'function') continue;
-      final name = tool.get('name').string;
-      if (name.isEmpty) continue;
-      converted.add({
-        'name': name,
-        if (tool.get('description').string case final description
-            when description.isNotEmpty)
-          'description': description,
-        'input_schema': _schema(tool.get('parameters')),
-      });
-    }
-    if (converted.isNotEmpty) {
-      out['tools'] = converted;
-      if (_toolChoice(root.get('tool_choice')) case final choice?) {
-        out['tool_choice'] = choice;
-      }
+  final declared = declaredToolsOf(root);
+  if (declared.isNotEmpty) {
+    final converted = [
+      for (final tool in declared) _claudeTool(tool),
+    ];
+    out['tools'] = converted;
+    if (_toolChoice(root.get('tool_choice')) case final choice?) {
+      out['tool_choice'] = choice;
     }
   }
 
@@ -163,6 +153,29 @@ Map<String, Object?> convertResponsesRequestToClaude(
   out['stream'] = root.get('stream').value == true;
   return out;
 }
+
+/// [tool] as Claude's: its own name, and its input schema.
+///
+/// A freeform tool — Codex's `exec`, which takes raw source rather than a
+/// JSON object — is sent as a tool of one string argument, so an upstream
+/// that speaks only JSON schemas can still call it; the response side reads
+/// that argument back as the call's `input`.
+Map<String, Object?> _claudeTool(DeclaredTool tool) => {
+  'name': tool.name,
+  if (tool.description.isNotEmpty) 'description': tool.description,
+  'input_schema': tool.freeform
+      ? {
+          'type': 'object',
+          'properties': {
+            freeformInputKey: {
+              'type': 'string',
+              'description': 'The tool input, as its own source text.',
+            },
+          },
+          'required': [freeformInputKey],
+        }
+      : _schema(tool.parameters),
+};
 
 /// A message item's content as its texts: a plain string, or the parts of
 /// an array that carry text. An image or a file is left out, as Claude
@@ -207,8 +220,8 @@ Object? _toolOutput(JsonValue output) {
 
 /// A function tool's `parameters` as Claude's `input_schema`: an object
 /// with a type, as Claude needs, whatever it was given.
-Map<String, Object?> _schema(JsonValue parameters) {
-  if (!parameters.isObject) {
+Map<String, Object?> _schema(JsonValue? parameters) {
+  if (parameters == null || !parameters.isObject) {
     return {'type': 'object', 'properties': <String, Object?>{}};
   }
   final schema = (parameters.value! as Map).cast<String, Object?>();

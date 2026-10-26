@@ -1,4 +1,4 @@
-// What BaoCode asks a forge, signed in as the user (see forge_accounts):
+// What MoonCode asks a forge, signed in as the user (see forge_accounts):
 // GitHub's REST API (api.github.com, a GitHub Enterprise's /api/v3) and
 // GitLab's (/api/v4). Over [ForgeHttp], which tests answer themselves.
 
@@ -486,7 +486,7 @@ class GitHubApi extends ForgeApi {
         'PUT',
         '/repos/${repo.path}/contents/$path',
         json: {
-          'message': 'Add a picture from BaoCode Stash',
+          'message': 'Add a picture from MoonCode Stash',
           'content': base64Encode(bytes),
           'branch': assetsBranch,
         },
@@ -519,7 +519,7 @@ class GitHubApi extends ForgeApi {
               'mode': '100644',
               'type': 'blob',
               'content':
-                  'Pictures of the issues opened from BaoCode\'s '
+                  'Pictures of the issues opened from MoonCode\'s '
                   'Stash (https://baocode.dev).\n',
             },
           ],
@@ -529,7 +529,7 @@ class GitHubApi extends ForgeApi {
         'POST',
         '$at/git/commits',
         json: {
-          'message': 'BaoCode Stash pictures',
+          'message': 'MoonCode Stash pictures',
           'tree': tree['sha'],
           'parents': const <String>[],
         },

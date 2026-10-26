@@ -1,11 +1,11 @@
 // Allow rules that would let auto mode be bypassed.
 //
-// In auto mode BaoCode judges the actions the CLI asks about. A rule like
+// In auto mode MoonCode judges the actions the CLI asks about. A rule like
 // `Bash(python:*)` lets an action through before the CLI asks, so the
 // classifier never sees it; so does any allow rule for the Agent tool,
 // whose subagents are then started without being weighed. The CLI strips
 // such rules when its own auto mode is entered, but with another provider's
-// model it runs in `default` and BaoCode classifies, so the rules stay in
+// model it runs in `default` and MoonCode classifies, so the rules stay in
 // effect. This finds them, to tell the user.
 //
 // The shapes are the CLI's (see its dangerousPatterns and

@@ -18,7 +18,7 @@ Future<AccountResponse> sendToAccountSite(
   final client = HttpClient()
     ..connectionTimeout = _timeout
     ..findProxy = route.findProxy
-    ..userAgent = 'BaoCode/$currentAppVersion (${Platform.operatingSystem})';
+    ..userAgent = 'MoonCode/$currentAppVersion (${Platform.operatingSystem})';
   try {
     final request = await client.openUrl(method, url).timeout(_timeout);
     request.followRedirects = false;

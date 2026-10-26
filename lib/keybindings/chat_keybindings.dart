@@ -11,14 +11,14 @@
 // src/vs/editor/contrib/suggest/browser/suggestController.ts (the suggest
 // widget's keys, for the @ and / menu); the context keys are upstream's
 // (src/vs/workbench/contrib/chat/common/actions/chatContextKeys.ts) where
-// BaoCode has the same.
+// MoonCode has the same.
 //
 // Deviations:
 // - New Chat starts a new agent, anywhere in the chat window (upstream: in
 //   the chat), on ⌘N/Ctrl+N only: its secondary ⌃L/Ctrl+L is Focus Chat
 //   Input's, which also has ⌘L/Ctrl+L, as Cursor has it. In the IDE, from
 //   its chat, ⌘N/Ctrl+N starts a chat there and ⌘W/Ctrl+W closes its tab
-//   (BaoCode's `baocode.chat.closeTab`), as Close Editor an editor's. From
+//   (MoonCode's `baocode.chat.closeTab`), as Close Editor an editor's. From
 //   a subagent's conversation, Focus Chat Input goes back to the chat's.
 // - Cancel also takes a plain Escape in the input while a turn runs, as the
 //   agents' own terminals do; Accept and Skip need no focus in the chat (in
@@ -33,7 +33,7 @@
 // - The @ and / menu's keys are commands of their own
 //   (`baocode.chat.*Suggestion*`), not the editor's suggest widget's; the chat
 //   history's are the list's (`list.focusDown`, …), which scroll it.
-// - BaoCode's own: the agents and the panes they show in, a prompt's options
+// - MoonCode's own: the agents and the panes they show in, a prompt's options
 //   (`baocode.chat.*`), the side panel's pages and tabs: ⌘W/Ctrl+W closes
 //   its tab in front while the focus is in it, as Close Editor (elsewhere
 //   Close Pane).

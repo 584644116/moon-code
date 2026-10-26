@@ -1,6 +1,6 @@
 part of 'browser_tools.dart';
 
-// What the tabs shared with BaoCode did, kept on disk as it happens, an
+// What the tabs shared with MoonCode did, kept on disk as it happens, an
 // agent there or not, over the app's restarts: the pages they went to, the
 // requests their pages made, the console's errors and warnings, dialogs,
 // downloads. In detailed mode (Settings → Browser) the requests' and the
@@ -535,7 +535,7 @@ DateTime? _historyTime(String? text, DateTime now) {
 final _historyTool = ClaudeSdkTool(
   name: 'browser_history',
   description:
-      'What happened in the tabs shared with BaoCode, kept as it happened '
+      'What happened in the tabs shared with MoonCode, kept as it happened '
       'even when no agent was looking, over restarts and in closed tabs: '
       'the pages gone to, the requests (method, status, time, initiator, '
       'headers), console errors and warnings, dialogs, downloads; with '

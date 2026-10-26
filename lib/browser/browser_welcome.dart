@@ -217,7 +217,7 @@ class _BrowserWelcomeState extends State<BrowserWelcome>
 
 // --- The picture ---------------------------------------------------------------
 
-/// A browser window, its yellow BaoCode tab group in front, an agent's
+/// A browser window, its yellow MoonCode tab group in front, an agent's
 /// pointer clicking a button on its page; the side panel beside it,
 /// showing the same page and the step it took.
 class _Picture extends StatelessWidget {
@@ -299,7 +299,7 @@ Widget _bar(double width, {double height = 6, Color? color}) => Container(
   ),
 );
 
-/// The browser: its tab strip (the BaoCode group's two tabs, one of the
+/// The browser: its tab strip (the MoonCode group's two tabs, one of the
 /// user's beside them), a page with a button, and the agent's pointer.
 class _Window extends StatelessWidget {
   const _Window({
@@ -372,7 +372,7 @@ class _Window extends StatelessWidget {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Text(
-                        'BaoCode',
+                        'MoonCode',
                         style: TextStyle(
                           color: Color(0xFF1B1A17),
                           fontSize: 8.5,
@@ -536,7 +536,7 @@ class _ArrowPainter extends CustomPainter {
   bool shouldRepaint(_ArrowPainter oldDelegate) => false;
 }
 
-/// BaoCode's side panel: the page small, and the step the agent took.
+/// MoonCode's side panel: the page small, and the step the agent took.
 class _Panel extends StatelessWidget {
   const _Panel({required this.clicked});
 

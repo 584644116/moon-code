@@ -179,14 +179,14 @@ class DownloadedServerBinaries implements RemoteServerBinaries {
     } on Object catch (error) {
       throw SshConnectException(
         SshFailure.server,
-        'The BaoCode server for $name could not be downloaded',
+        'The MoonCode server for $name could not be downloaded',
         detail: '${download.url}: $error',
       );
     }
     if (!download.matches(bytes)) {
       throw SshConnectException(
         SshFailure.server,
-        'The BaoCode server downloaded for $name is not the one this '
+        'The MoonCode server downloaded for $name is not the one this '
         'app was built with',
         detail: '${download.url}',
       );
@@ -361,7 +361,7 @@ class SourceServerBinaries implements RemoteServerBinaries {
     if (os == 'darwin' && platform != host) {
       throw SshConnectException(
         SshFailure.server,
-        'The BaoCode server for $name can only be built on a Mac of that '
+        'The MoonCode server for $name can only be built on a Mac of that '
         'architecture: run tool/build_remote_server.dart there',
       );
     }
@@ -391,7 +391,7 @@ class SourceServerBinaries implements RemoteServerBinaries {
         _built.remove(platform);
         throw SshConnectException(
           SshFailure.server,
-          'The BaoCode server could not be built for $name',
+          'The MoonCode server could not be built for $name',
           detail: '${result.stdout}\n${result.stderr}'.trim(),
         );
       }

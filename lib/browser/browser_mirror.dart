@@ -17,7 +17,7 @@ import 'browser_bridge.dart';
 import 'browser_keys.dart';
 import 'browser_tools.dart';
 
-/// A tab of the user's browser shared with BaoCode, as it is now: the one
+/// A tab of the user's browser shared with MoonCode, as it is now: the one
 /// an agent last used, or one picked from the shared. Its page is shown as
 /// the browser draws it (its screencast while the tab is in front, which
 /// stops behind another; screenshots then), and what the user does here is

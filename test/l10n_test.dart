@@ -11,6 +11,7 @@ import 'package:bao_editor/monaco/flutter/editor_keybindings.dart';
 import 'package:baocode/ide/ide_commands.dart';
 import 'package:baocode/ide/ide_quick_open.dart';
 import 'package:baocode/kernel/agent_kernel.dart';
+import 'package:baocode/kernel/kernel_types.dart';
 import 'package:baocode/kernel/claude_code/claude_code_kernel.dart';
 import 'package:baocode/kernel/mock/mock_kernels.dart';
 import 'package:baocode/keybindings/default_keybindings.dart';
@@ -576,6 +577,73 @@ void main() {
     expect(
       localizedKernelOption(_zh, 'codex', KernelChoiceKind.mode, other),
       same(other),
+    );
+  });
+
+  test('Codex\'s approvals are said in the app\'s language too', () {
+    // Its own three, by the ids it picks with: nothing is built here, as
+    // what is localized is the words alone.
+    const options = [
+      KernelOption(
+        'ask',
+        'Ask for approval',
+        Icons.front_hand_outlined,
+        'Ask before edits and commands',
+      ),
+      KernelOption(
+        'acceptEdits',
+        'Accept edits',
+        Icons.edit_note_rounded,
+        'Edit files freely, ask before commands',
+      ),
+      KernelOption(
+        'auto',
+        'Approve for me',
+        Icons.shield_outlined,
+        'Run what is safe, block what looks risky',
+      ),
+      KernelOption(
+        'fullAccess',
+        'Full access',
+        Icons.gpp_maybe_outlined,
+        'No checks: edits and commands run without asking',
+        caution: true,
+      ),
+    ];
+    for (final option in options) {
+      // English is the kernel's own; Chinese is the reader's.
+      final en = localizedKernelOption(
+        englishLocalizations,
+        'codex',
+        KernelChoiceKind.permission,
+        option,
+      );
+      expect(
+        (en.label, en.description, en.id),
+        (option.label, option.description, option.id),
+      );
+      final zh = localizedKernelOption(
+        _zh,
+        'codex',
+        KernelChoiceKind.permission,
+        option,
+      );
+      expect(zh.label, isNot(option.label), reason: option.id);
+      expect(zh.description, isNot(option.description), reason: option.id);
+      expect(
+        (zh.id, zh.icon, zh.caution),
+        (option.id, option.icon, option.caution),
+        reason: option.id,
+      );
+    }
+    expect(
+      localizedKernelOption(
+        _zh,
+        'codex',
+        KernelChoiceKind.permission,
+        options.first,
+      ).label,
+      '逐项批准',
     );
   });
 }

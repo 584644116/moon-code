@@ -14,7 +14,7 @@ import '../models/secret_store.dart';
 import 'forge_api.dart';
 import 'forge_ref.dart';
 
-/// BaoCode's OAuth apps' ids (public: a device flow needs no secret). Empty
+/// MoonCode's OAuth apps' ids (public: a device flow needs no secret). Empty
 /// until they are registered: only tokens can be used then.
 const githubClientId = '';
 const gitlabClientId = '';
@@ -195,7 +195,7 @@ class ForgeAccounts extends ChangeNotifier {
       _accounts[host.toLowerCase()]?.kind ?? publicForgeKind(host);
 
   /// Whether signing in from the browser works for [kind] on [host]: on
-  /// its public service, with BaoCode's app registered.
+  /// its public service, with MoonCode's app registered.
   bool canSignInFromBrowser(ForgeKind kind, String host) =>
       host == kind.publicHost &&
       switch (kind) {

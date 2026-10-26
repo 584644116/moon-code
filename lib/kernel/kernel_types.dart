@@ -300,7 +300,7 @@ class KernelHealth {
   /// said in the user's language rather than [message].
   final String? missingFolder;
 
-  /// Whether what it lacks is a model to run on (BaoCode's own core with
+  /// Whether what it lacks is a model to run on (MoonCode's own core with
   /// no upstream turned on): offered setting one up rather than a retry.
   final bool noModel;
 }
@@ -534,20 +534,40 @@ class TextPreview extends ApprovalPreview {
   final String text;
 }
 
+/// What a tool approval asks, when the kernel can say it without words:
+/// the card says it in the reader's language.
+enum ApprovalTitle { runCommand, applyChanges }
+
 /// The agent asks leave to use a tool.
 class ApprovalRequest extends InteractionRequest {
   const ApprovalRequest({
     required super.id,
     required super.title,
     required this.toolName,
+    this.titleKey,
     this.reason,
     this.preview,
     this.alwaysAllowLabel,
+    this.alwaysAllowRule,
+    this.alwaysAllowForSession = false,
     this.risk,
     this.reversible,
     this.source,
     this.why,
   });
+
+  /// What it asks, for a kernel that names it rather than writing it out:
+  /// the card prefers this to [title], which stays as the kernel's own
+  /// words (and what a card with no localization falls back to).
+  final ApprovalTitle? titleKey;
+
+  /// The command prefix "always allow" would allow, when it offers one:
+  /// the card words that row in the reader's language.
+  final String? alwaysAllowRule;
+
+  /// Whether "always allow" is for this session alone, when it offers no
+  /// rule to name: the card says that in the reader's language too.
+  final bool alwaysAllowForSession;
 
   final String toolName;
 

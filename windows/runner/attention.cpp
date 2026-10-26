@@ -3,6 +3,7 @@
 #include <flutter/standard_method_codec.h>
 #include <mmsystem.h>
 #include <windowsx.h>
+#include <wincodec.h>
 
 #include <algorithm>
 #include <cmath>
@@ -152,6 +153,59 @@ class Canvas {
           const double under = (pixel >> shift) & 0xFF;
           return static_cast<uint32_t>(std::lround(
               (top * coverage + under * below * (1 - coverage)) / alpha));
+        };
+        pixel = (static_cast<uint32_t>(std::lround(alpha * 255)) << 24) |
+                (channel(16) << 16) | (channel(8) << 8) | channel(0);
+      }
+    }
+  }
+
+  // The mark an icon carries, over what is there: the icon's own alpha is
+  // the shape, and its ink is replaced by |rgb| — the mark is drawn black,
+  // and a dark taskbar wants it white. Read as an image (WIC), not as an
+  // icon (DrawState), which would take the whole square as the shape.
+  void DrawIcon(HICON icon, uint32_t rgb) {
+    ComPtr<IWICImagingFactory> factory;
+    if (FAILED(::CoCreateInstance(CLSID_WICImagingFactory, nullptr,
+                                  CLSCTX_INPROC_SERVER,
+                                  IID_PPV_ARGS(&factory)))) {
+      return;
+    }
+    ComPtr<IWICBitmap> bitmap;
+    if (FAILED(factory->CreateBitmapFromHICON(icon, &bitmap))) {
+      return;
+    }
+    ComPtr<IWICFormatConverter> converted;
+    if (FAILED(factory->CreateFormatConverter(&converted)) ||
+        FAILED(converted->Initialize(bitmap.Get(),
+                                     GUID_WICPixelFormat32bppBGRA,
+                                     WICBitmapDitherTypeNone, nullptr, 0.0,
+                                     WICBitmapPaletteTypeCustom))) {
+      return;
+    }
+    const UINT width = static_cast<UINT>(size_);
+    std::vector<uint8_t> source(static_cast<size_t>(width) * width * 4);
+    if (FAILED(converted->CopyPixels(nullptr, width * 4,
+                                     static_cast<UINT>(source.size()),
+                                     source.data()))) {
+      return;
+    }
+    for (int y = 0; y < size_; y++) {
+      for (int x = 0; x < size_; x++) {
+        const size_t at = (static_cast<size_t>(y) * width + x) * 4;
+        // BGRA: the alpha is what the image says is the mark.
+        const double top = source[at + 3] / 255.0;
+        if (top <= 0.0) {
+          continue;
+        }
+        uint32_t& pixel = pixels_[static_cast<size_t>(y) * size_ + x];
+        const double below = (pixel >> 24) / 255.0;
+        const double alpha = top + below * (1 - top);
+        auto channel = [&](int shift) {
+          const double ink = (rgb >> shift) & 0xFF;
+          const double under = (pixel >> shift) & 0xFF;
+          return static_cast<uint32_t>(std::lround(
+              (ink * top + under * below * (1 - top)) / alpha));
         };
         pixel = (static_cast<uint32_t>(std::lround(alpha * 255)) << 24) |
                 (channel(16) << 16) | (channel(8) << 8) | channel(0);
@@ -493,18 +547,30 @@ void Attention::SetTray(const flutter::EncodableValue* value) {
 HICON Attention::TrayIcon(bool dot) const {
   const int size = ::GetSystemMetrics(SM_CXSMICON);
   Canvas canvas(size);
-  // Whole pixels for each of the logo's 8×6 cells, as large as fit.
-  const int cell = (std::max)(1, size / 8);
-  const double k = cell / 7.0;
-  const int left = (size - 8 * cell) / 2;
-  const int top = (size - 6 * cell) / 2;
-  const uint32_t ink = TaskbarIsLight() ? 0x1F1F1F : 0xFFFFFF;
-  for (const Cell& c : kLogoCells) {
-    canvas.Fill(left + static_cast<int>(std::lround(c.x * k)),
-                top + static_cast<int>(std::lround(c.y * k)),
-                left + static_cast<int>(std::lround((c.x + c.width) * k)),
-                top + static_cast<int>(std::lround((c.y + c.height) * k)),
-                ink);
+  // The app's own mark, from the icon the build carries (Runner.rc): a
+  // PNG in the ICO, so its alpha is the mark's shape and the taskbar's
+  // own background shows through. Black, as the mark is: the shape alone
+  // is what the taskbar is given.
+  if (HICON mark = static_cast<HICON>(::LoadImageW(
+          ::GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_TRAY_ICON),
+          IMAGE_ICON, size, size, LR_DEFAULTCOLOR))) {
+    canvas.DrawIcon(mark, 0x000000);
+    ::DestroyIcon(mark);
+  } else {
+    // No icon in the build: the cells of the mark it used to draw, so that
+    // the tray still has something.
+    const int cell = (std::max)(1, size / 8);
+    const double k = cell / 7.0;
+    const int left = (size - 8 * cell) / 2;
+    const int top = (size - 6 * cell) / 2;
+    const uint32_t ink = TaskbarIsLight() ? 0x1F1F1F : 0xFFFFFF;
+    for (const Cell& c : kLogoCells) {
+      canvas.Fill(left + static_cast<int>(std::lround(c.x * k)),
+                  top + static_cast<int>(std::lround(c.y * k)),
+                  left + static_cast<int>(std::lround((c.x + c.width) * k)),
+                  top + static_cast<int>(std::lround((c.y + c.height) * k)),
+                  ink);
+    }
   }
   if (dot) {
     const double radius = size * 0.17;

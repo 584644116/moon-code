@@ -43,7 +43,7 @@ class ChatFind extends ChangeNotifier {
   }
 
   final TextEditingController text = TextEditingController();
-  final FocusNode focusNode = FocusNode(debugLabel: 'BaoCode chat find');
+  final FocusNode focusNode = FocusNode(debugLabel: 'MoonCode chat find');
 
   /// What it searches: set by the history it shows over.
   ChatFeed? get feed => _feed;

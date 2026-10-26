@@ -111,7 +111,7 @@ class _Debugging {
       await browser.cdp(tab.tabId, 'DOM.enable');
       await browser.cdp(tab.tabId, 'Overlay.enable');
       await browser.cdp(tab.tabId, 'Overlay.setPausedInDebuggerMessage', {
-        'message': 'Paused in debugger (BaoCode)',
+        'message': 'Paused in debugger (MoonCode)',
       });
     } on Object {
       // No banner.

@@ -1,13 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-/// Where the stash's shortcut was pressed: in BaoCode itself or not, and
+/// Where the stash's shortcut was pressed: in MoonCode itself or not, and
 /// whether its panel was what the keyboard was in.
 @immutable
 class StashCapture {
   const StashCapture({this.inApp = false, this.panelInFront});
 
-  /// Pressed in BaoCode itself: its project, branch and conversation are
+  /// Pressed in MoonCode itself: its project, branch and conversation are
   /// kept as the new stash's source.
   final bool inApp;
 

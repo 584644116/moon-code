@@ -130,7 +130,7 @@ class ModelProviders extends ChangeNotifier {
   bool get builtinHidden => _read(builtinHiddenKey) == true;
 
   /// Whether there is Claude Code as set up on this machine (its login,
-  /// its models, its settings') to run on: only for the CLI. BaoCode's own
+  /// its models, its settings') to run on: only for the CLI. MoonCode's own
   /// core runs on the upstreams here alone, and the channel build on its
   /// account's (lib/channel/): never on this machine's.
   bool get builtinAvailable =>
@@ -139,7 +139,7 @@ class ModelProviders extends ChangeNotifier {
   /// Whether Claude Code as set up on this machine is in the picker.
   bool get builtinOffered => builtinAvailable && !builtinHidden;
 
-  /// The model a session on BaoCode's own core starts on when the one
+  /// The model a session on MoonCode's own core starts on when the one
   /// picked is no upstream's: the first of the first upstream turned on;
   /// null without one.
   String? get firstModel => switch (enabled.firstOrNull) {

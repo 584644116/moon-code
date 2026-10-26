@@ -46,7 +46,7 @@ import 'settings_widgets.dart';
 /// works (`chat.keepAwakeWhileRunning`), the permission mode a new chat
 /// starts in (`chat.defaultPermissionMode`), the Claude Code to run
 /// (`claudeCode.path`),
-/// the `code` shell command, and Open with BaoCode in Finder's or
+/// the `code` shell command, and Open with MoonCode in Finder's or
 /// Explorer's context menu. A choice is written at once; the default is not
 /// written.
 class GeneralSettingsPage extends StatelessWidget {
@@ -70,7 +70,7 @@ class GeneralSettingsPage extends StatelessWidget {
   static String attributionName(BuildContext context, CommitAttribution value) {
     final l10n = context.l10n;
     return switch (value) {
-      CommitAttribution.baocode => 'BaoCode',
+      CommitAttribution.baocode => 'MoonCode',
       CommitAttribution.agent => l10n.generalSettingsAttributionAgent,
       CommitAttribution.none => l10n.generalSettingsAttributionNone,
     };
@@ -618,7 +618,7 @@ class _ShellCommandSettingState extends State<_ShellCommandSetting> {
   }
 }
 
-/// Whether Open with BaoCode and Open with Fast Ide are in the system's
+/// Whether Open with MoonCode and Open with Fast Ide are in the system's
 /// context menu (see ContextMenu), and the buttons to turn them on or off
 /// (and, on macOS, System Settings' extensions); what failed, under them.
 class _ContextMenuSetting extends StatefulWidget {
@@ -710,7 +710,7 @@ class _ContextMenuSettingState extends State<_ContextMenuSetting> {
                 ? () => unawaited(
                     _run(
                       () => ContextMenu.install((
-                        agent: l10n.contextMenuOpenWith('BaoCode'),
+                        agent: l10n.contextMenuOpenWith('MoonCode'),
                         ide: l10n.contextMenuOpenWith('Fast Ide'),
                       )),
                     ),

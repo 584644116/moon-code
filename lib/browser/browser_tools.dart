@@ -27,7 +27,7 @@ part 'browser_sources.dart';
 part 'browser_watch.dart';
 
 /// The agents' tools for the user's browser (see browser_bridge.dart): the
-/// tabs shared with BaoCode (its tab group's) alone, through the DevTools
+/// tabs shared with MoonCode (its tab group's) alone, through the DevTools
 /// protocol. Their names are `mcp__baocode__browser_…` to an agent.
 abstract final class BrowserTools {
   static bool _registered = false;
@@ -198,15 +198,15 @@ Do not use the browser tools to scrape or bulk-collect data from government, hea
       name: 'browser_tabs',
       description:
           "Lists the tabs of the user's browser shared with you (the "
-          '"BaoCode" tab group): their ids, titles and URLs. You can only '
-          'use these; the user shares more with the BaoCode button of the '
+          '"MoonCode" tab group): their ids, titles and URLs. You can only '
+          'use these; the user shares more with the MoonCode button of the '
           'browser toolbar, or opens them for you with browser_open.',
       inputSchema: {'type': 'object', 'properties': <String, Object?>{}},
       run: (input, call) async {
         final browser = _browser();
         final tabs = await browser.request('tabs.list') as List? ?? const [];
         if (tabs.isEmpty) {
-          return 'No tab is shared with BaoCode in ${browser.browser}. '
+          return 'No tab is shared with MoonCode in ${browser.browser}. '
               'Open one with browser_open.';
         }
         return [
@@ -218,7 +218,7 @@ Do not use the browser tools to scrape or bulk-collect data from government, hea
     ClaudeSdkTool(
       name: 'browser_open',
       description:
-          "Opens a URL in a new tab of the user's browser, in the BaoCode "
+          "Opens a URL in a new tab of the user's browser, in the MoonCode "
           'tab group, and waits for it to load. Returns the tab id and what '
           'is on screen: the elements to act on (refs) and the words.',
       inputSchema: {
@@ -319,21 +319,21 @@ Do not use the browser tools to scrape or bulk-collect data from government, hea
     if (browsers.isNotEmpty) return browsers.first;
     if (bridge.otherApp) {
       throw StateError(
-        'Another BaoCode is connected to the browser: quit it first.',
+        'Another MoonCode is connected to the browser: quit it first.',
       );
     }
     if (bridge.mismatched case [final browser, ...]) {
       throw StateError(
         browser.protocol < BrowserBridge.protocol
-            ? "BaoCode's extension in ${browser.browser} is too old for "
-                  'this BaoCode: the user needs to update it (Settings → '
+            ? "MoonCode's extension in ${browser.browser} is too old for "
+                  'this MoonCode: the user needs to update it (Settings → '
                   'Browser says how).'
-            : "BaoCode's extension in ${browser.browser} is newer than "
-                  'this BaoCode: the user needs to update BaoCode.',
+            : "MoonCode's extension in ${browser.browser} is newer than "
+                  'this MoonCode: the user needs to update MoonCode.',
       );
     }
     throw StateError(
-      "No browser is connected: the user needs BaoCode's extension in "
+      "No browser is connected: the user needs MoonCode's extension in "
       'Chrome (or Edge, Brave, Arc), with the browser running.',
     );
   }

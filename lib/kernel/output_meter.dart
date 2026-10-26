@@ -13,7 +13,7 @@ import '../chat/chat_models.dart';
 /// first delta) to its last delta, the turn's messages one after another,
 /// the waits between them (a tool running, a request) left out. A turn of
 /// short messages, a line and a tool call each, is timed all the same; so
-/// is a tool call whose input comes all at once as it ends, as BaoCode's
+/// is a tool call whose input comes all at once as it ends, as MoonCode's
 /// proxy sends an OpenAI upstream's. Not the deltas that came with that
 /// start: the upstream holds back what the model writes until it sends
 /// anything (a tool call's input, a thought), and those tokens came out of

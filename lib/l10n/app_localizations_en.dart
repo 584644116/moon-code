@@ -50,7 +50,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get languageSettingsDescription =>
-      'The language of BaoCode\'s menus, views and messages. Changes apply at once.';
+      'The language of MoonCode\'s menus, views and messages. Changes apply at once.';
 
   @override
   String get languageSettingsResponseLanguage => 'Reply Language';
@@ -1419,7 +1419,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get menuContextPanel => 'Context Panel';
 
   @override
-  String get menuAboutBaoCode => 'About BaoCode';
+  String get menuAboutBaoCode => 'About MoonCode';
 
   @override
   String get windowShowSidebar => 'Show sidebar';
@@ -1459,14 +1459,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserNotConnected =>
-      'No browser is connected. Add BaoCode\'s extension to Chrome (or Edge, Brave, Arc) and agents can use the tabs you share with them.';
+      'No browser is connected. Add MoonCode\'s extension to Chrome (or Edge, Brave, Arc) and agents can use the tabs you share with them.';
 
   @override
   String get browserNoSharedTab =>
-      'No tab is shared yet. Ask an agent to open a page, or click BaoCode in the browser toolbar to share the tab in front.';
+      'No tab is shared yet. Ask an agent to open a page, or click MoonCode in the browser toolbar to share the tab in front.';
 
   @override
-  String get browserOtherApp => 'Another BaoCode is connected to the browser.';
+  String get browserOtherApp => 'Another MoonCode is connected to the browser.';
 
   @override
   String get browserSharedTabs => 'Shared Tabs';
@@ -1479,7 +1479,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserDetached =>
-      'The browser stopped letting BaoCode see this tab.';
+      'The browser stopped letting MoonCode see this tab.';
 
   @override
   String get browserReconnect => 'Reconnect';
@@ -1492,7 +1492,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserWatchHint =>
-      'Do it in the BaoCode tab of your browser. When you\'re done, click Done here or the BaoCode button in the browser\'s toolbar.';
+      'Do it in the MoonCode tab of your browser. When you\'re done, click Done here or the MoonCode button in the browser\'s toolbar.';
 
   @override
   String browserWatchSteps(int count) {
@@ -3016,6 +3016,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get interactionDenyHint => 'Tell the agent what to do instead';
 
   @override
+  String get interactionRunCommand => 'Run command';
+
+  @override
+  String get interactionApplyChanges => 'Apply changes';
+
+  @override
+  String get interactionApproveForSession => 'Approve for this session';
+
+  @override
+  String interactionAlwaysAllow(String rule) {
+    return 'Always allow $rule';
+  }
+
+  @override
   String get interactionRiskRead => 'Read only';
 
   @override
@@ -3602,7 +3616,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get generalSettingsClaudeCoreDescription =>
-      'Claude Code CLI: Anthropic\'s own program, with this machine\'s sign-in and setup; pick it to use a Claude subscription. Built-in: comes with BaoCode, and uses only the models added in Settings → Models. Codex: OpenAI\'s coding agent, on the same models. The CLI is the default, downloaded for you if this machine has none. Changes apply to new sessions.';
+      'Claude Code CLI: Anthropic\'s own program, with this machine\'s sign-in and setup; pick it to use a Claude subscription. Built-in: comes with MoonCode, and uses only the models added in Settings → Models. Codex: OpenAI\'s coding agent, on the same models. The CLI is the default, downloaded for you if this machine has none. Changes apply to new sessions.';
 
   @override
   String get generalSettingsClaudeCoreBuiltin => 'Built-in';
@@ -3740,7 +3754,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Closing the window hides it there and the agents keep running; its menu shows the agents waiting on you, and quits the app.';
 
   @override
-  String get trayShow => 'Show BaoCode';
+  String get trayShow => 'Show MoonCode';
 
   @override
   String get trayWaiting => 'Waiting for You';
@@ -3756,7 +3770,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get trayQuit => 'Quit BaoCode';
+  String get trayQuit => 'Quit MoonCode';
 
   @override
   String get attentionNeedsInput => 'Needs your input';
@@ -5292,9 +5306,9 @@ class AppLocalizationsEn extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          'BaoCode does not know the context keys $keys: this keybinding never applies.',
+          'MoonCode does not know the context keys $keys: this keybinding never applies.',
       one:
-          'BaoCode does not know the context key $keys: this keybinding never applies.',
+          'MoonCode does not know the context key $keys: this keybinding never applies.',
     );
     return '$_temp0';
   }
@@ -5371,7 +5385,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String kbCannotReadKey(String key) {
-    return 'BaoCode cannot read the key “$key”: this keybinding never applies.';
+    return 'MoonCode cannot read the key “$key”: this keybinding never applies.';
   }
 
   @override
@@ -5379,7 +5393,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get kbNotSupportedHover =>
-      'BaoCode does not have this command: the keybinding is kept, but does nothing.';
+      'MoonCode does not have this command: the keybinding is kept, but does nothing.';
 
   @override
   String get kbPressKeys =>
@@ -5443,26 +5457,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataDirChecking => 'Checking the folder…';
 
   @override
-  String get dataDirAlreadyHolds => 'The folder already holds BaoCode data';
+  String get dataDirAlreadyHolds => 'The folder already holds MoonCode data';
 
   @override
   String get dataDirMoveBack =>
-      'Move BaoCode\'s data back to the default folder?';
+      'Move MoonCode\'s data back to the default folder?';
 
   @override
-  String get dataDirMoveHere => 'Move BaoCode\'s data to this folder?';
+  String get dataDirMoveHere => 'Move MoonCode\'s data to this folder?';
 
   @override
   String get dataDirUseAsIsDetail =>
-      'After a restart BaoCode uses the data there as it is; nothing is copied, and the current folder keeps yours.';
+      'After a restart MoonCode uses the data there as it is; nothing is copied, and the current folder keeps yours.';
 
   @override
   String get dataDirCopyDetail =>
-      'BaoCode copies its settings, keybindings, language servers and state there, and uses that folder after a restart.';
+      'MoonCode copies its settings, keybindings, language servers and state there, and uses that folder after a restart.';
 
   @override
   String get dataDirOtherFiles =>
-      'The folder holds other files: they stay, beside BaoCode\'s own.';
+      'The folder holds other files: they stay, beside MoonCode\'s own.';
 
   @override
   String get dataDirUseItsData => 'Use Its Data';
@@ -5490,18 +5504,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dataDirRestartTitle =>
-      'Restart BaoCode to use the new data folder';
+      'Restart MoonCode to use the new data folder';
 
   @override
   String dataDirRestartDetail(String current, String next) {
-    return 'BaoCode keeps using $current until it restarts. The next start uses $next, and offers to remove what is left in the old one.';
+    return 'MoonCode keeps using $current until it restarts. The next start uses $next, and offers to remove what is left in the old one.';
   }
 
   @override
   String get dataDirTheNewFolder => 'the new folder';
 
   @override
-  String get quitConfirmMessage => 'Quit BaoCode?';
+  String get quitConfirmMessage => 'Quit MoonCode?';
 
   @override
   String get quitConfirmDetail =>
@@ -5536,7 +5550,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String dataDirSharedFiles(String folder) {
-    return 'Your settings, keybindings, argv.json, keymaps and keys are read from $folder, which the BaoCode installed on this machine uses too; sessions, caches, checkpoints and logs are only here.';
+    return 'Your settings, keybindings, argv.json, keymaps and keys are read from $folder, which the MoonCode installed on this machine uses too; sessions, caches, checkpoints and logs are only here.';
   }
 
   @override
@@ -5544,7 +5558,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dataDirDescription =>
-      'Where BaoCode keeps your settings, keybindings, language servers and its own state. Other programs keep files there too (the web view\'s caches); BaoCode never moves or removes those.';
+      'Where MoonCode keeps your settings, keybindings, language servers and its own state. Other programs keep files there too (the web view\'s caches); MoonCode never moves or removes those.';
 
   @override
   String get dataDirCurrentFolder => 'Current folder';
@@ -5575,13 +5589,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dataDirSettingUnreadable =>
-      'BaoCode\'s data folder setting cannot be read';
+      'MoonCode\'s data folder setting cannot be read';
 
   @override
-  String get dataDirCannotWrite => 'BaoCode cannot write to its data folder';
+  String get dataDirCannotWrite => 'MoonCode cannot write to its data folder';
 
   @override
-  String get dataDirUnavailable => 'BaoCode\'s data folder is not available';
+  String get dataDirUnavailable => 'MoonCode\'s data folder is not available';
 
   @override
   String dataDirWhereEnv(String variable) {
@@ -5590,7 +5604,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String dataDirWhereFixPointer(String file) {
-    return 'Fix or delete $file and try again; BaoCode changes it only if you choose another folder.';
+    return 'Fix or delete $file and try again; MoonCode changes it only if you choose another folder.';
   }
 
   @override
@@ -5614,11 +5628,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dataDirRemoveOldTitle =>
-      'Remove the data BaoCode left in its previous folder?';
+      'Remove the data MoonCode left in its previous folder?';
 
   @override
   String dataDirRemoveOldDetail(String current, String items) {
-    return 'BaoCode now keeps its data in $current. Only its own items are removed from the previous folder ($items); the folder and everything else in it stay.';
+    return 'MoonCode now keeps its data in $current. Only its own items are removed from the previous folder ($items); the folder and everything else in it stay.';
   }
 
   @override
@@ -5633,7 +5647,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String dataDirRemoveOldInUseDetail(String items) {
-    return 'Files in $items are in use, perhaps by another program. Everything else was removed; BaoCode offers to remove the rest the next time it starts.';
+    return 'Files in $items are in use, perhaps by another program. Everything else was removed; MoonCode offers to remove the rest the next time it starts.';
   }
 
   @override
@@ -5859,7 +5873,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String shellCommandOccupied(String path, String name) {
-    return '$path already runs another app\'s \'$name\' command. Replace it with BaoCode\'s?';
+    return '$path already runs another app\'s \'$name\' command. Replace it with MoonCode\'s?';
   }
 
   @override
@@ -5880,7 +5894,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get generalSettingsMainWindowDescription =>
-      'What BaoCode opens to: the agents, or the IDE windows (as Restore Windows says), never both. By default, wherever it was left when it last quit.';
+      'What MoonCode opens to: the agents, or the IDE windows (as Restore Windows says), never both. By default, wherever it was left when it last quit.';
 
   @override
   String generalSettingsMainWindowLabel(String name) {
@@ -5945,7 +5959,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String claudePathInUseDownloaded(String version) {
-    return 'In use: Claude Code $version, downloaded by BaoCode';
+    return 'In use: Claude Code $version, downloaded by MoonCode';
   }
 
   @override
@@ -6100,7 +6114,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String generalSettingsShellCommandDescription(String location) {
-    return 'Open files and folders in BaoCode from a terminal: \'code <path>\'. Installed at $location.';
+    return 'Open files and folders in MoonCode from a terminal: \'code <path>\'. Installed at $location.';
   }
 
   @override
@@ -6403,7 +6417,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelsFeaturedNote =>
-      'These sites are officially listed by BaoCode';
+      'These sites are officially listed by MoonCode';
 
   @override
   String get modelsFeaturedNoteHow =>
@@ -6470,7 +6484,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelsImportInvalidDetail =>
-      'It needs a base URL (http or https) and a protocol BaoCode knows. Ask the site for a new link, or add the upstream by hand in Settings → Models.';
+      'It needs a base URL (http or https) and a protocol MoonCode knows. Ask the site for a new link, or add the upstream by hand in Settings → Models.';
 
   @override
   String get modelsAddProvider => 'Add Upstream';
@@ -6850,7 +6864,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelsRoleSubagentDescription =>
-      'CLAUDE_CODE_SUBAGENT_MODEL: the model every subagent runs on, over the one its definition or the agent\'s call names (but inherit). It may be another upstream\'s: BaoCode\'s local proxy sends its requests there.';
+      'CLAUDE_CODE_SUBAGENT_MODEL: the model every subagent runs on, over the one its definition or the agent\'s call names (but inherit). It may be another upstream\'s: MoonCode\'s local proxy sends its requests there.';
 
   @override
   String get modelsRoleMissing =>
@@ -7120,7 +7134,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updatesSettingsDescription =>
-      'BaoCode looks for new versions on baocode.dev.';
+      'MoonCode does not check for new versions online.';
 
   @override
   String get updateCurrentVersion => 'Current Version';
@@ -7140,31 +7154,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updateChecking => 'Checking for updates…';
 
   @override
-  String get updateUpToDate => 'BaoCode is up to date.';
+  String get updateUpToDate => 'MoonCode is up to date.';
 
   @override
   String updateAvailable(String version) {
-    return 'BaoCode $version is available.';
+    return 'MoonCode $version is available.';
   }
 
   @override
   String updateReady(String version) {
-    return 'BaoCode $version has been downloaded. Restart to update.';
+    return 'MoonCode $version has been downloaded. Restart to update.';
   }
 
   @override
   String updateDownloading(String version) {
-    return 'Downloading BaoCode $version…';
+    return 'Downloading MoonCode $version…';
   }
 
   @override
   String updateDownloadingProgress(String version, int percent) {
-    return 'Downloading BaoCode $version… $percent%';
+    return 'Downloading MoonCode $version… $percent%';
   }
 
   @override
   String updateMandatory(String version) {
-    return 'This version of BaoCode is no longer supported. Update to $version to keep using it.';
+    return 'This version of MoonCode is no longer supported. Update to $version to keep using it.';
   }
 
   @override
@@ -7182,7 +7196,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String updateFailed(String error) {
-    return 'Couldn\'t update BaoCode: $error';
+    return 'Couldn\'t update MoonCode: $error';
   }
 
   @override
@@ -7196,11 +7210,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateUnsupported =>
-      'This build of BaoCode doesn\'t update itself.';
+      'This build of MoonCode doesn\'t update itself.';
 
   @override
   String updateManual(String reason) {
-    return 'BaoCode can\'t update itself here ($reason). Download the new version from baocode.dev.';
+    return 'MoonCode can\'t update itself here ($reason).';
   }
 
   @override
@@ -7208,7 +7222,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String updateUnfinished(String version, String current) {
-    return 'BaoCode $version wasn\'t installed: this is still $current. Try again from Settings > Updates, or download it from baocode.dev.';
+    return 'MoonCode $version wasn\'t installed: this is still $current.';
   }
 
   @override
@@ -7227,7 +7241,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateModeDescription =>
-      'Whether BaoCode looks for new versions by itself (update.mode).';
+      'Whether MoonCode looks for new versions by itself (update.mode).';
 
   @override
   String updateModeLabel(String name) {
@@ -7248,7 +7262,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get diagnosticsDescription =>
-      'Send BaoCode\'s error logs to its developers to help track down a problem. Nothing is sent until you upload.';
+      'Send MoonCode\'s error logs to its developers to help track down a problem. Nothing is sent until you upload.';
 
   @override
   String get diagnosticsUpload => 'Upload…';
@@ -7299,7 +7313,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get diagnosticsUploadedDetail =>
-      'Give this ID to BaoCode\'s developers so they can find these logs.';
+      'Give this ID to MoonCode\'s developers so they can find these logs.';
 
   @override
   String diagnosticsOmittedDumps(int count) {
@@ -7640,11 +7654,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get generalSettingsContextMenuDescription =>
-      'Adds \"Open with BaoCode\" (a new agent) and \"Open with Fast Ide\" (a new IDE window) to the context menu of files, folders and a folder\'s background.';
+      'Adds \"Open with MoonCode\" (a new agent) and \"Open with Fast Ide\" (a new IDE window) to the context menu of files, folders and a folder\'s background.';
 
   @override
   String get generalSettingsContextMenuMacNote =>
-      'Finder\'s own setting is in System Settings\' extensions, where the BaoCode extension can also be turned on and off.';
+      'Finder\'s own setting is in System Settings\' extensions, where the MoonCode extension can also be turned on and off.';
 
   @override
   String get generalSettingsContextMenuOn => 'On';
@@ -7860,7 +7874,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updateButton => 'Update';
 
   @override
-  String get tipsSetupTitle => 'Set Up BaoCode';
+  String get tipsSetupTitle => 'Set Up MoonCode';
 
   @override
   String tipsSetupCount(int done, int total) {
@@ -7894,7 +7908,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String tipsUpdated(String version, String features) {
-    return 'BaoCode was updated to $version. New: $features.';
+    return 'MoonCode was updated to $version. New: $features.';
   }
 
   @override
@@ -7909,7 +7923,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tipContextMenuBody =>
-      'Open files and folders in BaoCode from their context menu.';
+      'Open files and folders in MoonCode from their context menu.';
 
   @override
   String tipShellCommandTitle(String name) {
@@ -7918,7 +7932,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String tipShellCommandBody(String name) {
-    return 'Open folders in BaoCode from a terminal: $name <path>.';
+    return 'Open folders in MoonCode from a terminal: $name <path>.';
   }
 
   @override
@@ -7936,14 +7950,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cmdShowSetupGuide => 'Show Setup Guide';
 
   @override
-  String get cmdStarOnGitHub => 'Star BaoCode on GitHub';
+  String get cmdStarOnGitHub => 'Star MoonCode on GitHub';
 
   @override
-  String get starPromptMessage => 'Enjoying BaoCode?';
+  String get starPromptMessage => 'Enjoying MoonCode?';
 
   @override
   String get starPromptDetail =>
-      'BaoCode is free and open source. If it helps you, a star on GitHub helps other people find it.';
+      'MoonCode is free and open source. If it helps you, a star on GitHub helps other people find it.';
 
   @override
   String get starPromptStar => 'Star on GitHub';
@@ -8079,14 +8093,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get networkSettingsDescription =>
-      'How BaoCode and the Claude Code it starts reach the internet.';
+      'How MoonCode and the Claude Code it starts reach the internet.';
 
   @override
   String get networkProxy => 'Proxy';
 
   @override
   String get networkProxyDescription =>
-      'The proxy for BaoCode and Claude Code (http.proxyMode). System Proxy follows the system\'s settings, such as Clash\'s system proxy. New sessions take a change; restart a running one for it.';
+      'The proxy for MoonCode and Claude Code (http.proxyMode). System Proxy follows the system\'s settings, such as Clash\'s system proxy. New sessions take a change; restart a running one for it.';
 
   @override
   String networkProxyLabel(String name) {
@@ -8146,7 +8160,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get networkProxyStatusAutoConfig =>
-      'Direct: the system sets its proxy with an auto-config (PAC) file, which BaoCode doesn\'t follow. Turn on Clash\'s system proxy, or enter the address manually.';
+      'Direct: the system sets its proxy with an auto-config (PAC) file, which MoonCode doesn\'t follow. Turn on Clash\'s system proxy, or enter the address manually.';
 
   @override
   String get networkProxyRefresh => 'Detect Again';
@@ -8228,7 +8242,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get extsCapabilityPartialDetail =>
-      'Its themes apply; the rest of it does nothing in BaoCode.';
+      'Its themes apply; the rest of it does nothing in MoonCode.';
 
   @override
   String extsEngineIncompatible(String current, String requested) {
@@ -8439,7 +8453,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get extsCapabilityUnsupportedDetail =>
-      'It has no color or file icon theme: BaoCode only uses themes from extensions.';
+      'It has no color or file icon theme: MoonCode only uses themes from extensions.';
 
   @override
   String get extsFindingCode => 'Its code does not run.';
@@ -8552,7 +8566,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mobileSettingsDescription =>
-      'Follow and drive this computer\'s agents from BaoCode on your phone, over the local network or the internet. What goes between them is end-to-end encrypted.';
+      'Follow and drive this computer\'s agents from MoonCode on your phone, over the local network or the internet. What goes between them is end-to-end encrypted.';
 
   @override
   String get mobileAllow => 'Allow Phones to Connect';
@@ -8639,7 +8653,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mobileRelayDescription =>
-      'Reach this computer through BaoCode\'s relay when none of its addresses can be reached. Coming later.';
+      'Reach this computer through MoonCode\'s relay when none of its addresses can be reached. Coming later.';
 
   @override
   String get mobileRelayUnavailable => 'Not Available Yet';
@@ -8649,7 +8663,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mobilePairDescription =>
-      'Scan the code with BaoCode on the phone (Me → Paired computers → Pair a computer), or pick this computer under Nearby Computers there.';
+      'Scan the code with MoonCode on the phone (Me → Paired computers → Pair a computer), or pick this computer under Nearby Computers there.';
 
   @override
   String get mobilePairShow => 'Show QR Code';
@@ -9183,7 +9197,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get stashImplement => 'Implement in BaoCode';
+  String get stashImplement => 'Implement in MoonCode';
 
   @override
   String get stashImplementHow => 'How should the agent work on it?';
@@ -9300,7 +9314,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get stashSettingsDirectoryRestart =>
-      'Takes effect after BaoCode restarts.';
+      'Takes effect after MoonCode restarts.';
 
   @override
   String get stashAll => 'All';
@@ -9470,7 +9484,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String accountsSignOutDetail(String forge) {
-    return 'The token is deleted from this computer. To revoke BaoCode\'s access altogether, revoke it in your $forge settings too.';
+    return 'The token is deleted from this computer. To revoke MoonCode\'s access altogether, revoke it in your $forge settings too.';
   }
 
   @override
@@ -9516,7 +9530,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String accountsBrowserDetail(String host) {
-    return 'Enter this code on $host to let BaoCode access your account:';
+    return 'Enter this code on $host to let MoonCode access your account:';
   }
 
   @override
@@ -9735,7 +9749,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get stashWelcomeAgent =>
-      'Click Implement in BaoCode, or mention it in a conversation; the conversation and the stash stay linked.';
+      'Click Implement in MoonCode, or mention it in a conversation; the conversation and the stash stay linked.';
 
   @override
   String get stashWelcomeTrackTitle => 'See how it goes';
@@ -9807,7 +9821,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserSettingsNotRunningDescription =>
-      'Open a browser with BaoCode\'s extension: it connects automatically.';
+      'Open a browser with MoonCode\'s extension: it connects automatically.';
 
   @override
   String get browserSettingsSandboxed =>
@@ -9815,7 +9829,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserSettingsSandboxedDescription =>
-      'Their sandbox keeps BaoCode\'s helper from running. Install the browser from its own .deb or .rpm package instead, such as Google Chrome from google.com/chrome.';
+      'Their sandbox keeps MoonCode\'s helper from running. Install the browser from its own .deb or .rpm package instead, such as Google Chrome from google.com/chrome.';
 
   @override
   String browserSettingsConnected(String browser) {
@@ -9838,7 +9852,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserSettingsAppOld =>
-      'The extension is newer than this BaoCode. Update BaoCode.';
+      'The extension is newer than this MoonCode. Update MoonCode.';
 
   @override
   String get browserSettingsInstall => 'Get the Extension';
@@ -9871,7 +9885,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserHistoryDescription =>
-      'What the tabs shared with BaoCode do is kept as it happens, no recording needed: the pages, the requests, console errors and warnings. Agents look back at it when you ask (“it failed when I saved”). Kept on this computer; cookies and tokens are not.';
+      'What the tabs shared with MoonCode do is kept as it happens, no recording needed: the pages, the requests, console errors and warnings. Agents look back at it when you ask (“it failed when I saved”). Kept on this computer; cookies and tokens are not.';
 
   @override
   String get browserHistoryDetailed => 'Detailed history';
@@ -9912,14 +9926,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserWelcomeLead =>
-      'With BaoCode\'s extension, agents open pages, read them, click and type in your own Chrome, signed in as you are.';
+      'With MoonCode\'s extension, agents open pages, read them, click and type in your own Chrome, signed in as you are.';
 
   @override
   String get browserWelcomeSharedTitle => 'Only the tabs you share';
 
   @override
   String get browserWelcomeShared =>
-      'They work in the yellow BaoCode tab group alone; your other tabs stay yours.';
+      'They work in the yellow MoonCode tab group alone; your other tabs stay yours.';
 
   @override
   String get browserWelcomeWatchTitle => 'Watch it work';
@@ -9953,7 +9967,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserWelcomeTry =>
-      'Try telling an agent: “Open baocode.dev and look at the download page.”';
+      'Try telling an agent: “Open a web page and take a look.”';
 
   @override
   String get browserWelcomeUnpacked => 'Developer Mode Zip';
@@ -9975,7 +9989,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelWelcomeLead =>
-      'BaoCode runs your agents on a model of your choosing. Add an upstream, a service with an API key, and its models are ready to use.';
+      'MoonCode runs your agents on a model of your choosing. Add an upstream, a service with an API key, and its models are ready to use.';
 
   @override
   String get modelWelcomeAnyTitle => 'Any upstream';
@@ -10032,7 +10046,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get claudeCoreHint =>
-      'This chat runs on BaoCode\'s built-in core. We recommend the Claude Code core for the fullest experience; it\'s downloaded for you if needed.';
+      'This chat runs on MoonCode\'s built-in core. We recommend the Claude Code core for the fullest experience; it\'s downloaded for you if needed.';
 
   @override
   String get claudeCoreHintSwitch => 'Switch to Claude Code';
@@ -10191,7 +10205,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sshServerCoreBuiltinHint =>
-      'BaoCode\'s own core: it runs on the upstreams of Settings → Models.';
+      'MoonCode\'s own core: it runs on the upstreams of Settings → Models.';
 
   @override
   String get sshServerCoreCliHint =>
@@ -10263,7 +10277,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'The server could not be reached: check the address, port and network.';
 
   @override
-  String get channelSetupTitle => 'Welcome to BaoCode';
+  String get channelSetupTitle => 'Welcome to MoonCode';
 
   @override
   String get channelSetupLead =>
@@ -10274,21 +10288,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get channelSetupStep =>
-      'BaoCode opens baocode.dev in your browser. Once the page says it\'s done, BaoCode continues on its own.';
+      'MoonCode opens baocode.dev in your browser. Once the page says it\'s done, MoonCode continues on its own.';
 
   @override
   String get channelSetupWaitingTitle => 'Waiting for your browser…';
 
   @override
   String get channelSetupWaiting =>
-      'Once the page says it\'s done, BaoCode continues on its own. Closed the page by mistake? Open it again.';
+      'Once the page says it\'s done, MoonCode continues on its own. Closed the page by mistake? Open it again.';
 
   @override
   String get channelSetupOpenFailedTitle => 'Your browser didn\'t open';
 
   @override
   String get channelSetupOpenFailed =>
-      'Copy this address and open it in your browser. Once the page says it\'s done, BaoCode continues on its own.';
+      'Copy this address and open it in your browser. Once the page says it\'s done, MoonCode continues on its own.';
 
   @override
   String get channelSetupAddressCopied => 'Copied';
@@ -10325,7 +10339,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get channelSetupLinkOther =>
-      'That link is for another BaoCode install. Use the page this BaoCode opened.';
+      'That link is for another MoonCode install. Use the page this MoonCode opened.';
 
   @override
   String get channelSetupTrouble => 'Having trouble?';
@@ -10342,7 +10356,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get channelSetupPrivate =>
-      'The page only tells BaoCode where you heard of it, like a video or a website.';
+      'The page only tells MoonCode where you heard of it, like a video or a website.';
 
   @override
   String get channelSetupFindingTitle => 'Getting your channel ready…';
@@ -10355,7 +10369,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get channelSetupSiteOffline =>
-      'BaoCode needs to be online to read your channel. Check your connection and retry.';
+      'MoonCode needs to be online to read your channel. Check your connection and retry.';
 
   @override
   String get channelSetupUnavailableTitle => 'This channel isn\'t available';
@@ -10408,7 +10422,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String channelAccountSignOutDetail(String channel) {
-    return 'You\'ll need to sign in to $channel again to keep using BaoCode.';
+    return 'You\'ll need to sign in to $channel again to keep using MoonCode.';
   }
 
   @override

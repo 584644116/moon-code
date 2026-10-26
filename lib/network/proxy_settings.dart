@@ -1,4 +1,4 @@
-/// settings.json's `http.proxyMode`: where the proxy BaoCode and the
+/// settings.json's `http.proxyMode`: where the proxy MoonCode and the
 /// Claude Code it starts go through comes from.
 enum ProxyMode {
   /// The system's (System Settings → Network, Windows' proxy settings):

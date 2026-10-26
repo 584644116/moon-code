@@ -31,12 +31,12 @@ const remoteClaudeInstallCommand =
     'curl -fsSL https://claude.ai/install.sh | bash';
 
 /// Claude Code where [launch]'s project is: on its host for a remote one.
-/// BaoCode's own core only on an upstream's model ([ClaudeLaunch.env]):
+/// MoonCode's own core only on an upstream's model ([ClaudeLaunch.env]):
 /// never on what the machine's Claude Code setup names.
 Future<ClaudeCodeTransport> startClaude(ClaudeLaunch launch) async {
   final host = RemoteLocation.hostOf(launch.cwd);
   if (host == null) {
-    // On this machine: BaoCode's own core, unless the CLI is picked.
+    // On this machine: MoonCode's own core, unless the CLI is picked.
     return switch (ClaudeCore.current()) {
       ClaudeCore.builtin when launch.env == null => throw const ClaudeNoModel(
         ClaudeCore.noModel,
@@ -50,14 +50,14 @@ Future<ClaudeCodeTransport> startClaude(ClaudeLaunch launch) async {
 
 /// What runs Claude Code on [host]: as its server saved in the app says;
 /// as ssh reaches it otherwise (one of ~/.ssh/config, one typed), the CLI
-/// where it has one, else BaoCode's own core.
+/// where it has one, else MoonCode's own core.
 SshCore remoteCoreOf(String host) =>
     SshHosts.instance.savedServers()[host]?.core ?? SshCore.auto;
 
 /// Starts Claude Code on [host] with [start], given the core to run
 /// ([RemoteClient.startClaude]'s `core`: `builtin`, or null for the CLI; a
 /// server of before runs the CLI), as [remoteCoreOf] says. [model]: whether
-/// it runs on an upstream's model, which BaoCode's own core needs; without
+/// it runs on an upstream's model, which MoonCode's own core needs; without
 /// one, the CLI. Where the CLI is wanted and the host has none, it is
 /// installed there when [install], as VS Code's extension sets itself up.
 Future<RemoteProcess> startRemoteCore(
@@ -92,7 +92,7 @@ Future<RemoteProcess> startRemoteCore(
   }
 }
 
-/// [executable] refused an option BaoCode starts it with, where [cwd]'s
+/// [executable] refused an option MoonCode starts it with, where [cwd]'s
 /// project is: whether another, newer, may be started instead. On this
 /// machine only: a remote host's is updated there.
 Future<bool> rejectTooOldClaude(String cwd, String executable) async {

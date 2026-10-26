@@ -8,7 +8,7 @@ import '../../chat/chat_models.dart';
 typedef TurnRecord = ({Duration worked, TurnUsage? usage});
 
 /// The turns' records of Claude Code sessions, by session; each turn by its
-/// prompt's uuid (the turn's id, as BaoCode sends it and the session file
+/// prompt's uuid (the turn's id, as MoonCode sends it and the session file
 /// keeps it).
 abstract class TurnStats {
   /// Keeps [record] for turn [turnId] of session [sessionId].

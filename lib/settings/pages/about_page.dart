@@ -1,39 +1,22 @@
-import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
-import '../../ide/ide_button.dart';
 import '../../l10n/l10n.dart';
 import '../../platform/app_identity.dart';
 import '../../theme/app_theme.dart';
-import '../../theme/codicons.dart';
-import '../../tips/star_prompt.dart' show StarPrompt;
 import '../../update/version.dart';
-import '../../workspace/editor_launcher.dart' show openExternal;
 import '../../workspace/window_header/about_dialog.dart' show aboutIconAsset;
 import 'settings_widgets.dart';
 
-/// Settings → About: what BaoCode is, which build this is, and where it
+/// Settings → About: what MoonCode is, which build this is, and where it
 /// is made in the open: its repository (a star there helps others find
 /// it), its site, its changelog, and where to tell of a problem.
 class AboutSettingsPage extends StatelessWidget {
   const AboutSettingsPage({super.key});
 
-  static final website = Uri.parse('https://baocode.dev');
-  static final issues = StarPrompt.repository.replace(
-    path: '${StarPrompt.repository.path}/issues',
-  );
-
-  void _open(Uri url) => unawaited(openExternal('$url'));
-
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
-    final changelog = website.replace(
-      path: zh ? '/zh/changelog' : '/changelog',
-    );
-    final repository = StarPrompt.repository;
     return SettingsPage(
       title: l10n.settingsSectionAbout,
       lead: Padding(
@@ -96,50 +79,10 @@ class AboutSettingsPage extends StatelessWidget {
           ],
         ),
       ),
-      children: [
-        SettingsCard(
-          children: [
-            SettingsRow(
-              label: 'GitHub',
-              description: l10n.aboutRepository(
-                '${repository.host}${repository.path}',
-              ),
-              trailing: IdeButton(
-                label: l10n.starPromptStar,
-                icon: Codicons.star,
-                onPressed: () => _open(repository),
-              ),
-            ),
-            SettingsRow(
-              label: l10n.aboutWebsite,
-              description: website.host,
-              trailing: IdeButton(
-                label: l10n.aboutOpen,
-                secondary: true,
-                onPressed: () => _open(website),
-              ),
-            ),
-            SettingsRow(
-              label: l10n.aboutChangelog,
-              description: l10n.aboutChangelogDetail,
-              trailing: IdeButton(
-                label: l10n.aboutOpen,
-                secondary: true,
-                onPressed: () => _open(changelog),
-              ),
-            ),
-            SettingsRow(
-              label: l10n.aboutFeedback,
-              description: l10n.aboutFeedbackDetail,
-              trailing: IdeButton(
-                label: l10n.aboutOpen,
-                secondary: true,
-                onPressed: () => _open(issues),
-              ),
-            ),
-          ],
-        ),
-      ],
+      // Nothing here links anywhere: the site, the repository, the
+      // changelog and the issue tracker were MoonCode's, and this build is
+      // not that project's to send anyone to.
+      children: const [],
     );
   }
 }

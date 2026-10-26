@@ -3,7 +3,7 @@ import 'dart:async';
 import 'browser_bridge.dart';
 
 /// What the shared tabs' pages log and load, kept from the first time
-/// BaoCode uses each (its console's and network's domains enabled then),
+/// MoonCode uses each (its console's and network's domains enabled then),
 /// for agents to look at afterwards: as DevTools' Console and Network keep
 /// them once open. Of the page's frames from other sites and its workers
 /// too (their own sessions, attached to as they come), and the dialogs it
@@ -88,7 +88,7 @@ class BrowserRecords {
     }
   }
 
-  /// When BaoCode began keeping [tab]'s: what came before is not here.
+  /// When MoonCode began keeping [tab]'s: what came before is not here.
   DateTime? since(BrowserTab tab) => _tabs[tab]?.since;
 
   List<ConsoleEntry> console(BrowserTab tab) => [...?_tabs[tab]?.console];
@@ -521,7 +521,7 @@ class BrowserRecords {
     }
     dialog
       ..answer = accept ? 'accepted' : 'dismissed'
-      ..by = asked == null ? 'BaoCode' : 'browser_dialog';
+      ..by = asked == null ? 'MoonCode' : 'browser_dialog';
     unawaited(
       tab.browser
           .cdp(tab.tabId, 'Page.handleJavaScriptDialog', {
@@ -1031,7 +1031,7 @@ class BrowserDialog {
   /// `accepted`, `dismissed`; null while it is open.
   String? answer;
 
-  /// Who answered: `BaoCode` (while an agent acted), `browser_dialog`,
+  /// Who answered: `MoonCode` (while an agent acted), `browser_dialog`,
   /// `the user`.
   String? by;
 

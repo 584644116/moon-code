@@ -343,7 +343,7 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
   /// Whether this is one of them.
   bool get _ideWindow => _multi && (widget.window?.isIde ?? false);
 
-  /// Whether this is an agent's window (Explorer's Open with BaoCode): its
+  /// Whether this is an agent's window (Explorer's Open with MoonCode): its
   /// conversation alone, [_agentThread]'s.
   bool get _agentWindow => widget.window?.isAgent ?? false;
   AgentThread? get _agentThread => _agentWindow ? widget.window!.thread : null;
@@ -1492,15 +1492,8 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
     _restores = tips.restores;
     tips.addListener(_tipsChanged);
     if (_main) _welcomeBrowserAfterUpdate(tips);
-    if (_main) {
-      _starPrompt = StarPrompt(
-        workspace: _workspace,
-        storage: tips.storage,
-        enabled: () => tips.enabled,
-        busy: () => _busyForTips() || !_inFront(),
-        ask: _showStarDialog,
-      )..start();
-    }
+    // No star prompt: it asks for a star on MoonCode's repository, which
+    // this build is not.
   }
 
   // --- The browser's welcome -------------------------------------------------
@@ -1584,7 +1577,7 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
     );
   }
 
-  /// Star BaoCode on GitHub, the command: the ask, now.
+  /// Star MoonCode on GitHub, the command: the ask, now.
   void _starOnGitHub() => unawaited(_starPrompt?.show() ?? _showStarDialog());
 
   /// The restores of the card seen (see [_tipsChanged]).

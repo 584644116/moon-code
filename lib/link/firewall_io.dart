@@ -79,9 +79,9 @@ Future<bool> allowThroughFirewall(int port) async {
   final exe = _quoted(Platform.resolvedExecutable);
   final inner =
       '''
-Remove-NetFirewallRule -DisplayName 'BaoCode Lab' -ErrorAction SilentlyContinue
+Remove-NetFirewallRule -DisplayName 'MoonCode Lab' -ErrorAction SilentlyContinue
 foreach (\$protocol in 'TCP', 'UDP') {
-  New-NetFirewallRule -DisplayName 'BaoCode Lab' -Direction Inbound -Action Allow `
+  New-NetFirewallRule -DisplayName 'MoonCode Lab' -Direction Inbound -Action Allow `
     -Program '$exe' -Enabled True -Profile Domain,Private,Public `
     -Protocol \$protocol | Out-Null
 }

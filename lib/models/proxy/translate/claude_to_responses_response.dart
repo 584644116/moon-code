@@ -5,6 +5,7 @@
 import 'dart:convert';
 
 import 'json_value.dart';
+import 'responses_tools.dart';
 
 /// One event of the Responses API's stream, as its line of SSE.
 String responsesEvent(Map<String, Object?> data) =>
@@ -19,9 +20,15 @@ String responsesEvent(Map<String, Object?> data) =>
 /// `status: incomplete` — the Responses API has no `tool_use` stop reason,
 /// and Codex goes on from the calls it was given either way.
 class ClaudeToResponsesTranslator {
-  ClaudeToResponsesTranslator(this.model);
+  ClaudeToResponsesTranslator(this.model, {Map<String, DeclaredTool>? tools})
+    : _tools = tools ?? const {};
 
   final String model;
+
+  /// The tools the request declared, by the name a call comes back under:
+  /// a freeform one is answered as `custom_tool_call`, a namespace's
+  /// member carries its namespace, and the rest as `function_call`.
+  final Map<String, DeclaredTool> _tools;
 
   /// The response id, made here: the upstream's is Claude's own, and the
   /// Responses API's is this proxy's to name.
@@ -110,10 +117,11 @@ class ClaudeToResponsesTranslator {
     final item = switch (kind) {
       'text' => _OpenItem.text(_nextIndex++),
       'thinking' => _OpenItem.reasoning(_nextIndex++),
-      'tool_use' => _OpenItem.functionCall(
+      'tool_use' => _OpenItem.call(
         _nextIndex++,
         block.get('id').string,
         block.get('name').string,
+        _tools[block.get('name').string],
       ),
       _ => null,
     };
@@ -164,9 +172,14 @@ class ClaudeToResponsesTranslator {
         final text = delta.get('partial_json').string;
         if (text.isEmpty) return const [];
         item.text.write(text);
+        // A freeform call's input is source text, which Claude sends as the
+        // one string argument: unwrapped once the arguments are whole (in
+        // [done]), and streamed here as they come.
         return [
           responsesEvent({
-            'type': 'response.function_call_arguments.delta',
+            'type': item.freeform
+                ? 'response.custom_tool_call_input.delta'
+                : 'response.function_call_arguments.delta',
             'item_id': item.id,
             'output_index': item.index,
             'delta': text,
@@ -219,17 +232,39 @@ class ClaudeToResponsesTranslator {
 
 /// A block being written, as the item the Responses API reports.
 class _OpenItem {
-  _OpenItem.text(this.index) : kind = 'message', callId = '', name = '';
+  _OpenItem.text(this.index)
+    : kind = 'message',
+      callId = '',
+      name = '',
+      namespace = null,
+      freeform = false;
 
-  _OpenItem.reasoning(this.index) : kind = 'reasoning', callId = '', name = '';
+  _OpenItem.reasoning(this.index)
+    : kind = 'reasoning',
+      callId = '',
+      name = '',
+      namespace = null,
+      freeform = false;
 
-  _OpenItem.functionCall(this.index, this.callId, this.name)
-    : kind = 'function_call';
+  /// A call the model made. [declared] says how it comes back: a freeform
+  /// tool as `custom_tool_call`, whose input is source text rather than
+  /// arguments; a namespace's member with the namespace beside its name,
+  /// which Codex needs to find the tool; the rest as `function_call`.
+  _OpenItem.call(this.index, this.callId, this.name, DeclaredTool? declared)
+    : kind = declared?.freeform == true ? 'custom_tool_call' : 'function_call',
+      namespace = declared?.namespace,
+      freeform = declared?.freeform == true;
 
   final int index;
   final String kind;
   final String callId;
   final String name;
+
+  /// The namespace the called tool belongs to, when it is a member of one.
+  final String? namespace;
+
+  /// Whether it takes its input as source text (Codex's `exec`).
+  final bool freeform;
 
   /// What it has said so far: the text, the thinking, or the arguments.
   final StringBuffer text = StringBuffer();
@@ -255,12 +290,13 @@ class _OpenItem {
       'summary': <Object?>[],
     },
     _ => {
-      'type': 'function_call',
+      'type': kind,
       'id': id,
       'status': 'in_progress',
       'call_id': callId,
       'name': name,
-      'arguments': '',
+      'namespace': ?namespace,
+      if (freeform) 'input': '' else 'arguments': '',
     },
   };
 
@@ -283,12 +319,27 @@ class _OpenItem {
       ],
     },
     _ => {
-      'type': 'function_call',
+      'type': kind,
       'id': id,
       'status': 'completed',
       'call_id': callId,
       'name': name,
-      'arguments': text.toString(),
+      'namespace': ?namespace,
+      if (freeform)
+        'input': _freeformInput(text.toString())
+      else
+        'arguments': text.toString(),
     },
   };
+
+  /// A freeform call's input out of the arguments it came in: the one
+  /// string argument's text, or the arguments as they are when they are not
+  /// that (an upstream that answered in its own shape).
+  static String _freeformInput(String arguments) {
+    final parsed = JsonValue.parse(arguments);
+    if (parsed.get(freeformInputKey) case final input when input.isString) {
+      return input.string;
+    }
+    return arguments;
+  }
 }

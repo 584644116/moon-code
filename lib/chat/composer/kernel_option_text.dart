@@ -32,6 +32,24 @@ KernelOption localizedKernelOption(
       l10n.composerApprovalFullAccess,
       l10n.composerApprovalFullAccessDetail,
     ),
+    // Codex's own approvals, its ids: the same three a reader picks between
+    // there, said the same way.
+    ('codex', KernelChoiceKind.permission, 'ask') => (
+      l10n.composerApprovalDefault,
+      l10n.composerApprovalDefaultDetail,
+    ),
+    ('codex', KernelChoiceKind.permission, 'acceptEdits') => (
+      l10n.composerApprovalAcceptEdits,
+      l10n.composerApprovalAcceptEditsDetail,
+    ),
+    ('codex', KernelChoiceKind.permission, 'auto') => (
+      l10n.composerApprovalAuto,
+      l10n.composerApprovalAutoDetail,
+    ),
+    ('codex', KernelChoiceKind.permission, 'fullAccess') => (
+      l10n.composerApprovalFullAccess,
+      l10n.composerApprovalFullAccessDetail,
+    ),
     _ => null,
   };
   if (text == null) return option;

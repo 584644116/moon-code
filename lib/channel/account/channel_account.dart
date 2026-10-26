@@ -166,7 +166,7 @@ class ChannelAccount extends ChangeNotifier {
   static const providerId = 'channel';
 
   /// The key made for the user when they have none.
-  static const keyName = 'BaoCode';
+  static const keyName = 'MoonCode';
 
   final ChannelAccountSite site;
 

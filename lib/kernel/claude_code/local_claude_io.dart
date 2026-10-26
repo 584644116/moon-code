@@ -19,7 +19,7 @@ import 'claude_path_setting.dart';
 
 /// Claude Code on this machine, as VS Code's extension carries its own:
 /// the one set in Settings ([ClaudePathSetting]), else the newest of the
-/// user's builds and the one BaoCode downloaded into the data folder for
+/// user's builds and the one MoonCode downloaded into the data folder for
 /// them (see [ClaudeRuntime]), which is downloaded the first time the
 /// user has none that runs. Its progress is [LocalClaudeInstall]'s.
 abstract final class LocalClaude {
@@ -85,7 +85,7 @@ abstract final class LocalClaude {
   /// Downloads one where there is none, ahead of the session that runs it.
   static Future<void> install() => locate();
 
-  /// [executable] refused an option BaoCode starts it with: whether
+  /// [executable] refused an option MoonCode starts it with: whether
   /// another, newer, may be run instead (see [ClaudeRuntime.rejectTooOld]).
   static Future<bool> rejectTooOld(String executable) async {
     try {

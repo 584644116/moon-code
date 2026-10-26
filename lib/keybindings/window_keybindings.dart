@@ -4,7 +4,7 @@
 // 6a598d4a13031703d483d103c1d934a36ad27971): New Window, Close Window (⌘W
 // too, where no editor is open), Switch Window… (⌃W on macOS).
 //
-// Show Chat Window is BaoCode's: the chat's window back from an IDE's. It
+// Show Chat Window is MoonCode's: the chat's window back from an IDE's. It
 // has no keys of its own: ⌘0 / Ctrl+0 are Focus Side Bar's.
 
 import 'package:bao_editor/monaco/flutter/keybinding_entry.dart';

@@ -3,7 +3,7 @@ import 'package:path/path.dart' as p;
 import 'lsp/lsp_glob.dart';
 
 /// The files and folders the explorer leaves out, as VS Code's
-/// `files.exclude` does but kept in BaoCode's own settings (`explorer.exclude`
+/// `files.exclude` does but kept in MoonCode's own settings (`explorer.exclude`
 /// in its settings.json, an array of globs): the tree shows neither them nor
 /// anything under them.
 ///

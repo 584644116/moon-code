@@ -14,7 +14,7 @@ import 'version.dart';
 /// What updates the app where it runs: the platform's download, and what
 /// installs it. Null where there are none: not macOS, Windows or Linux, a
 /// debug build (which would replace the build folder's app), or a build
-/// kept beside an installed app (BaoCode Lab, see [AppIdentity]: its
+/// kept beside an installed app (MoonCode Lab, see [AppIdentity]: its
 /// installer is not the one the releases are made for), unless
 /// [manifestUrlVariable] points at a manifest to try.
 PlatformUpdates? platformUpdates({required String updatesDirectory}) {
@@ -66,7 +66,7 @@ PlatformUpdates? platformUpdates({required String updatesDirectory}) {
     manifestUrl: manifestUrl,
     backend: IoUpdateBackend(
       directory: updatesDirectory,
-      userAgent: 'BaoCode/$currentAppVersion ($edition)',
+      userAgent: 'MoonCode/$currentAppVersion ($edition)',
     ),
     installer: installer,
   );
@@ -198,7 +198,7 @@ class WindowsUpdateInstaller implements UpdateInstaller {
     final uninstaller = File(p.join(p.dirname(executable), 'unins000.exe'));
     if (!await uninstaller.exists()) {
       throw const ManualUpdateRequired(
-        'BaoCode was not installed by its installer',
+        'MoonCode was not installed by its installer',
       );
     }
     final arguments = windowsInstallerArguments(
@@ -293,11 +293,11 @@ class MacUpdateInstaller implements UpdateInstaller {
   Future<PreparedUpdate> prepare(String file, UpdateRelease release) async {
     final app = appBundle;
     if (p.extension(app) != '.app') {
-      throw const ManualUpdateRequired('BaoCode is not in an app bundle');
+      throw const ManualUpdateRequired('MoonCode is not in an app bundle');
     }
     if (app.contains('/AppTranslocation/')) {
       throw const ManualUpdateRequired(
-        'macOS runs BaoCode from a temporary place: move it to Applications',
+        'macOS runs MoonCode from a temporary place: move it to Applications',
       );
     }
     if (!await _writable(p.dirname(app))) {
@@ -425,7 +425,7 @@ String macUpdateScript({
 }) =>
     '''
 #!/bin/bash
-# Installs a BaoCode update once the app has quit, then opens it again
+# Installs a MoonCode update once the app has quit, then opens it again
 # (lib/update/installer_io.dart).
 pid=$pid
 target=${_shQuote(target)}
@@ -438,7 +438,7 @@ for _ in \$(seq 1 1200); do
   sleep 0.1
 done
 if kill -0 "\$pid" 2>/dev/null; then
-  echo "BaoCode is still running: not installed"
+  echo "MoonCode is still running: not installed"
   exit 1
 fi
 new="\$target.baocode-new"
@@ -505,7 +505,7 @@ class LinuxUpdateInstaller implements UpdateInstaller {
   Future<PreparedUpdate> prepare(String file, UpdateRelease release) async {
     if (p.dirname(executable) != linuxInstallDirectory || !await _packaged()) {
       throw const ManualUpdateRequired(
-        'BaoCode was not installed by its package',
+        'MoonCode was not installed by its package',
       );
     }
     if (!await File(pkexec).exists()) {
@@ -555,7 +555,7 @@ String linuxUpdateScript({
 }) =>
     '''
 #!/bin/bash
-# Installs a BaoCode update, then opens it again once the app has quit
+# Installs a MoonCode update, then opens it again once the app has quit
 # (lib/update/installer_io.dart).
 pid=$pid
 package=${_shQuote(package)}

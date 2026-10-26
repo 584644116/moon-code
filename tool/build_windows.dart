@@ -50,11 +50,11 @@ const _installersRelative = r'build\installers';
 const _symbolsRelative = r'build\symbols';
 
 /// What has to be in the bundle for the app to start. A Release build that
-/// fails at the link step (a running baocode.exe holding the output file) still
-/// leaves a baocode.exe behind — but data\ is written by the install step that
+/// fails at the link step (a running mooncode.exe holding the output file) still
+/// leaves a mooncode.exe behind — but data\ is written by the install step that
 /// failure skipped, and the executable cannot start without it.
 const _required = [
-  'baocode.exe',
+  'mooncode.exe',
   'flutter_windows.dll',
   // The browsers' native messaging host and its manifest, which the
   // installer's keys point the browsers to (windows/BrowserBridge).
@@ -297,7 +297,7 @@ void _checkBundle(Directory directory, List<String> required) {
     '\n'
     'A Release build that failed at the link step leaves exactly this: the\n'
     'install step that writes data\\ never ran. If the build reported\n'
-    'LNK1104, a running baocode.exe is holding the output file — close it and\n'
+    'LNK1104, a running mooncode.exe is holding the output file — close it and\n'
     'build again.',
   );
 }

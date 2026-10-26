@@ -13,7 +13,7 @@
   "commonSelectAll": "Select All",
   "languageSettingsTitle": "Region & Language",
   "languageSettingsDisplayLanguage": "Display Language",
-  "languageSettingsDescription": "The language of BaoCode's menus, views and messages. Changes apply at once.",
+  "languageSettingsDescription": "The language of MoonCode's menus, views and messages. Changes apply at once.",
   "languageSettingsResponseLanguage": "Reply Language",
   "languageSettingsResponseLanguageDescription": "The language the agent answers in, for the next chat you start. Automatic follows the language of the conversation.",
   "languageSettingsResponseLanguageFollow": "Automatic",
@@ -626,7 +626,7 @@
   "menuHideSidebar": "Hide Sidebar",
   "menuKeepOnTop": "Keep on Top",
   "menuContextPanel": "Context Panel",
-  "menuAboutBaoCode": "About BaoCode",
+  "menuAboutBaoCode": "About MoonCode",
   "windowShowSidebar": "Show sidebar",
   "@windowShowSidebar": {
     "description": "Tooltip."
@@ -652,18 +652,18 @@
   "sidePanelTerminal": "Terminal",
   "sidePanelBrowser": "Browser",
   "@sidePanelBrowser": {"description": "The side panel's browser page, there once the browser plugin is installed."},
-  "browserNotConnected": "No browser is connected. Add BaoCode's extension to Chrome (or Edge, Brave, Arc) and agents can use the tabs you share with them.",
-  "browserNoSharedTab": "No tab is shared yet. Ask an agent to open a page, or click BaoCode in the browser toolbar to share the tab in front.",
-  "browserOtherApp": "Another BaoCode is connected to the browser.",
+  "browserNotConnected": "No browser is connected. Add MoonCode's extension to Chrome (or Edge, Brave, Arc) and agents can use the tabs you share with them.",
+  "browserNoSharedTab": "No tab is shared yet. Ask an agent to open a page, or click MoonCode in the browser toolbar to share the tab in front.",
+  "browserOtherApp": "Another MoonCode is connected to the browser.",
   "browserSharedTabs": "Shared Tabs",
   "browserReload": "Reload",
   "browserShowInBrowser": "Show in Browser",
-  "browserDetached": "The browser stopped letting BaoCode see this tab.",
+  "browserDetached": "The browser stopped letting MoonCode see this tab.",
   "browserReconnect": "Reconnect",
   "browserShowInPanel": "Show in Side Panel",
   "browserWatchTitle": "Watching you in the browser",
   "@browserWatchTitle": {"description": "The card in the conversation while an agent watches the user do something in their browser (browser_watch), recording it."},
-  "browserWatchHint": "Do it in the BaoCode tab of your browser. When you're done, click Done here or the BaoCode button in the browser's toolbar.",
+  "browserWatchHint": "Do it in the MoonCode tab of your browser. When you're done, click Done here or the MoonCode button in the browser's toolbar.",
   "browserWatchSteps": "{count, plural, =0{Nothing recorded yet} =1{1 step recorded} other{{count} steps recorded}}",
   "@browserWatchSteps": {"placeholders": {"count": {"type": "int"}}},
   "browserWatchCancel": "Cancel",
@@ -1946,6 +1946,25 @@
   "interactionAllowOnce": "Allow once",
   "interactionDeny": "Deny",
   "interactionDenyHint": "Tell the agent what to do instead",
+  "interactionRunCommand": "Run command",
+  "@interactionRunCommand": {
+    "description": "The title of a tool approval asking to run a shell command."
+  },
+  "interactionApplyChanges": "Apply changes",
+  "@interactionApplyChanges": {
+    "description": "The title of a tool approval asking to write files."
+  },
+  "interactionApproveForSession": "Approve for this session",
+  "@interactionApproveForSession": {
+    "description": "The row of a tool approval that allows the tool for the rest of the session."
+  },
+  "interactionAlwaysAllow": "Always allow {rule}",
+  "@interactionAlwaysAllow": {
+    "description": "The row of a tool approval that allows a command prefix from now on.",
+    "placeholders": {
+      "rule": {"type": "String"}
+    }
+  },
   "interactionRiskRead": "Read only",
   "interactionRiskWrite": "Changes files",
   "interactionRiskDestructive": "Destructive",
@@ -2411,12 +2430,12 @@
   "generalSettingsCommitAttributionDescription": "Who the commits and pull requests an agent writes credit. Applies to agents started after a change; Claude Code only for now.",
   "generalSettingsClaudeCore": "Core",
   "@generalSettingsClaudeCore": {
-    "description": "Settings → General → Claude Code row: what runs Claude Code sessions, BaoCode's built-in core (written in Dart) or the Claude Code CLI."
+    "description": "Settings → General → Claude Code row: what runs Claude Code sessions, MoonCode's built-in core (written in Dart) or the Claude Code CLI."
   },
-  "generalSettingsClaudeCoreDescription": "Claude Code CLI: Anthropic's own program, with this machine's sign-in and setup; pick it to use a Claude subscription. Built-in: comes with BaoCode, and uses only the models added in Settings → Models. Codex: OpenAI's coding agent, on the same models. The CLI is the default, downloaded for you if this machine has none. Changes apply to new sessions.",
+  "generalSettingsClaudeCoreDescription": "Claude Code CLI: Anthropic's own program, with this machine's sign-in and setup; pick it to use a Claude subscription. Built-in: comes with MoonCode, and uses only the models added in Settings → Models. Codex: OpenAI's coding agent, on the same models. The CLI is the default, downloaded for you if this machine has none. Changes apply to new sessions.",
   "generalSettingsClaudeCoreBuiltin": "Built-in",
   "@generalSettingsClaudeCoreBuiltin": {
-    "description": "Claude Code core choice: BaoCode's own agent core, written in Dart and run inside the app."
+    "description": "Claude Code core choice: MoonCode's own agent core, written in Dart and run inside the app."
   },
   "generalSettingsClaudeCoreCli": "Claude Code CLI",
   "@generalSettingsClaudeCoreCli": {
@@ -2526,7 +2545,7 @@
   "trayEnabledMacOS": "Show the icon in the menu bar",
   "trayEnabledWindows": "Show the icon in the system tray",
   "trayEnabledDescription": "Closing the window hides it there and the agents keep running; its menu shows the agents waiting on you, and quits the app.",
-  "trayShow": "Show BaoCode",
+  "trayShow": "Show MoonCode",
   "trayWaiting": "Waiting for You",
   "@trayWaiting": {
     "description": "Tray menu header over the agents waiting on the user."
@@ -2549,7 +2568,7 @@
     },
     "description": "Tray menu: how many agents are running."
   },
-  "trayQuit": "Quit BaoCode",
+  "trayQuit": "Quit MoonCode",
   "attentionNeedsInput": "Needs your input",
   "@attentionNeedsInput": {
     "description": "Notification: the agent waits on the user."
@@ -3756,7 +3775,7 @@
       }
     }
   },
-  "kbUnknownContextKeys": "{count, plural, =1{BaoCode does not know the context key {keys}: this keybinding never applies.} other{BaoCode does not know the context keys {keys}: this keybinding never applies.}}",
+  "kbUnknownContextKeys": "{count, plural, =1{MoonCode does not know the context key {keys}: this keybinding never applies.} other{MoonCode does not know the context keys {keys}: this keybinding never applies.}}",
   "@kbUnknownContextKeys": {
     "placeholders": {
       "count": {
@@ -3803,7 +3822,7 @@
   "kbColumnSource": "Source",
   "kbWhenLabel": "When expression",
   "kbNoneFound": "No keybindings found",
-  "kbCannotReadKey": "BaoCode cannot read the key “{key}”: this keybinding never applies.",
+  "kbCannotReadKey": "MoonCode cannot read the key “{key}”: this keybinding never applies.",
   "@kbCannotReadKey": {
     "placeholders": {
       "key": {
@@ -3812,7 +3831,7 @@
     }
   },
   "kbNotSupported": "Not supported",
-  "kbNotSupportedHover": "BaoCode does not have this command: the keybinding is kept, but does nothing.",
+  "kbNotSupportedHover": "MoonCode does not have this command: the keybinding is kept, but does nothing.",
   "kbPressKeys": "Press desired key combination and then press Enter.",
   "kbChordTo": "chord to",
   "kbExistingCommands": "{count, plural, =1{1 existing command has this keybinding} other{{count} existing commands have this keybinding}}",
@@ -3862,12 +3881,12 @@
   "dataDirRevealInFileExplorer": "Reveal in File Explorer",
   "dataDirRevealInFileManager": "Reveal in File Manager",
   "dataDirChecking": "Checking the folder…",
-  "dataDirAlreadyHolds": "The folder already holds BaoCode data",
-  "dataDirMoveBack": "Move BaoCode's data back to the default folder?",
-  "dataDirMoveHere": "Move BaoCode's data to this folder?",
-  "dataDirUseAsIsDetail": "After a restart BaoCode uses the data there as it is; nothing is copied, and the current folder keeps yours.",
-  "dataDirCopyDetail": "BaoCode copies its settings, keybindings, language servers and state there, and uses that folder after a restart.",
-  "dataDirOtherFiles": "The folder holds other files: they stay, beside BaoCode's own.",
+  "dataDirAlreadyHolds": "The folder already holds MoonCode data",
+  "dataDirMoveBack": "Move MoonCode's data back to the default folder?",
+  "dataDirMoveHere": "Move MoonCode's data to this folder?",
+  "dataDirUseAsIsDetail": "After a restart MoonCode uses the data there as it is; nothing is copied, and the current folder keeps yours.",
+  "dataDirCopyDetail": "MoonCode copies its settings, keybindings, language servers and state there, and uses that folder after a restart.",
+  "dataDirOtherFiles": "The folder holds other files: they stay, beside MoonCode's own.",
   "dataDirUseItsData": "Use Its Data",
   "dataDirCopyAndSwitch": "Copy and Switch",
   "dataDirCopying": "Copying…",
@@ -3898,8 +3917,8 @@
       }
     }
   },
-  "dataDirRestartTitle": "Restart BaoCode to use the new data folder",
-  "dataDirRestartDetail": "BaoCode keeps using {current} until it restarts. The next start uses {next}, and offers to remove what is left in the old one.",
+  "dataDirRestartTitle": "Restart MoonCode to use the new data folder",
+  "dataDirRestartDetail": "MoonCode keeps using {current} until it restarts. The next start uses {next}, and offers to remove what is left in the old one.",
   "@dataDirRestartDetail": {
     "placeholders": {
       "current": {
@@ -3911,7 +3930,7 @@
     }
   },
   "dataDirTheNewFolder": "the new folder",
-  "quitConfirmMessage": "Quit BaoCode?",
+  "quitConfirmMessage": "Quit MoonCode?",
   "quitConfirmDetail": "Running agents and terminals will be stopped.",
   "quitConfirmQuit": "Quit",
   "dataDirQuitNow": "Quit Now",
@@ -3941,7 +3960,7 @@
       }
     }
   },
-  "dataDirSharedFiles": "Your settings, keybindings, argv.json, keymaps and keys are read from {folder}, which the BaoCode installed on this machine uses too; sessions, caches, checkpoints and logs are only here.",
+  "dataDirSharedFiles": "Your settings, keybindings, argv.json, keymaps and keys are read from {folder}, which the MoonCode installed on this machine uses too; sessions, caches, checkpoints and logs are only here.",
   "@dataDirSharedFiles": {
     "placeholders": {
       "folder": {
@@ -3950,7 +3969,7 @@
     }
   },
   "dataDirTitle": "Data Folder",
-  "dataDirDescription": "Where BaoCode keeps your settings, keybindings, language servers and its own state. Other programs keep files there too (the web view's caches); BaoCode never moves or removes those.",
+  "dataDirDescription": "Where MoonCode keeps your settings, keybindings, language servers and its own state. Other programs keep files there too (the web view's caches); MoonCode never moves or removes those.",
   "dataDirCurrentFolder": "Current folder",
   "dataDirNewFolder": "New folder",
   "dataDirAfterRestart": "After a restart: {path}",
@@ -3982,9 +4001,9 @@
       }
     }
   },
-  "dataDirSettingUnreadable": "BaoCode's data folder setting cannot be read",
-  "dataDirCannotWrite": "BaoCode cannot write to its data folder",
-  "dataDirUnavailable": "BaoCode's data folder is not available",
+  "dataDirSettingUnreadable": "MoonCode's data folder setting cannot be read",
+  "dataDirCannotWrite": "MoonCode cannot write to its data folder",
+  "dataDirUnavailable": "MoonCode's data folder is not available",
   "dataDirWhereEnv": "It is set by the {variable} environment variable.",
   "@dataDirWhereEnv": {
     "placeholders": {
@@ -3993,7 +4012,7 @@
       }
     }
   },
-  "dataDirWhereFixPointer": "Fix or delete {file} and try again; BaoCode changes it only if you choose another folder.",
+  "dataDirWhereFixPointer": "Fix or delete {file} and try again; MoonCode changes it only if you choose another folder.",
   "@dataDirWhereFixPointer": {
     "placeholders": {
       "file": {
@@ -4020,8 +4039,8 @@
   "dataDirRetry": "Retry",
   "dataDirUseDefaultOnce": "Use the Default Folder This Time",
   "dataDirChooseAnother": "Choose Another Folder…",
-  "dataDirRemoveOldTitle": "Remove the data BaoCode left in its previous folder?",
-  "dataDirRemoveOldDetail": "BaoCode now keeps its data in {current}. Only its own items are removed from the previous folder ({items}); the folder and everything else in it stay.",
+  "dataDirRemoveOldTitle": "Remove the data MoonCode left in its previous folder?",
+  "dataDirRemoveOldDetail": "MoonCode now keeps its data in {current}. Only its own items are removed from the previous folder ({items}); the folder and everything else in it stay.",
   "@dataDirRemoveOldDetail": {
     "placeholders": {
       "current": {
@@ -4035,7 +4054,7 @@
   "dataDirRemove": "Remove",
   "dataDirKeep": "Keep",
   "dataDirRemoveOldInUse": "Some of the old data could not be removed",
-  "dataDirRemoveOldInUseDetail": "Files in {items} are in use, perhaps by another program. Everything else was removed; BaoCode offers to remove the rest the next time it starts.",
+  "dataDirRemoveOldInUseDetail": "Files in {items} are in use, perhaps by another program. Everything else was removed; MoonCode offers to remove the rest the next time it starts.",
   "@dataDirRemoveOldInUseDetail": {
     "placeholders": {
       "items": {
@@ -4238,7 +4257,7 @@
       }
     }
   },
-  "shellCommandOccupied": "{path} already runs another app's '{name}' command. Replace it with BaoCode's?",
+  "shellCommandOccupied": "{path} already runs another app's '{name}' command. Replace it with MoonCode's?",
   "@shellCommandOccupied": {
     "placeholders": {
       "path": {
@@ -4273,7 +4292,7 @@
     }
   },
   "generalSettingsMainWindow": "Open at Launch",
-  "generalSettingsMainWindowDescription": "What BaoCode opens to: the agents, or the IDE windows (as Restore Windows says), never both. By default, wherever it was left when it last quit.",
+  "generalSettingsMainWindowDescription": "What MoonCode opens to: the agents, or the IDE windows (as Restore Windows says), never both. By default, wherever it was left when it last quit.",
   "generalSettingsMainWindowLabel": "Open at Launch: {name}",
   "@generalSettingsMainWindowLabel": {
     "placeholders": {
@@ -4317,7 +4336,7 @@
       }
     }
   },
-  "claudePathInUseDownloaded": "In use: Claude Code {version}, downloaded by BaoCode",
+  "claudePathInUseDownloaded": "In use: Claude Code {version}, downloaded by MoonCode",
   "@claudePathInUseDownloaded": {
     "placeholders": {
       "version": {
@@ -4388,7 +4407,7 @@
   "windowMenuWindows": "Windows",
   "windowOpened": "Opened",
   "generalSettingsShellCommand": "Shell Command",
-  "generalSettingsShellCommandDescription": "Open files and folders in BaoCode from a terminal: 'code <path>'. Installed at {location}.",
+  "generalSettingsShellCommandDescription": "Open files and folders in MoonCode from a terminal: 'code <path>'. Installed at {location}.",
   "@generalSettingsShellCommandDescription": {
     "placeholders": {
       "location": {
@@ -4557,7 +4576,7 @@
     }
   },
   "modelsFeaturedWhy": "Why am I seeing this?",
-  "modelsFeaturedNote": "These sites are officially listed by BaoCode",
+  "modelsFeaturedNote": "These sites are officially listed by MoonCode",
   "modelsFeaturedNoteHow": "Add the one-click import to be listed too, for free",
   "modelsFeaturedNoteLink": "List My Site Too",
   "modelsImportTitle": "Import an upstream from {host}",
@@ -4604,7 +4623,7 @@
   },
   "modelsImportAsNew": "Add as New Upstream",
   "modelsImportInvalid": "This import link can't be used",
-  "modelsImportInvalidDetail": "It needs a base URL (http or https) and a protocol BaoCode knows. Ask the site for a new link, or add the upstream by hand in Settings → Models.",
+  "modelsImportInvalidDetail": "It needs a base URL (http or https) and a protocol MoonCode knows. Ask the site for a new link, or add the upstream by hand in Settings → Models.",
   "modelsAddProvider": "Add Upstream",
   "modelsNewProviderName": "New Upstream",
   "modelsProviderNoUrl": "No base URL",
@@ -4860,7 +4879,7 @@
   "modelsRoleHaikuDescription": "ANTHROPIC_DEFAULT_HAIKU_MODEL: Claude Code's background work, and agents' titles.",
   "modelsRoleHaikuWarning": "Unset, background work runs on the model picked, which may be slower and cost more. Pick a small, fast model.",
   "modelsRoleSubagent": "Subagents",
-  "modelsRoleSubagentDescription": "CLAUDE_CODE_SUBAGENT_MODEL: the model every subagent runs on, over the one its definition or the agent's call names (but inherit). It may be another upstream's: BaoCode's local proxy sends its requests there.",
+  "modelsRoleSubagentDescription": "CLAUDE_CODE_SUBAGENT_MODEL: the model every subagent runs on, over the one its definition or the agent's call names (but inherit). It may be another upstream's: MoonCode's local proxy sends its requests there.",
   "modelsRoleMissing": "This model is no longer one of its upstream's: subagents' requests to it will fail.",
   "@modelsRoleMissing": {
     "description": "Under a role that picks another upstream's model, once that upstream or model is gone."
@@ -4994,7 +5013,7 @@
   "modelsAuxiliaryBuiltin": "Claude Code Haiku (this machine's setup)",
   "settingsSectionUpdates": "Updates",
   "updatesSettingsTitle": "Updates",
-  "updatesSettingsDescription": "BaoCode looks for new versions on baocode.dev.",
+  "updatesSettingsDescription": "MoonCode does not check for new versions online.",
   "updateCurrentVersion": "Current Version",
   "updateLastChecked": "Last checked {time}",
   "@updateLastChecked": {
@@ -5010,8 +5029,8 @@
     "description": "The settings page's button."
   },
   "updateChecking": "Checking for updates…",
-  "updateUpToDate": "BaoCode is up to date.",
-  "updateAvailable": "BaoCode {version} is available.",
+  "updateUpToDate": "MoonCode is up to date.",
+  "updateAvailable": "MoonCode {version} is available.",
   "@updateAvailable": {
     "placeholders": {
       "version": {
@@ -5019,7 +5038,7 @@
       }
     }
   },
-  "updateReady": "BaoCode {version} has been downloaded. Restart to update.",
+  "updateReady": "MoonCode {version} has been downloaded. Restart to update.",
   "@updateReady": {
     "placeholders": {
       "version": {
@@ -5027,7 +5046,7 @@
       }
     }
   },
-  "updateDownloading": "Downloading BaoCode {version}…",
+  "updateDownloading": "Downloading MoonCode {version}…",
   "@updateDownloading": {
     "placeholders": {
       "version": {
@@ -5035,7 +5054,7 @@
       }
     }
   },
-  "updateDownloadingProgress": "Downloading BaoCode {version}… {percent}%",
+  "updateDownloadingProgress": "Downloading MoonCode {version}… {percent}%",
   "@updateDownloadingProgress": {
     "placeholders": {
       "version": {
@@ -5046,7 +5065,7 @@
       }
     }
   },
-  "updateMandatory": "This version of BaoCode is no longer supported. Update to {version} to keep using it.",
+  "updateMandatory": "This version of MoonCode is no longer supported. Update to {version} to keep using it.",
   "@updateMandatory": {
     "placeholders": {
       "version": {
@@ -5058,7 +5077,7 @@
   "updateLater": "Later",
   "updateSkip": "Skip This Version",
   "updateSkippedNote": "You skipped this version: it is not offered again, but can still be installed here.",
-  "updateFailed": "Couldn't update BaoCode: {error}",
+  "updateFailed": "Couldn't update MoonCode: {error}",
   "@updateFailed": {
     "placeholders": {
       "error": {
@@ -5075,8 +5094,8 @@
     }
   },
   "updateDisabled": "Updates are turned off (update.mode is \"none\").",
-  "updateUnsupported": "This build of BaoCode doesn't update itself.",
-  "updateManual": "BaoCode can't update itself here ({reason}). Download the new version from baocode.dev.",
+  "updateUnsupported": "This build of MoonCode doesn't update itself.",
+  "updateManual": "MoonCode can't update itself here ({reason}).",
   "@updateManual": {
     "placeholders": {
       "reason": {
@@ -5085,7 +5104,7 @@
     }
   },
   "updateOpenDownloadPage": "Open Download Page",
-  "updateUnfinished": "BaoCode {version} wasn't installed: this is still {current}. Try again from Settings > Updates, or download it from baocode.dev.",
+  "updateUnfinished": "MoonCode {version} wasn't installed: this is still {current}.",
   "@updateUnfinished": {
     "placeholders": {
       "version": {
@@ -5107,7 +5126,7 @@
     }
   },
   "updateMode": "Update Mode",
-  "updateModeDescription": "Whether BaoCode looks for new versions by itself (update.mode).",
+  "updateModeDescription": "Whether MoonCode looks for new versions by itself (update.mode).",
   "updateModeLabel": "Update Mode: {name}",
   "@updateModeLabel": {
     "description": "The update mode dropdown, as read out.",
@@ -5130,7 +5149,7 @@
     "description": "Update mode: never checks."
   },
   "diagnosticsTitle": "Diagnostic Logs",
-  "diagnosticsDescription": "Send BaoCode's error logs to its developers to help track down a problem. Nothing is sent until you upload.",
+  "diagnosticsDescription": "Send MoonCode's error logs to its developers to help track down a problem. Nothing is sent until you upload.",
   "diagnosticsUpload": "Upload…",
   "diagnosticsDialogTitle": "Upload Diagnostic Logs",
   "diagnosticsNotePlaceholder": "Note (optional): what went wrong, and how to make it happen again",
@@ -5163,7 +5182,7 @@
   "diagnosticsSend": "Upload",
   "diagnosticsUploading": "Uploading…",
   "diagnosticsUploaded": "Uploaded. Report ID:",
-  "diagnosticsUploadedDetail": "Give this ID to BaoCode's developers so they can find these logs.",
+  "diagnosticsUploadedDetail": "Give this ID to MoonCode's developers so they can find these logs.",
   "diagnosticsOmittedDumps": "{count, plural, =1{1 older memory dump was} other{{count} older memory dumps were}} left out: over 10 MB.",
   "@diagnosticsOmittedDumps": {
     "placeholders": {
@@ -5385,8 +5404,8 @@
   },
   "generalSettingsContextMenuFinder": "Finder Context Menu",
   "generalSettingsContextMenuExplorer": "File Explorer Context Menu",
-  "generalSettingsContextMenuDescription": "Adds \"Open with BaoCode\" (a new agent) and \"Open with Fast Ide\" (a new IDE window) to the context menu of files, folders and a folder's background.",
-  "generalSettingsContextMenuMacNote": "Finder's own setting is in System Settings' extensions, where the BaoCode extension can also be turned on and off.",
+  "generalSettingsContextMenuDescription": "Adds \"Open with MoonCode\" (a new agent) and \"Open with Fast Ide\" (a new IDE window) to the context menu of files, folders and a folder's background.",
+  "generalSettingsContextMenuMacNote": "Finder's own setting is in System Settings' extensions, where the MoonCode extension can also be turned on and off.",
   "generalSettingsContextMenuOn": "On",
   "generalSettingsContextMenuOff": "Off",
   "generalSettingsContextMenuUnsupported": "This build of the app has no Finder extension.",
@@ -5583,7 +5602,7 @@
   },
   "localDownloadingClaude": "Downloading Claude Code… {percent}%",
   "@localDownloadingClaude": {
-    "description": "Shown over the chat while Claude Code is downloaded into BaoCode's data folder, the user having none that runs (or only one too old), before the agent starts.",
+    "description": "Shown over the chat while Claude Code is downloaded into MoonCode's data folder, the user having none that runs (or only one too old), before the agent starts.",
     "placeholders": {
       "percent": {
         "type": "int"
@@ -5647,7 +5666,7 @@
   "@updateButton": {
     "description": "The sidebar's button while an update waits to be installed: restarts into it."
   },
-  "tipsSetupTitle": "Set Up BaoCode",
+  "tipsSetupTitle": "Set Up MoonCode",
   "tipsSetupCount": "{done}/{total}",
   "@tipsSetupCount": {
     "placeholders": {
@@ -5686,7 +5705,7 @@
       }
     }
   },
-  "tipsUpdated": "BaoCode was updated to {version}. New: {features}.",
+  "tipsUpdated": "MoonCode was updated to {version}. New: {features}.",
   "@tipsUpdated": {
     "placeholders": {
       "version": {
@@ -5700,7 +5719,7 @@
   "tipsListSeparator": ", ",
   "tipsSettingsTitle": "Recommended",
   "tipsSettingsDescription": "Features not turned on yet. Show Setup Guide brings back the setup checklist; \"workbench.tips.enabled\": false in settings.json turns tips off.",
-  "tipContextMenuBody": "Open files and folders in BaoCode from their context menu.",
+  "tipContextMenuBody": "Open files and folders in MoonCode from their context menu.",
   "tipShellCommandTitle": "'{name}' Command",
   "@tipShellCommandTitle": {
     "placeholders": {
@@ -5709,7 +5728,7 @@
       }
     }
   },
-  "tipShellCommandBody": "Open folders in BaoCode from a terminal: {name} <path>.",
+  "tipShellCommandBody": "Open folders in MoonCode from a terminal: {name} <path>.",
   "@tipShellCommandBody": {
     "placeholders": {
       "name": {
@@ -5721,9 +5740,9 @@
   "tipImportKeybindingsBody": "Bring your keybindings over from VS Code or Cursor.",
   "tipColorThemeBody": "Pick the colors of the chat, the IDE and the terminal.",
   "cmdShowSetupGuide": "Show Setup Guide",
-  "cmdStarOnGitHub": "Star BaoCode on GitHub",
-  "starPromptMessage": "Enjoying BaoCode?",
-  "starPromptDetail": "BaoCode is free and open source. If it helps you, a star on GitHub helps other people find it.",
+  "cmdStarOnGitHub": "Star MoonCode on GitHub",
+  "starPromptMessage": "Enjoying MoonCode?",
+  "starPromptDetail": "MoonCode is free and open source. If it helps you, a star on GitHub helps other people find it.",
   "starPromptStar": "Star on GitHub",
   "starPromptLater": "Maybe Later",
   "cmdResetFeatureTips": "Reset Feature Tips",
@@ -5848,9 +5867,9 @@
   "settingsSectionNetwork": "Network",
   "settingsNetworkKeywords": "proxy http https clash vpn network",
   "networkSettingsTitle": "Network",
-  "networkSettingsDescription": "How BaoCode and the Claude Code it starts reach the internet.",
+  "networkSettingsDescription": "How MoonCode and the Claude Code it starts reach the internet.",
   "networkProxy": "Proxy",
-  "networkProxyDescription": "The proxy for BaoCode and Claude Code (http.proxyMode). System Proxy follows the system's settings, such as Clash's system proxy. New sessions take a change; restart a running one for it.",
+  "networkProxyDescription": "The proxy for MoonCode and Claude Code (http.proxyMode). System Proxy follows the system's settings, such as Clash's system proxy. New sessions take a change; restart a running one for it.",
   "networkProxyLabel": "Proxy: {name}",
   "@networkProxyLabel": {
     "description": "The proxy dropdown, as read out.",
@@ -5911,7 +5930,7 @@
   "networkProxyStatusManualMissing": "Enter the proxy's address.",
   "networkProxyStatusNone": "Direct: the system has no proxy set.",
   "networkProxyStatusOff": "Direct.",
-  "networkProxyStatusAutoConfig": "Direct: the system sets its proxy with an auto-config (PAC) file, which BaoCode doesn't follow. Turn on Clash's system proxy, or enter the address manually.",
+  "networkProxyStatusAutoConfig": "Direct: the system sets its proxy with an auto-config (PAC) file, which MoonCode doesn't follow. Turn on Clash's system proxy, or enter the address manually.",
   "networkProxyRefresh": "Detect Again",
   "networkTest": "Connection Test",
   "networkTestDescription": "Reaches these sites through the proxy in use: whether each answers, and how quickly (a new connection's time, until the answer starts).",
@@ -5953,7 +5972,7 @@
   "extsCapabilityFull": "Fully supported",
   "extsCapabilityFullDetail": "Its color or file icon themes all apply.",
   "extsCapabilityPartial": "Partly supported",
-  "extsCapabilityPartialDetail": "Its themes apply; the rest of it does nothing in BaoCode.",
+  "extsCapabilityPartialDetail": "Its themes apply; the rest of it does nothing in MoonCode.",
   "extsEngineIncompatible": "Needs VS Code {requested}; this is {current}.",
   "@extsEngineIncompatible": {
     "placeholders": {
@@ -6114,7 +6133,7 @@
   "themeSelectIconThemePlaceholder": "Select File Icon Theme (Up/Down Keys to Preview)",
   "themeIconThemeBuiltIn": "Built-in",
   "extsCapabilityUnsupported": "Not supported",
-  "extsCapabilityUnsupportedDetail": "It has no color or file icon theme: BaoCode only uses themes from extensions.",
+  "extsCapabilityUnsupportedDetail": "It has no color or file icon theme: MoonCode only uses themes from extensions.",
   "extsFindingCode": "Its code does not run.",
   "extsFindingContribution": "Not used: {name}",
   "@extsFindingContribution": {
@@ -6193,7 +6212,7 @@
   },
   "settingsSectionMobile": "Mobile",
   "settingsMobileKeywords": "phone iphone android ios pair qr code remote lan",
-  "mobileSettingsDescription": "Follow and drive this computer's agents from BaoCode on your phone, over the local network or the internet. What goes between them is end-to-end encrypted.",
+  "mobileSettingsDescription": "Follow and drive this computer's agents from MoonCode on your phone, over the local network or the internet. What goes between them is end-to-end encrypted.",
   "mobileAllow": "Allow Phones to Connect",
   "mobileAllowDescription": "Phones paired with this computer connect to it directly.",
   "mobileStatus": "Status",
@@ -6245,10 +6264,10 @@
   "mobilePublicAddress": "Public Address",
   "mobilePublicAddressDescription": "A domain or IP this computer can be reached at from the internet (with the port forwarded), put in the QR code; several separated by commas. Behind a proxy that only takes HTTPS (such as a Cloudflare Tunnel), write it as wss://domain. Public IPv6 addresses are found by themselves.",
   "mobileRelay": "Relay",
-  "mobileRelayDescription": "Reach this computer through BaoCode's relay when none of its addresses can be reached. Coming later.",
+  "mobileRelayDescription": "Reach this computer through MoonCode's relay when none of its addresses can be reached. Coming later.",
   "mobileRelayUnavailable": "Not Available Yet",
   "mobilePair": "Pair a Phone",
-  "mobilePairDescription": "Scan the code with BaoCode on the phone (Me → Paired computers → Pair a computer), or pick this computer under Nearby Computers there.",
+  "mobilePairDescription": "Scan the code with MoonCode on the phone (Me → Paired computers → Pair a computer), or pick this computer under Nearby Computers there.",
   "mobilePairShow": "Show QR Code",
   "mobilePairCancel": "Cancel",
   "mobilePairNewCode": "New Code",
@@ -6552,7 +6571,7 @@
       }
     }
   },
-  "stashImplement": "Implement in BaoCode",
+  "stashImplement": "Implement in MoonCode",
   "stashImplementHow": "How should the agent work on it?",
   "stashImplementHowDetail": "In a new git worktree (a branch of its own, your working copy untouched), or directly in the project as it is.",
   "stashImplementWorktree": "New Worktree",
@@ -6613,7 +6632,7 @@
   "stashSettingsDirectory": "Location",
   "stashSettingsDirectoryChange": "Change…",
   "stashSettingsDirectoryReset": "Default",
-  "stashSettingsDirectoryRestart": "Takes effect after BaoCode restarts.",
+  "stashSettingsDirectoryRestart": "Takes effect after MoonCode restarts.",
   "stashAll": "All",
   "@stashAll": {
     "description": "Opens the list of every stash beside the one written in, in the stash panel."
@@ -6767,7 +6786,7 @@
       }
     }
   },
-  "accountsSignOutDetail": "The token is deleted from this computer. To revoke BaoCode's access altogether, revoke it in your {forge} settings too.",
+  "accountsSignOutDetail": "The token is deleted from this computer. To revoke MoonCode's access altogether, revoke it in your {forge} settings too.",
   "@accountsSignOutDetail": {
     "placeholders": {
       "forge": {
@@ -6813,7 +6832,7 @@
       }
     }
   },
-  "accountsBrowserDetail": "Enter this code on {host} to let BaoCode access your account:",
+  "accountsBrowserDetail": "Enter this code on {host} to let MoonCode access your account:",
   "@accountsBrowserDetail": {
     "placeholders": {
       "host": {
@@ -6976,7 +6995,7 @@
   "stashWelcomeLead": "Note things down the moment they come to you, hand them to an agent when you are ready, and see how each one is going.",
   "stashWelcomeNoteTitle": "Note it down",
   "stashWelcomeAgentTitle": "Hand it to an agent",
-  "stashWelcomeAgent": "Click Implement in BaoCode, or mention it in a conversation; the conversation and the stash stay linked.",
+  "stashWelcomeAgent": "Click Implement in MoonCode, or mention it in a conversation; the conversation and the stash stay linked.",
   "stashWelcomeTrackTitle": "See how it goes",
   "stashWelcomeTrack": "Cards show their conversations live, and the GitHub and GitLab issues and pull requests they link to stay in sync.",
   "stashWelcomeStart": "Get Started",
@@ -7003,17 +7022,17 @@
   "browserSettingsNotInstalled": "No browser has connected yet",
   "browserSettingsNotInstalledDescription": "Install the extension either way below, then open the browser: it connects automatically.",
   "browserSettingsNotRunning": "No browser connected",
-  "browserSettingsNotRunningDescription": "Open a browser with BaoCode's extension: it connects automatically.",
+  "browserSettingsNotRunningDescription": "Open a browser with MoonCode's extension: it connects automatically.",
   "browserSettingsSandboxed": "Snap and Flatpak browsers can't connect",
-  "browserSettingsSandboxedDescription": "Their sandbox keeps BaoCode's helper from running. Install the browser from its own .deb or .rpm package instead, such as Google Chrome from google.com/chrome.",
+  "browserSettingsSandboxedDescription": "Their sandbox keeps MoonCode's helper from running. Install the browser from its own .deb or .rpm package instead, such as Google Chrome from google.com/chrome.",
   "browserSettingsConnected": "{browser} connected",
   "@browserSettingsConnected": {"description": "A browser connected, by its name (Google Chrome, Microsoft Edge…).", "placeholders": {"browser": {"type": "String"}}},
   "browserSettingsIncompatible": "{browser}: extension version doesn't match",
-  "@browserSettingsIncompatible": {"description": "A browser connected whose extension BaoCode cannot use: one too old, or newer than the app.", "placeholders": {"browser": {"type": "String"}}},
+  "@browserSettingsIncompatible": {"description": "A browser connected whose extension MoonCode cannot use: one too old, or newer than the app.", "placeholders": {"browser": {"type": "String"}}},
   "browserSettingsExtensionVersion": "Extension {version}",
-  "@browserSettingsExtensionVersion": {"description": "The version of BaoCode's extension in a connected browser.", "placeholders": {"version": {"type": "String"}}},
+  "@browserSettingsExtensionVersion": {"description": "The version of MoonCode's extension in a connected browser.", "placeholders": {"version": {"type": "String"}}},
   "browserSettingsExtensionOld": "The extension is out of date. From the store, it updates automatically, or click Update in chrome://extensions; installed manually, download the zip again, replace the folder's contents and click reload.",
-  "browserSettingsAppOld": "The extension is newer than this BaoCode. Update BaoCode.",
+  "browserSettingsAppOld": "The extension is newer than this MoonCode. Update MoonCode.",
   "browserSettingsInstall": "Get the Extension",
   "browserSettingsStore": "Chrome Web Store",
   "browserSettingsStoreDescription": "Recommended. Updates automatically; works in Chrome, Edge, Brave, Arc and other Chromium browsers.",
@@ -7023,7 +7042,7 @@
   "browserSettingsUnpackedDownload": "Download Zip",
   "browserSettingsOpen": "Browser Settings",
   "browserHistoryTitle": "Debugging history",
-  "browserHistoryDescription": "What the tabs shared with BaoCode do is kept as it happens, no recording needed: the pages, the requests, console errors and warnings. Agents look back at it when you ask (“it failed when I saved”). Kept on this computer; cookies and tokens are not.",
+  "browserHistoryDescription": "What the tabs shared with MoonCode do is kept as it happens, no recording needed: the pages, the requests, console errors and warnings. Agents look back at it when you ask (“it failed when I saved”). Kept on this computer; cookies and tokens are not.",
   "browserHistoryDetailed": "Detailed history",
   "browserHistoryDetailedDescription": "Also keeps the request and response bodies, what you do (clicks and typing, never passwords) and every console message. Takes more space.",
   "browserHistorySize": "Using {size}",
@@ -7036,9 +7055,9 @@
   "browserHistoryTooLargeDetail": "Clear it, or look at it in Settings → Browser.",
   "browserHistoryOpenSettings": "Browser settings",
   "browserWelcomeTitle": "Agents can use your browser now",
-  "browserWelcomeLead": "With BaoCode's extension, agents open pages, read them, click and type in your own Chrome, signed in as you are.",
+  "browserWelcomeLead": "With MoonCode's extension, agents open pages, read them, click and type in your own Chrome, signed in as you are.",
   "browserWelcomeSharedTitle": "Only the tabs you share",
-  "browserWelcomeShared": "They work in the yellow BaoCode tab group alone; your other tabs stay yours.",
+  "browserWelcomeShared": "They work in the yellow MoonCode tab group alone; your other tabs stay yours.",
   "browserWelcomeWatchTitle": "Watch it work",
   "browserWelcomeWatch": "The side panel shows the page live as the agent uses it. Take over any time.",
   "browserWelcomeShowTitle": "Show it once",
@@ -7048,14 +7067,14 @@
   "browserWelcomeTurnedOff": "The browser is turned off in Settings → Browser.",
   "browserWelcomeConnected": "{browser} is connected",
   "@browserWelcomeConnected": {"description": "The welcome's step once a browser connected, by its name.", "placeholders": {"browser": {"type": "String"}}},
-  "browserWelcomeTry": "Try telling an agent: “Open baocode.dev and look at the download page.”",
+  "browserWelcomeTry": "Try telling an agent: “Open a web page and take a look.”",
   "browserWelcomeUnpacked": "Developer Mode Zip",
   "browserWelcomeDone": "Got It",
   "cmdBrowserWelcome": "Connect Your Browser...",
   "cmdStashWelcome": "Meet Stash...",
   "cmdModelWelcome": "Set Up a Model...",
   "modelWelcomeTitle": "Pick a Model to Start",
-  "modelWelcomeLead": "BaoCode runs your agents on a model of your choosing. Add an upstream, a service with an API key, and its models are ready to use.",
+  "modelWelcomeLead": "MoonCode runs your agents on a model of your choosing. Add an upstream, a service with an API key, and its models are ready to use.",
   "modelWelcomeAnyTitle": "Any upstream",
   "modelWelcomeAny": "Anthropic's API, OpenAI's Chat Completions or Responses, or a service that speaks one of them, such as OpenRouter or DeepSeek.",
   "modelWelcomeKeysTitle": "Your keys stay with you",
@@ -7078,7 +7097,7 @@
   "modelWelcomeStart": "Start Chatting",
   "healthNoModel": "Pick a model to start: add an upstream and its models are ready to use.",
   "modelSetUp": "Set Up a Model",
-  "claudeCoreHint": "This chat runs on BaoCode's built-in core. We recommend the Claude Code core for the fullest experience; it's downloaded for you if needed.",
+  "claudeCoreHint": "This chat runs on MoonCode's built-in core. We recommend the Claude Code core for the fullest experience; it's downloaded for you if needed.",
   "claudeCoreHintSwitch": "Switch to Claude Code",
   "claudeCoreHintLater": "Not Now",
   "remoteAddServer": "Add SSH Server...",
@@ -7134,7 +7153,7 @@
   "sshServerCore": "Core",
   "sshServerCoreAuto": "Automatic",
   "sshServerCoreAutoHint": "The server's Claude Code CLI if it has one, else the built-in core.",
-  "sshServerCoreBuiltinHint": "BaoCode's own core: it runs on the upstreams of Settings → Models.",
+  "sshServerCoreBuiltinHint": "MoonCode's own core: it runs on the upstreams of Settings → Models.",
   "sshServerCoreCliHint": "The server's Claude Code CLI, installed there if it has none.",
   "sshServerJump": "Jump Host (optional)",
   "sshServerNoJump": "None: connect directly",
@@ -7162,14 +7181,14 @@
   "remoteFailHostKey": "The server's key is not known, and your ssh config says not to accept new ones (StrictHostKeyChecking).",
   "remoteFailHostKeyChanged": "The server's key changed since the last connection: it was reinstalled, or someone is in between.",
   "remoteFailUnreachable": "The server could not be reached: check the address, port and network.",
-  "channelSetupTitle": "Welcome to BaoCode",
+  "channelSetupTitle": "Welcome to MoonCode",
   "channelSetupLead": "Finish your first-time setup on baocode.dev. It takes about 10 seconds.",
   "channelSetupStepTitle": "Finish setup in your browser",
-  "channelSetupStep": "BaoCode opens baocode.dev in your browser. Once the page says it's done, BaoCode continues on its own.",
+  "channelSetupStep": "MoonCode opens baocode.dev in your browser. Once the page says it's done, MoonCode continues on its own.",
   "channelSetupWaitingTitle": "Waiting for your browser…",
-  "channelSetupWaiting": "Once the page says it's done, BaoCode continues on its own. Closed the page by mistake? Open it again.",
+  "channelSetupWaiting": "Once the page says it's done, MoonCode continues on its own. Closed the page by mistake? Open it again.",
   "channelSetupOpenFailedTitle": "Your browser didn't open",
-  "channelSetupOpenFailed": "Copy this address and open it in your browser. Once the page says it's done, BaoCode continues on its own.",
+  "channelSetupOpenFailed": "Copy this address and open it in your browser. Once the page says it's done, MoonCode continues on its own.",
   "channelSetupAddressCopied": "Copied",
   "channelSetupOffline": "Can't reach baocode.dev. You need to be online to finish setup.",
   "channelSetupRetry": "Retry",
@@ -7180,16 +7199,16 @@
   "channelSetupPasteLead": "If the page shows a link, copy it and paste it here:",
   "channelSetupPasteConfirm": "OK",
   "channelSetupLinkInvalid": "That isn't the link from the page. Copy the whole link shown there.",
-  "channelSetupLinkOther": "That link is for another BaoCode install. Use the page this BaoCode opened.",
+  "channelSetupLinkOther": "That link is for another MoonCode install. Use the page this MoonCode opened.",
   "channelSetupTrouble": "Having trouble?",
   "channelSetupOnceTitle": "Only once",
   "channelSetupOnce": "Once it's done, this won't show again, not even after an update.",
   "channelSetupPrivateTitle": "Nothing personal",
-  "channelSetupPrivate": "The page only tells BaoCode where you heard of it, like a video or a website.",
+  "channelSetupPrivate": "The page only tells MoonCode where you heard of it, like a video or a website.",
   "channelSetupFindingTitle": "Getting your channel ready…",
   "channelSetupFinding": "Just a moment.",
   "channelSetupSiteOfflineTitle": "Can't reach baocode.dev",
-  "channelSetupSiteOffline": "BaoCode needs to be online to read your channel. Check your connection and retry.",
+  "channelSetupSiteOffline": "MoonCode needs to be online to read your channel. Check your connection and retry.",
   "channelSetupUnavailableTitle": "This channel isn't available",
   "channelSetupUnavailable": "The channel this installer came from doesn't have accounts set up yet. If you downloaded it through another channel, confirm where you came from in your browser; otherwise contact whoever gave you the installer, or download the standard edition from baocode.dev.",
   "channelSetupConfirmAgain": "Confirm in Browser",
@@ -7207,7 +7226,7 @@
   "channelAccountRefresh": "Refresh",
   "channelAccountSignOut": "Sign Out",
   "channelAccountSignOutTitle": "Sign out?",
-  "channelAccountSignOutDetail": "You'll need to sign in to {channel} again to keep using BaoCode.",
+  "channelAccountSignOutDetail": "You'll need to sign in to {channel} again to keep using MoonCode.",
   "@channelAccountSignOutDetail": {"placeholders": {"channel": {"type": "String"}}},
   "channelAccountOpenSite": "Open Website",
   "channelAccountDefaultModel": "Default model for new chats",
