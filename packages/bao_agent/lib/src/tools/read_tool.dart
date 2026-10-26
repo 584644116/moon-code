@@ -38,17 +38,17 @@ class ReadTool extends Tool {
 
   @override
   String get description =>
-      '''Gives you the contents of a file on this machine: text, an image, a PDF or a Jupyter notebook. Any path on the machine can be read, and a path the user gives can be taken as it is; one that is not there just comes back as an error.
+      '''读取本机文件的内容：文本、图片、PDF 或 Jupyter notebook。本机任何路径都能读，用户给出的路径可以直接照用；不存在的路径只会返回一个错误。
 
-- Give an absolute path.
-- Without offset and limit you get the first $maxLines lines, which is usually best. Use them only for a file too long to take at once.
-- Every line comes back after its number and a tab, the first line 1. A line longer than $maxLineLength characters is cut short.
-- An image (PNG, JPG, GIF, WebP) comes back as the picture itself.
-- A PDF comes back as the document; for a long one, ask for some pages, at most 20 at a time (pages: "1-5").
-- A notebook comes back cell by cell, each with what it printed.
-- A folder cannot be read: list it with `ls` through Bash, or with Glob.
-- Several files that may matter can be read at once, in calls side by side in one reply.
-- An empty file comes back as a note saying so.''';
+- 给出绝对路径。
+- 不给 offset 和 limit 时返回前 $maxLines 行，通常这样最好。只在文件长到一次读不完时才用它们。
+- 每一行都带行号和一个制表符，第一行是 1。超过 $maxLineLength 字符的行会被截短。
+- 图片（PNG、JPG、GIF、WebP）直接返回图片本身。
+- PDF 返回文档内容；长文档请按页索取，一次最多 20 页（pages："1-5"）。
+- notebook 按单元格返回，每个单元格连同它的输出。
+- 文件夹不能读：用 Bash 的 `ls` 或 Glob 列出来。
+- 几个可能相关的文件可以一次读完，在同一条回复里并排调用即可。
+- 空文件会返回一句说明。''';
 
   @override
   Map<String, Object?> get inputSchema => const {
@@ -56,20 +56,19 @@ class ReadTool extends Tool {
     'properties': {
       'file_path': {
         'type': 'string',
-        'description': 'Absolute path of the file',
+        'description': '文件的绝对路径',
       },
       'offset': {
         'type': 'integer',
-        'description': 'The first line to give, counting from 1: only for a file too long to take whole',
+        'description': '从第几行开始给，从 1 数起：只用于长到无法整读的文件',
       },
       'limit': {
         'type': 'integer',
-        'description':
-            'How many lines to give: only for a file too long to take whole',
+        'description': '给多少行：只用于长到无法整读的文件',
       },
       'pages': {
         'type': 'string',
-        'description': 'For a PDF only: the pages to give, one ("3") or a range ("1-5"), 20 at most',
+        'description': '仅用于 PDF：要给的页，单页（"3"）或范围（"1-5"），最多 20 页',
       },
     },
     'required': ['file_path'],

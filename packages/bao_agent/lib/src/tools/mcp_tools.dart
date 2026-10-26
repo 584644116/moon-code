@@ -217,15 +217,14 @@ class ListMcpResourcesTool extends Tool {
 
   @override
   String get description =>
-      'Lists what resources the connected MCP servers offer, each with the '
-      'server it is on (its server field). Give server for one server\'s '
-      'alone.';
+      '列出已连接的 MCP 服务器提供哪些资源，每条都带上它所在的服务器'
+      '（server 字段）。给出 server 则只看一个服务器的。';
 
   @override
   Map<String, Object?> get inputSchema => const {
     'type': 'object',
     'properties': {
-      'server': {'type': 'string', 'description': 'Only this server\'s'},
+      'server': {'type': 'string', 'description': '只要这个服务器的'},
     },
     'additionalProperties': false,
   };
@@ -279,15 +278,14 @@ class ReadMcpResourceTool extends Tool {
 
   @override
   String get description =>
-      'Reads one resource of an MCP server, by the server\'s name and the '
-      'resource\'s URI.';
+      '读取 MCP 服务器的一个资源，用服务器名称和资源的 URI 指定。';
 
   @override
   Map<String, Object?> get inputSchema => const {
     'type': 'object',
     'properties': {
-      'server': {'type': 'string', 'description': 'The server, by name'},
-      'uri': {'type': 'string', 'description': 'The resource, by URI'},
+      'server': {'type': 'string', 'description': '服务器，按名称'},
+      'uri': {'type': 'string', 'description': '资源，按 URI'},
     },
     'required': ['server', 'uri'],
     'additionalProperties': false,

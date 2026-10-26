@@ -29,7 +29,7 @@ class BashTool extends Tool {
   String get name => 'Bash';
 
   @override
-  String get description => 'Runs a shell command and returns what it printed.';
+  String get description => '运行一条 shell 命令并返回它的输出。';
 
   /// What the model is told of it, with the session's commit trailer.
   @override
@@ -90,22 +90,22 @@ End with the pull request's URL, for the user to open.''';
   Map<String, Object?> get inputSchema => const {
     'type': 'object',
     'properties': {
-      'command': {'type': 'string', 'description': 'The command to run'},
+      'command': {'type': 'string', 'description': '要运行的命令'},
       'timeout': {
         'type': 'number',
-        'description': 'How long it may run, in milliseconds (at most 600000)',
+        'description': '最多可运行多久，单位毫秒（上限 600000）',
       },
       'description': {
         'type': 'string',
-        'description': 'What the command does, in 5 to 10 words: the user sees it in place of the command',
+        'description': '命令做什么，5 到 10 个词：用户会看到它代替命令本身',
       },
       'run_in_background': {
         'type': 'boolean',
-        'description': 'Start it and go on without waiting; read its output later with TaskOutput',
+        'description': '启动后不等它结束就继续；之后用 TaskOutput 读取输出',
       },
       'dangerouslyDisableSandbox': {
         'type': 'boolean',
-        'description': 'Run it outside the sandbox, where there is one',
+        'description': '在沙箱之外运行（如果有沙箱）',
       },
     },
     'required': ['command'],
@@ -418,30 +418,30 @@ class TaskOutputTool extends Tool {
   List<String> get aliases => const ['BashOutput', 'AgentOutputTool'];
 
   @override
-  String get description => '''Reads what a background task has produced (a shell started with run_in_background, or an agent sent to the background), and whether it is still running. For a shell, only what it printed since the last read comes back.
+  String get description => '''读取后台任务已经产生的输出（用 run_in_background 启动的 shell，或送到后台的智能体），以及它是否还在运行。对 shell 而言，只返回上次读取之后新打印的内容。
 
-By default it waits for the task to end, for up to `timeout` milliseconds; with block set to false it looks without waiting.''';
+默认会等到任务结束，最长 `timeout` 毫秒；block 设为 false 则只看一眼不等。''';
 
   @override
   Map<String, Object?> get inputSchema => const {
     'type': 'object',
     'properties': {
-      'task_id': {'type': 'string', 'description': 'The task\'s ID'},
-      'bash_id': {'type': 'string', 'description': 'Older name of task_id'},
+      'task_id': {'type': 'string', 'description': '任务的 ID'},
+      'bash_id': {'type': 'string', 'description': 'task_id 的旧名称'},
       'block': {
         'type': 'boolean',
-        'description': 'Wait for the task to end',
+        'description': '等待任务结束',
         'default': true,
       },
       'timeout': {
         'type': 'number',
-        'description': 'The longest to wait, in milliseconds',
+        'description': '最长等待时间，单位毫秒',
         'default': 30000,
       },
       'filter': {
         'type': 'string',
         'description':
-            'A regular expression: only the lines that match it come back',
+            '正则表达式：只返回匹配它的行',
       },
     },
     'additionalProperties': false,
@@ -537,8 +537,7 @@ class TaskStopTool extends Tool {
 
   @override
   String get description =>
-      'Stops a background task, a shell or an agent, by its ID: one that runs '
-      'too long or is no longer needed. Says whether it was stopped.';
+      '按 ID 停止一个后台任务、shell 或智能体：用于跑得太久或不再需要的任务。会说明是否停掉了。';
 
   @override
   Map<String, Object?> get inputSchema => const {
@@ -546,9 +545,9 @@ class TaskStopTool extends Tool {
     'properties': {
       'task_id': {
         'type': 'string',
-        'description': 'The ID of the task to stop',
+        'description': '要停止的任务 ID',
       },
-      'shell_id': {'type': 'string', 'description': 'Older name of task_id'},
+      'shell_id': {'type': 'string', 'description': 'task_id 的旧名称'},
     },
     'additionalProperties': false,
   };

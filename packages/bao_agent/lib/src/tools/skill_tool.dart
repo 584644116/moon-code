@@ -15,7 +15,7 @@ class SkillTool extends Tool {
 
   @override
   String get description =>
-      'Loads a skill\'s instructions into this conversation.';
+      '把某个技能的说明加载进本次对话。';
 
   /// The skills and commands the model may use.
   static List<PromptCommand> available(AgentSession session) => [
@@ -54,9 +54,9 @@ $listing''';
     'properties': {
       'skill': {
         'type': 'string',
-        'description': 'The skill, by name: "commit", "review-pr", "pdf"',
+        'description': '技能名称："commit"、"review-pr"、"pdf"',
       },
-      'args': {'type': 'string', 'description': 'What to pass it, if anything'},
+      'args': {'type': 'string', 'description': '传给它的参数，如果有'},
     },
     'required': ['skill'],
     'additionalProperties': false,

@@ -62,16 +62,16 @@ class WebFetchTool extends Tool {
   String get name => 'WebFetch';
 
   @override
-  String get description => '''Reads a web page for you: fetches the URL, makes its HTML Markdown, and has a small model answer your prompt from it. What comes back is that answer, not the page.
+  String get description => '''替你读一个网页：抓取该 URL，把 HTML 转成 Markdown，再由一个小模型根据它回答你的提示。返回的是那个答案，不是网页本身。
 
-- If an MCP server offers a fetch tool of its own, use that instead: it may reach more.
-- Give a whole URL; http is taken as https.
-- Say in the prompt what you want from the page.
-- A very long page is cut short before it is read.
-- A page fetched in the last 15 minutes is answered from a copy.
-- A redirect to another host is not followed: you are told where it goes, and can fetch that URL in a new call.
-- For GitHub, `gh` through Bash (gh pr view, gh issue view, gh api) usually does better.
-- It only reads: nothing on this machine changes.''';
+- 如果某个 MCP 服务器自带抓取工具，优先用它：它可能访问到更多内容。
+- 给出完整 URL；http 会按 https 处理。
+- 在提示里说明你想从页面得到什么。
+- 很长的页面会在读取前被截断。
+- 最近 15 分钟内抓过的页面会用副本作答。
+- 跳到其他主机的重定向不会跟随：会告诉你它指向哪里，你可以再发起一次调用抓那个 URL。
+- 对 GitHub，通过 Bash 用 `gh`（gh pr view、gh issue view、gh api）通常更好。
+- 它只读：本机不会有任何改动。''';
 
   @override
   Map<String, Object?> get inputSchema => const {
@@ -80,11 +80,11 @@ class WebFetchTool extends Tool {
       'url': {
         'type': 'string',
         'format': 'uri',
-        'description': 'The page to read',
+        'description': '要读取的页面',
       },
       'prompt': {
         'type': 'string',
-        'description': 'What you want to know from the page',
+        'description': '你想从页面中了解什么',
       },
     },
     'required': ['url', 'prompt'],
@@ -319,11 +319,11 @@ class WebSearchTool extends Tool {
   String get name => 'WebSearch';
 
   @override
-  String get description => '''Searches the web and gives back what it found, with each result's title and link: for news, recent releases, or anything newer than what you know.
+  String get description => '''搜索网络并返回找到的结果，每条带标题和链接：用于新闻、近期发布，或任何比你已知更新的事。
 
-- allowed_domains keeps to some sites, blocked_domains leaves some out (one or the other).
-- For something recent, put the year in the query, the current one from the date you were given.
-- When you answer from a search, end the answer with a "Sources:" list of the links you drew on, as Markdown links: [Title](URL).''';
+- allowed_domains 只保留某些站点，blocked_domains 排除某些站点（二选一）。
+- 查较新的事，把年份写进查询，用你被告知的日期中的当前年份。
+- 用搜索结果作答时，在回答末尾附一个 "Sources:" 列表，列出你用到的链接，用 Markdown 链接格式：[标题](URL)。''';
 
   @override
   Map<String, Object?> get inputSchema => const {
@@ -332,17 +332,17 @@ class WebSearchTool extends Tool {
       'query': {
         'type': 'string',
         'minLength': 2,
-        'description': 'What to search for',
+        'description': '要搜索什么',
       },
       'allowed_domains': {
         'type': 'array',
         'items': {'type': 'string'},
-        'description': 'Keep to results from these sites',
+        'description': '只保留这些站点的结果',
       },
       'blocked_domains': {
         'type': 'array',
         'items': {'type': 'string'},
-        'description': 'Leave out results from these sites',
+        'description': '排除这些站点的结果',
       },
     },
     'required': ['query'],

@@ -13,15 +13,15 @@ class TodoWriteTool extends Tool {
   String get name => 'TodoWrite';
 
   @override
-  String get description => '''Keeps your to-do list for this session, which the user sees as a checklist beside the conversation. Each call replaces the whole list: send every item each time, with its status (pending, in_progress or completed).
+  String get description => '''维护本次会话的待办清单，用户会在对话旁看到它。每次调用都会替换整个列表：每次都发送全部条目及其状态（pending、in_progress 或 completed）。
 
-Keep one when the work takes several steps (three or more), when the user hands you a list of things to do, or when it helps them see where you are. Skip it for a single quick change, or for a question you can simply answer.
+工作有好几步（三步及以上）时、用户给出一串要做的事时、或这能让用户看清你的进度时，用它。只改一处、或一个问题就能回答时，不要用。
 
-As you go:
-- Write the steps down when you start; add the ones you discover, and drop those that stop mattering.
-- Keep exactly one item in_progress: mark it before you begin, and complete it the moment it is done, not later together with others.
-- Complete an item only when it is really done. With tests failing, an error unresolved or the work half finished it stays in_progress, and a new item says what is in the way.
-- Word each item twice: content says what to do ("Run the tests"), activeForm what is going on while you do it ("Running the tests").''';
+推进过程中：
+- 开始时先把步骤写下来；发现新的就补上，不再重要的就删掉。
+- 始终只保留一项 in_progress：开始前标上，做完立刻完成它，不要拖到后面和其他项一起完成。
+- 只有确实做完才标记完成。测试没过、错误未解决、工作只做了一半，它保持 in_progress，并新增一条说明卡在哪里。
+- 每条都写两遍：content 说要做什么（"运行测试"），activeForm 说正在做什么（"正在运行测试"）。''';
 
   @override
   Map<String, Object?> get inputSchema => const {
@@ -29,7 +29,7 @@ As you go:
     'properties': {
       'todos': {
         'type': 'array',
-        'description': 'The whole list, as it is now',
+        'description': '当前完整的列表',
         'items': {
           'type': 'object',
           'properties': {
@@ -95,12 +95,12 @@ class AskUserQuestionTool extends Tool {
   String get name => 'AskUserQuestion';
 
   @override
-  String get description => '''Puts one to four multiple-choice questions to the user and waits for the answers: for a preference, a requirement left open, or a choice between ways of doing the work that is theirs to make. Do not ask what you can find out yourself, from the code or by running something.
+  String get description => '''向用户提一到四个选择题并等待回答：用于偏好、尚未确定的要求，或在几种做法之间由用户来定的选择。自己能查到的（读代码或跑一下）就不要问。
 
-- Give each question two to four options: a short label, and a line on what picking it means. The user can always answer in their own words instead, so leave out an "Other" option.
-- With multiSelect, more than one option may be picked.
-- If you would pick one of them, put it first and end its label with "(Recommended)".
-- In plan mode, ask while the plan is still open. To have the plan approved, call ExitPlanMode; never ask whether it is ready.''';
+- 每个问题给两到四个选项：一个简短的标签，再加一句说明选中它意味着什么。用户随时可以自己写答案，所以不要加"其他"选项。
+- 设 multiSelect 时，可以选多个。
+- 如果你自己会选其中一个，把它放在第一位，并在标签末尾加"（推荐）"。
+- 计划模式下，趁计划还没定下来时问。要让计划获批，调用 ExitPlanMode；不要问计划是否已经就绪。''';
 
   @override
   Map<String, Object?> get inputSchema => const {
@@ -110,39 +110,39 @@ class AskUserQuestionTool extends Tool {
         'type': 'array',
         'minItems': 1,
         'maxItems': 4,
-        'description': 'One to four questions',
+        'description': '一到四个问题',
         'items': {
           'type': 'object',
           'properties': {
             'question': {
               'type': 'string',
               'description':
-                  'The question in full, ending with a question mark',
+                  '完整的问题，以问号结尾',
             },
             'header': {
               'type': 'string',
-              'description': 'A tag of at most 12 characters naming the question, such as "Database" or "Scope"',
+              'description': '最多 12 个字符的标签，概括这个问题，例如 "Database" 或 "Scope"',
             },
             'options': {
               'type': 'array',
               'minItems': 2,
               'maxItems': 4,
-              'description': 'Two to four choices; the user may always write an answer of their own',
+              'description': '两到四个选项；用户随时可以自己写答案',
               'items': {
                 'type': 'object',
                 'properties': {
                   'label': {
                     'type': 'string',
-                    'description': 'The choice, in one to five words',
+                    'description': '选项，一到五个词',
                   },
                   'description': {
                     'type': 'string',
                     'description':
-                        'What picking it means, or what happens then',
+                        '选中它意味着什么，或之后会发生什么',
                   },
                   'preview': {
                     'type': 'string',
-                    'description': 'Shown beside the option while it is focused: a sketch of a layout, a code sample',
+                    'description': '选项获得焦点时显示在旁边：布局草图、代码示例',
                   },
                 },
                 'required': ['label', 'description'],
@@ -151,7 +151,7 @@ class AskUserQuestionTool extends Tool {
             'multiSelect': {
               'type': 'boolean',
               'default': false,
-              'description': 'Whether more than one option may be picked',
+              'description': '是否允许选多个选项',
             },
           },
           'required': ['question', 'header', 'options', 'multiSelect'],
@@ -159,14 +159,14 @@ class AskUserQuestionTool extends Tool {
       },
       'answers': {
         'type': 'object',
-        'description': 'The user\'s answers, filled in by the host',
+        'description': '用户的回答，由宿主填入',
       },
       'annotations': {
         'type': 'object',
         'description':
-            'The user\'s notes on the questions, filled in by the host',
+            '用户对这些问题的备注，由宿主填入',
       },
-      'metadata': {'type': 'object', 'description': 'For the host\'s own use'},
+      'metadata': {'type': 'object', 'description': '供宿主自用'},
     },
     'required': ['questions'],
     'additionalProperties': false,
@@ -239,11 +239,11 @@ class EnterPlanModeTool extends Tool {
   String get name => 'EnterPlanMode';
 
   @override
-  String get description => '''Switches the session to plan mode, once the user agrees: you explore and write a plan, and change nothing else until they approve it (ExitPlanMode).
+  String get description => '''经用户同意后把会话切到计划模式：你只做探索并写计划，在用户批准之前不做其他改动（ExitPlanMode）。
 
-Worth it before work whose shape is not settled: a feature that needs design decisions, a change across several files or to how existing code behaves, a task with more than one sensible approach, or one you must look into before you can say what it involves. Not for a small, clear fix, for instructions that already say exactly what to do, or for questions that only need reading.
+工作的形态还没定下来时，值得这么做：需要做设计决策的功能、跨多个文件或改变现有代码行为的改动、有不止一种合理做法的任务，或必须先调研才能说清涉及什么的任务。小而明确的修复、已经写明具体做法的指令、只需阅读就能回答的问题，不要用。
 
-In plan mode, read the code to see how things are done now, decide on an approach, ask with AskUserQuestion where the choice is the user's, write the plan to the plan file, and call ExitPlanMode.''';
+计划模式下，读代码看现在是怎么做的，定下方案，需要用户拿主意的地方用 AskUserQuestion 问，把计划写进计划文件，然后调用 ExitPlanMode。''';
 
   @override
   Map<String, Object?> get inputSchema => const {
@@ -294,9 +294,9 @@ class ExitPlanModeTool extends Tool {
   String get name => 'ExitPlanMode';
 
   @override
-  String get description => '''Asks the user to approve the plan you wrote to the plan file (named in the plan mode reminder); once they do, plan mode ends. The plan is read from that file, so write it there first: the file is what the user sees.
+  String get description => '''请用户批准你写进计划文件的计划（文件名在计划模式提示里）；用户批准后，计划模式结束。计划是从那个文件读的，所以要先把计划写进去：用户看到的就是这个文件。
 
-Call it only when the plan is finished, and only for work that will change code, not to report what you found while researching. Settle open questions with AskUserQuestion beforehand, and never ask whether the plan is ready: calling this tool is how you ask.''';
+只在计划完成时调用，且只用于会改动代码的工作，不要用它汇报调研发现。未定的事项先用 AskUserQuestion 敲定；不要问计划是否就绪：调用这个工具本身就是在问。''';
 
   @override
   Map<String, Object?> get inputSchema => const {
@@ -304,7 +304,7 @@ Call it only when the plan is finished, and only for work that will change code,
     'properties': {
       'plan': {
         'type': 'string',
-        'description': 'The plan, when it was not written to the plan file (else it is read from there)',
+        'description': '计划内容，未写入计划文件时提供（否则从文件读取）',
       },
     },
     'additionalProperties': true,

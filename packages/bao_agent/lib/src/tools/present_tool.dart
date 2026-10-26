@@ -17,9 +17,9 @@ class PresentTool extends Tool {
   List<String> get aliases => const ['present'];
 
   @override
-  String get description => '''Hands the user what you delivered: at most eight files, with a line on what each is. The app shows them as a card beside the conversation, so the user can open them without reading the whole turn.
+  String get description => '''把你交付的成果交给用户：最多八个文件，每个附一句说明它是什么。应用会在对话旁以卡片展示，用户不用读完整轮就能打开。
 
-Use it when the work produced something to look at or keep: a report, a page, a picture, a set of documents. Give each file's path as the project has it; the note says why it is there ("the summary", "the slides"). Skip it for a change to one file the user asked for, and for answers that are only text.''';
+当工作产出了可看或可留存的东西时用它：报告、页面、图片、一组文档。每个文件的路径按项目中的写法给出；说明里写清它为什么在这儿（"摘要"、"幻灯片"）。用户只是要求改一个文件、或答案只有文字时，不要用。''';
 
   @override
   Map<String, Object?> get inputSchema => const {
@@ -27,20 +27,20 @@ Use it when the work produced something to look at or keep: a report, a page, a 
     'properties': {
       'summary': {
         'type': 'string',
-        'description': 'One line on what was delivered',
+        'description': '一句话说明交付了什么',
       },
       'files': {
         'type': 'array',
         'minItems': 1,
         'maxItems': presentMaxFiles,
-        'description': 'The files to show, the first first',
+        'description': '要展示的文件，第一个排在最前',
         'items': {
           'type': 'object',
           'properties': {
             'path': {'type': 'string', 'minLength': 1},
             'note': {
               'type': 'string',
-              'description': 'What it is, in a few words',
+              'description': '这是什么，几个词说明',
             },
           },
           'required': ['path'],

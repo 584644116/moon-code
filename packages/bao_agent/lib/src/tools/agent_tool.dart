@@ -32,7 +32,7 @@ class AgentTool extends Tool {
 
   @override
   String get description =>
-      'Hands a task to an agent of its own, which does it and reports back.';
+      '把任务交给一个独立的智能体去做，做完后回报。';
 
   @override
   String promptFor(AgentSession session) {
@@ -79,31 +79,31 @@ Nor for work that fits none of the kinds above.
     'properties': {
       'description': {
         'type': 'string',
-        'description': 'What it is to do, in 3 to 5 words',
+        'description': '要做的事，3 到 5 个词',
       },
       'prompt': {
         'type': 'string',
-        'description': 'The task, with all the agent needs to know for it',
+        'description': '任务，包含智能体需要知道的一切',
       },
       'subagent_type': {
         'type': 'string',
         'description':
-            'The kind of agent to do it (general-purpose if left out)',
+            '执行它的智能体类型（省略则为 general-purpose）',
       },
       'model': {
         'type': 'string',
         'enum': ['sonnet', 'opus', 'haiku'],
-        'description': 'The model it runs on, if not the one you run on: haiku is cheaper and quicker for a simple task',
+        'description': '它使用的模型，与你的不同时填写：简单任务用 haiku 更便宜更快',
       },
       'run_in_background': {
         'type': 'boolean',
         'description':
-            'Let it work while you go on: you are told when it is done',
+            '让它在后台工作，你可以继续：完成时会通知你',
       },
       'resume': {
         'type': 'string',
         'description':
-            'The ID of an agent from before, to go on with all it had',
+            '之前某个智能体的 ID，用于带着它已有的上下文继续',
       },
     },
     'required': ['description', 'prompt'],

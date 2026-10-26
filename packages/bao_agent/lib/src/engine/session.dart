@@ -46,6 +46,7 @@ class EngineOptions {
     this.promptSuggestions = false,
     this.environment = const {},
     this.configDir,
+    this.bundledToolsDir,
     this.productName = 'BaoCode',
     this.systemPrompt,
     this.tools,
@@ -122,6 +123,10 @@ class EngineOptions {
 
   /// Where Claude Code's files are, if not where the environment says.
   final String? configDir;
+
+  /// Where this app keeps the tools it fetched for itself (ripgrep), when
+  /// it did: searched before `PATH` ([BundledRipgrep]).
+  final String? bundledToolsDir;
 
   /// What the agent is built into, as the system prompt names it.
   final String productName;
@@ -254,7 +259,10 @@ class AgentSession {
   /// The main agent's conversation, a view of [mainRun]'s.
   SessionStore get store => mainRun.store;
   set store(SessionStore store) => mainRun.store = store;
-  late final FileIndex fileIndex = FileIndex(environment);
+  late final FileIndex fileIndex = FileIndex(
+    environment,
+    bundledDirectory: options.bundledToolsDir,
+  );
   late final Toolbox toolbox = Toolbox(this);
   late final SessionContext context = SessionContext(this);
   late final Shell shell = Shell.find(environment);

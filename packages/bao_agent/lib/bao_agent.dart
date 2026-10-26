@@ -27,5 +27,8 @@ export 'src/permissions/approval_risk.dart'
     show ApprovalAssessment, ApprovalRisk, approvalRiskFor;
 export 'src/permissions/shell_command.dart'
     show DangerKind, dangerKindOf, isBlanketBashRule;
+export 'src/tools/bundled_ripgrep.dart'
+    show BundledRipgrep, BundledRipgrepException;
+export 'src/tools/file_index.dart' show FileIndex, byModified, shownPath;
 export 'src/prompts/task_prompts.dart' show classifierPrompt, classifierSystem;
 export 'src/util/cancel.dart' show CancelToken, Cancelled;

@@ -64,12 +64,12 @@ class WriteTool extends Tool with _Editing {
   String get name => 'Write';
 
   @override
-  String get description => '''Puts a whole file on disk: makes it, or puts the content given in place of all it had.
+  String get description => '''把整个文件写到磁盘：新建，或用给定内容替换它原有的全部内容。
 
-- A file that is already there must have been read with Read first in this conversation, or the write is refused.
-- To change part of a file, use Edit: it sends only the change. Write is for new files, or for rewriting one whole.
-- Make a new file only when the task needs one. Documentation (README, *.md) only when the user asks for it.
-- No emoji in files unless the user wants them.''';
+- 已存在的文件必须在本次对话中先用 Read 读过，否则写入会被拒绝。
+- 要改文件的一部分，用 Edit：它只发送改动。Write 用于新文件，或整体重写。
+- 只在任务需要时才新建文件。文档（README、*.md）只在用户要求时创建。
+- 文件里不要用 emoji，除非用户想要。''';
 
   @override
   Map<String, Object?> get inputSchema => const {
@@ -77,11 +77,11 @@ class WriteTool extends Tool with _Editing {
     'properties': {
       'file_path': {
         'type': 'string',
-        'description': 'Absolute path of the file',
+        'description': '文件的绝对路径',
       },
       'content': {
         'type': 'string',
-        'description': 'All that the file is to hold',
+        'description': '文件要保存的全部内容',
       },
     },
     'required': ['file_path', 'content'],
@@ -268,13 +268,13 @@ class EditTool extends Tool with _Editing {
 
   @override
   String get description =>
-      '''Changes a file by swapping one exact piece of its text for another.
+      '''通过把文件中一段确切的文本换成另一段来修改文件。
 
-- Read the file first in this conversation: an edit of a file not read is refused.
-- old_string must match the file exactly, its indentation included. A line from Read comes after its number and a tab: what follows the tab is the file's text, and none of the number goes in old_string or new_string.
-- old_string must be found once in the file, or the edit fails: take in more of the lines around it until it is, or set replace_all to change every place it is found (to rename something throughout the file, say).
-- Change the files that are there rather than making new ones, unless the task needs one.
-- No emoji in files unless the user wants them.''';
+- 先在本对话中读这个文件：未读过的文件改不了。
+- old_string 必须与文件完全一致，包括缩进。Read 返回的行带行号和制表符：制表符之后才是文件文本，行号不要写进 old_string 或 new_string。
+- old_string 在文件中必须只出现一次，否则修改失败：把上下更多行一起写进来直到唯一，或设 replace_all 改掉它出现的每一处（比如在全文里重命名某样东西）。
+- 尽量修改已有的文件而不是新建，除非任务需要。
+- 文件里不要用 emoji，除非用户想要。''';
 
   @override
   Map<String, Object?> get inputSchema => const {
@@ -282,21 +282,20 @@ class EditTool extends Tool with _Editing {
     'properties': {
       'file_path': {
         'type': 'string',
-        'description': 'Absolute path of the file',
+        'description': '文件的绝对路径',
       },
       'old_string': {
         'type': 'string',
-        'description': 'The text there now, exactly',
+        'description': '当前就在那里的文本，必须完全一致',
       },
       'new_string': {
         'type': 'string',
-        'description':
-            'The text to put in its place (not the same as old_string)',
+        'description': '要替换成的文本（不能与 old_string 相同）',
       },
       'replace_all': {
         'type': 'boolean',
         'default': false,
-        'description': 'Change every place old_string is found, not just one',
+        'description': '改掉 old_string 出现的每一处，而不只是一处',
       },
     },
     'required': ['file_path', 'old_string', 'new_string'],
@@ -379,11 +378,10 @@ class NotebookEditTool extends Tool with _Editing {
 
   @override
   String get description =>
-      'Changes one cell of a Jupyter notebook (.ipynb): gives it new '
-      'source, adds a cell after it, or takes it out. Give the notebook by '
-      'its absolute path and the cell by the ID Read shows for it. With '
-      'edit_mode insert, the new cell goes after cell_id, or first when no '
-      'cell_id is given; with delete, the cell is taken out.';
+      '修改 Jupyter notebook（.ipynb）里的一个单元格：给它新的源码，'
+      '在它之后插入一个单元格，或把它删掉。notebook 用绝对路径给出，'
+      '单元格用 Read 显示给它的 ID 给出。edit_mode 为 insert 时，新单元格插在 '
+      'cell_id 之后，不给 cell_id 则插在最前面；为 delete 时，该单元格被删掉。';
 
   @override
   Map<String, Object?> get inputSchema => const {
@@ -391,27 +389,27 @@ class NotebookEditTool extends Tool with _Editing {
     'properties': {
       'notebook_path': {
         'type': 'string',
-        'description': 'Absolute path of the notebook',
+        'description': 'notebook 的绝对路径',
       },
       'cell_id': {
         'type': 'string',
-        'description': 'The cell, by the ID Read shows; for insert, the cell the new one follows (none: it goes first)',
+        'description': '单元格，用 Read 显示的 ID；insert 时表示新单元格跟在哪个后面（不给则插在最前）',
       },
       'new_source': {
         'type': 'string',
-        'description': 'The cell\'s source from now on',
+        'description': '该单元格从现在起的源码',
       },
       'cell_type': {
         'type': 'string',
         'enum': ['code', 'markdown'],
         'description':
-            'code or markdown: needed for insert, else the cell keeps its own',
+            'code 或 markdown：insert 时必填，否则单元格保持原有类型',
       },
       'edit_mode': {
         'type': 'string',
         'enum': ['replace', 'insert', 'delete'],
         'description':
-            'replace (the default) its source, insert a new cell, or delete it',
+            'replace（默认）替换其源码，insert 插入新单元格，delete 删除它',
       },
     },
     'required': ['notebook_path', 'new_source'],

@@ -9,16 +9,42 @@ import '../util/cancel.dart';
 /// The files under a folder, as a search goes through them: those git (or
 /// ripgrep) would not ignore, hidden ones too, `.git` itself left out.
 class FileIndex {
-  FileIndex(this.environment);
+  FileIndex(this.environment, {this.bundledDirectory});
 
   /// The environment programs are looked up in (`PATH`).
   final Map<String, String> environment;
+
+  /// Where this app keeps the ripgrep it fetched for itself, when it did
+  /// ([BundledRipgrep]): looked in before `PATH`, so that an install of
+  /// this app's own is what a session uses even where the system has none.
+  final String? bundledDirectory;
 
   /// The most a folder that is no repository is walked for.
   static const maxWalked = 100000;
 
   /// ripgrep, where installed: null when not.
-  late final String? ripgrep = which('rg');
+  late final String? ripgrep = _findRipgrep();
+
+  String? _findRipgrep() {
+    if (bundledDirectory case final directory?) {
+      if (_executableAt(p.join(directory, _ripgrepName)) case final found?) {
+        return found;
+      }
+    }
+    return which('rg');
+  }
+
+  static String get _ripgrepName =>
+      Platform.isWindows ? 'rg.exe' : 'rg';
+
+  /// [candidate] when it is there and may be run; null otherwise.
+  static String? _executableAt(String candidate) {
+    final file = File(candidate);
+    if (!file.existsSync()) return null;
+    if (Platform.isWindows) return candidate;
+    // Executable by someone: the mode's x bits.
+    return file.statSync().mode & 0x49 != 0 ? candidate : null;
+  }
 
   /// [program]'s path on `PATH`; null when it is not there.
   String? which(String program) {
@@ -154,5 +180,12 @@ List<String> byModified(List<String> paths) {
 }
 
 /// [path] as the model is shown it: from [cwd] when inside it.
-String shownPath(String path, String cwd) =>
-    p.isWithin(cwd, path) ? p.relative(path, from: cwd) : path;
+///
+/// Always with `/`, whatever the platform's separator: a path is quoted in
+/// the tools' own examples that way (`lib/**/test_*.py`), and a model that
+/// sees both `lib\b.dart` and `lib/b.dart` for one file can take them for
+/// two. Windows takes either when it reads them back.
+String shownPath(String path, String cwd) {
+  final shown = p.isWithin(cwd, path) ? p.relative(path, from: cwd) : path;
+  return Platform.isWindows ? shown.replaceAll(r'\', '/') : shown;
+}

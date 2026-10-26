@@ -39,12 +39,10 @@ class CompressTool extends _ContextTool {
 
   @override
   String get description =>
-      'Fold an older, contiguous part of this conversation into a summary, '
-      'freeing context. Parts are named by the <ctx id="m…"/> markers at '
-      'the ends of user messages: start_ref is the first message to fold, '
-      'end_ref the message just after the part (omit it to fold everything '
-      'before the most recent turns). The original messages stay in the '
-      'session and decompress brings them back.';
+      '把本次对话中较早的、连续的一段折叠成摘要，释放上下文。'
+      '各段由用户消息末尾的 <ctx id="m…"/> 标记命名：start_ref 是要折叠的第一条消息，'
+      'end_ref 是该段之后那条消息（省略则折叠最近若干轮之前的全部内容）。'
+      '原始消息仍留在会话中，用 decompress 可以把它们取回来。';
 
   @override
   Map<String, Object?> get inputSchema => {
@@ -52,23 +50,23 @@ class CompressTool extends _ContextTool {
     'properties': {
       'start_ref': {
         'type': 'string',
-        'description': 'The m… ref of the first message to fold.',
+        'description': '要折叠的第一条消息的 m… 引用。',
       },
       'end_ref': {
         'type': 'string',
         'description':
-            'The m… ref of the message just after the part; omit to keep '
-            'the most recent turns.',
+            '该部分之后那条消息的 m… 引用；省略则保留 '
+            '最近的若干轮。',
       },
       'summary': {
         'type': 'string',
         'description':
-            'The summary to keep, if you have it. Omit to have one '
+            '已有的摘要，如果有就给出。省略则由系统生成'
             'written.',
       },
       'reason': {
         'type': 'string',
-        'description': 'What the summary must be sure to keep.',
+        'description': '摘要必须保留的内容。',
       },
     },
     'required': ['start_ref'],
@@ -122,9 +120,8 @@ class DecompressTool extends _ContextTool {
 
   @override
   String get description =>
-      'Bring back the original messages of a folded range, by its block '
-      'id (from acp_status or a compression notice). The context grows '
-      'again; fold another range afterwards if room is needed.';
+      '按块 id（来自 acp_status 或压缩提示）取回某个折叠范围的原始消息。'
+      '上下文会重新变大；需要空间时之后再折叠别的范围。';
 
   @override
   Map<String, Object?> get inputSchema => {
@@ -132,7 +129,7 @@ class DecompressTool extends _ContextTool {
     'properties': {
       'block_id': {
         'type': 'string',
-        'description': 'The id of the folded range, such as c1a2b3.',
+        'description': '折叠范围的 id，例如 c1a2b3。',
       },
     },
     'required': ['block_id'],
@@ -169,10 +166,9 @@ class SearchContextTool extends _ContextTool {
 
   @override
   String get description =>
-      'Search this conversation, including parts folded into summaries, '
-      'for words. A hit names the prompt before it (a ref) or the folded '
-      'block it is in; decompress that block to read more. A subagent also '
-      'searches its parent\'s context, read-only.';
+      '在本次对话中搜索词语，包括已折叠成摘要的部分。'
+      '每条命中会指出它前面的提示（一个 ref）或它所在的折叠块；'
+      '用 decompress 展开那个块可以读到更多。子智能体也能以只读方式搜索其父级上下文。';
 
   @override
   Map<String, Object?> get inputSchema => {
@@ -180,13 +176,13 @@ class SearchContextTool extends _ContextTool {
     'properties': {
       'query': {
         'type': 'string',
-        'description': 'What to look for (at least two characters).',
+        'description': '要查找的内容（至少两个字符）。',
       },
       'limit': {
         'type': 'integer',
         'minimum': 1,
         'maximum': 50,
-        'description': 'How many hits at most (20 by default).',
+        'description': '最多返回多少条（默认 20）。',
       },
     },
     'required': ['query'],
@@ -225,9 +221,8 @@ class AcpStatusTool extends _ContextTool {
 
   @override
   String get description =>
-      'Show what context management has folded or offloaded: the active '
-      'blocks with what each saved, the offloaded results, the conversation '
-      'size and when a nudge comes.';
+      '显示上下文管理已折叠或移出上下文的内容：'
+      '当前生效的块及各自省下的量、已移出的工具结果、对话大小，以及何时会提示。';
 
   @override
   Map<String, Object?> get inputSchema => const {
@@ -257,9 +252,9 @@ class RetrieveToolResultTool extends _ContextTool {
 
   @override
   String get description =>
-      'Read a tool result that was stored out of the context; the '
-      'placeholder names its id. Reads from offset, at most limit '
-      'characters; the answer says whether there is more.';
+      '读取被存到上下文之外的某个工具结果；'
+      '占位符里写着它的 id。从 offset 开始读，最多 limit 个字符；'
+      '返回结果会说明是否还有更多。';
 
   @override
   Map<String, Object?> get inputSchema => {
@@ -267,18 +262,18 @@ class RetrieveToolResultTool extends _ContextTool {
     'properties': {
       'tool_use_id': {
         'type': 'string',
-        'description': 'The id in the placeholder (toolu_…).',
+        'description': '占位符里的 id（toolu_…）。',
       },
       'offset': {
         'type': 'integer',
         'minimum': 0,
-        'description': 'Where to start reading (0 by default).',
+        'description': '从哪个位置开始读（默认 0）。',
       },
       'limit': {
         'type': 'integer',
         'minimum': 1,
         'maximum': 50000,
-        'description': 'How many characters at most.',
+        'description': '最多多少字符。',
       },
     },
     'required': ['tool_use_id'],

@@ -9,8 +9,13 @@ import '../support/harness.dart';
 /// A ripgrep on this machine, if there is one (on `PATH`, or the one
 /// BaoCode's extension host brings).
 String? _ripgrep() {
-  for (final dir in (Platform.environment['PATH'] ?? '').split(':')) {
-    final candidate = File(p.join(dir, 'rg'));
+  // The separator and the name are the platform's: `rg.exe` on Windows,
+  // whose PATH is `;`-separated.
+  final name = Platform.isWindows ? 'rg.exe' : 'rg';
+  final separator = Platform.isWindows ? ';' : ':';
+  for (final dir in (Platform.environment['PATH'] ?? '').split(separator)) {
+    if (dir.isEmpty) continue;
+    final candidate = File(p.join(dir, name));
     if (candidate.existsSync()) return candidate.path;
   }
   final home = Platform.environment['HOME'] ?? '';

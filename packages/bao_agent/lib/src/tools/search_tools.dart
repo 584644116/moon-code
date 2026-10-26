@@ -30,12 +30,12 @@ class GlobTool extends Tool {
 
   @override
   String get description =>
-      '''Finds files by name, with a glob pattern such as "**/*.dart" or "lib/**/test_*.py", in a project of any size.
+      '''按文件名查找文件，用 "**/*.dart"、"lib/**/test_*.py" 这样的 glob 模式，项目多大都行。
 
-- The paths found come back newest first (by when they were last changed), at most $maxResults.
-- For finding files by what is in them, use Grep.
-- A search that may take many rounds of looking is better handed to an agent (Agent).
-- Several searches that may help can run at once, in calls side by side in one reply.''';
+- 找到的路径按最后修改时间从新到旧返回，最多 $maxResults 个。
+- 要按文件内容查找，用 Grep。
+- 需要反复多轮查找的搜索，交给智能体（Agent）更合适。
+- 几个可能有用的搜索可以同时跑，在同一条回复里并排调用即可。''';
 
   @override
   Map<String, Object?> get inputSchema => const {
@@ -43,11 +43,11 @@ class GlobTool extends Tool {
     'properties': {
       'pattern': {
         'type': 'string',
-        'description': 'The glob the paths must match',
+        'description': '路径必须匹配的 glob 模式',
       },
       'path': {
         'type': 'string',
-        'description': 'The folder to look in. Leave it out for the working directory (rather than "null" or "undefined")',
+        'description': '要查找的文件夹。省略则用工作目录（不要写 "null" 或 "undefined"）',
       },
     },
     'required': ['pattern'],
@@ -147,14 +147,14 @@ class GrepTool extends Tool {
   String get name => 'Grep';
 
   @override
-  String get description => '''Searches what files contain, with a regular expression, as ripgrep does.
+  String get description => '''搜索文件内容，用正则表达式，行为与 ripgrep 一致。
 
-- Search with this, not with `grep` or `rg` through Bash: it keeps to the folders you may read.
-- The pattern is ripgrep's syntax (Rust regex): "fn\\s+\\w+", "TODO|FIXME". A brace to be found as itself is escaped: `map\\{\\}` finds `map{}`.
-- Narrow the files with glob ("*.ts", "src/**/*.rs") or type ("py", "go").
-- output_mode: files_with_matches (the default) gives the paths of the files with a match; content gives the lines that match, with line numbers and any lines around them asked for (-A, -B, -C); count gives how many matches each file has.
-- A pattern matches within a line. For one that runs across lines, such as `class \\w+[\\s\\S]*?init`, set multiline.
-- A search that may take many rounds of looking is better handed to an agent (Agent).''';
+- 用这个搜索，不要通过 Bash 调 `grep` 或 `rg`：它会守住你可读的文件夹。
+- 模式是 ripgrep 的语法（Rust regex）："fn\\s+\\w+"、"TODO|FIXME"。要匹配花括号本身需要转义：`map\\{\\}` 能搜到 `map{}`。
+- 用 glob（"*.ts"、"src/**/*.rs"）或 type（"py"、"go"）缩小文件范围。
+- output_mode：files_with_matches（默认）给出有匹配的文件路径；content 给出匹配的行，带行号以及要求的上下文行（-A、-B、-C）；count 给出每个文件的匹配数。
+- 模式在单行内匹配。要跨行匹配（例如 `class \\w+[\\s\\S]*?init`），设 multiline。
+- 需要反复多轮查找的搜索，交给智能体（Agent）更合适。''';
 
   @override
   Map<String, Object?> get inputSchema => const {
@@ -162,61 +162,57 @@ class GrepTool extends Tool {
     'properties': {
       'pattern': {
         'type': 'string',
-        'description': 'The regular expression to look for',
+        'description': '要查找的正则表达式',
       },
       'path': {
         'type': 'string',
-        'description':
-            'The file or folder to search (the working directory if left out)',
+        'description': '要搜索的文件或文件夹（省略则用工作目录）',
       },
       'glob': {
         'type': 'string',
-        'description': 'Only the files whose paths match this glob ("*.kt", "*.{c,h}"), as rg --glob',
+        'description': '只搜路径匹配这个 glob 的文件（"*.kt"、"*.{c,h}"），同 rg --glob',
       },
       'output_mode': {
         'type': 'string',
         'enum': ['content', 'files_with_matches', 'count'],
-        'description': 'What comes back: "files_with_matches" (the default) the paths of the files with a match, "content" the lines that match, "count" how many matches in each file',
+        'description': '返回什么："files_with_matches"（默认）返回有匹配的文件路径，"content" 返回匹配的行，"count" 返回每个文件的匹配数',
       },
       '-B': {
         'type': 'number',
-        'description':
-            'With content: this many lines before each match too (rg -B)',
+        'description': '配合 content：每处匹配前再多给这么多行（rg -B）',
       },
       '-A': {
         'type': 'number',
-        'description':
-            'With content: this many lines after each match too (rg -A)',
+        'description': '配合 content：每处匹配后再多给这么多行（rg -A）',
       },
       '-C': {
         'type': 'number',
-        'description':
-            'With content: this many lines on both sides of each match (rg -C)',
+        'description': '配合 content：每处匹配前后各给这么多行（rg -C）',
       },
-      'context': {'type': 'number', 'description': 'Another name for -C'},
+      'context': {'type': 'number', 'description': '-C 的另一个名字'},
       '-n': {
         'type': 'boolean',
-        'description': 'With content: each line\'s number before it (rg -n); on unless set false',
+        'description': '配合 content：每行前加行号（rg -n）；除非设为 false，否则默认开启',
       },
       '-i': {
         'type': 'boolean',
-        'description': 'Match upper and lower case alike (rg -i)',
+        'description': '不区分大小写（rg -i）',
       },
       'type': {
         'type': 'string',
-        'description': 'Only files of this ripgrep type (rg --type): py, js, rust, go, java and so on; quicker than a glob for a common kind',
+        'description': '只搜这种 ripgrep 类型的文件（rg --type）：py、js、rust、go、java 等；常见类型用它比 glob 快',
       },
       'head_limit': {
         'type': 'number',
-        'description': 'Give at most this many lines or paths, whatever the output_mode: 250 unless set, 0 for all',
+        'description': '无论 output_mode 是什么，最多给这么多行或路径：不设则 250，0 表示全部',
       },
       'offset': {
         'type': 'number',
-        'description': 'Leave out this many lines or paths from the start, before head_limit: for the next page',
+        'description': '从开头跳过这么多行或路径，在 head_limit 之前：用于翻到下一页',
       },
       'multiline': {
         'type': 'boolean',
-        'description': 'Let a match run across lines, . matching a line break too (rg -U --multiline-dotall)',
+        'description': '允许匹配跨行，. 也匹配换行（rg -U --multiline-dotall）',
       },
     },
     'required': ['pattern'],
