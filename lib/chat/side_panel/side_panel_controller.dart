@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
 
@@ -11,6 +12,7 @@ import '../../ide/ide_code_editor.dart' show IdeCodeHighlights;
 import '../../ide/ide_explorer.dart';
 import '../../ide/search/ide_search_view.dart';
 import '../../ide/search/text_search.dart';
+import '../../ide/ide_diff_options.dart';
 import '../../settings/user_settings.dart';
 import 'file_edit.dart';
 import 'file_open.dart';
@@ -116,6 +118,7 @@ class SidePanelTabs {
 /// tabs open are each conversation's own.
 class AgentSidePanel extends ChangeNotifier {
   AgentSidePanel({Map<String, Object?>? state, this.onSave, this.settings}) {
+    IdeDiffOptions.instance.attach(settings);
     _read(state);
   }
 
@@ -141,6 +144,11 @@ class AgentSidePanel extends ChangeNotifier {
     if (state?['listShown'] case final bool shown) _listShown = shown;
     if (state?['changesAsTree'] case final bool tree) _changesAsTree = tree;
     if (state?['atLeft'] case final bool left) _atLeft = left;
+    if (state?['searches'] case final Map<Object?, Object?> searches) {
+      for (final MapEntry(:key, :value) in searches.entries) {
+        if (value is Map) _keptSearches['$key'] = value.cast<String, Object?>();
+      }
+    }
   }
 
   /// Told when what [toJson] gives changed, to keep it.
@@ -240,13 +248,19 @@ class AgentSidePanel extends ChangeNotifier {
     final explorer = _explorers[key];
     if (explorer != null && identical(explorer.files, files)) return explorer;
     explorer?.dispose();
-    return _explorers[key] = IdeExplorerController(
+    final made = _explorers[key] = IdeExplorerController(
       files: files,
       root: root,
       watch: watch,
       roots: roots,
       paths: paths ?? p.context,
     );
+    if (_folderAsked case final folder? when made.shows(folder)) {
+      _folderAsked = null;
+      // Made as the page builds: changed after it.
+      scheduleMicrotask(() => _revealFolder(folder));
+    }
+    return made;
   }
 
   /// The files page's text search of each project (by its folder), kept
@@ -257,7 +271,28 @@ class AgentSidePanel extends ChangeNotifier {
   /// The search of the project in [root], run by [engine]; made once per
   /// project (its results then still there on coming back).
   IdeSearchSession searchOf(String root, IdeTextSearch engine) =>
-      _searches[root] ??= IdeSearchSession(engine: engine);
+      _searches[root] ??= _keptSearch(root, IdeSearchSession(engine: engine));
+
+  /// Each project's search as it was left ([IdeSearchSession.kept]), its
+  /// files to include and exclude and its options, kept between runs.
+  final Map<String, Map<String, Object?>> _keptSearches = {};
+
+  /// [search] as [root]'s was left, kept as it changes.
+  IdeSearchSession _keptSearch(String root, IdeSearchSession search) {
+    search
+      ..restore(_keptSearches[root])
+      ..keptChanges.addListener(() {
+        final kept = search.kept;
+        if (mapEquals(kept, _keptSearches[root] ?? const {})) return;
+        if (kept.isEmpty) {
+          _keptSearches.remove(root);
+        } else {
+          _keptSearches[root] = kept;
+        }
+        onSave?.call();
+      });
+    return search;
+  }
 
   /// The projects whose files page shows the search rather than the tree.
   final Set<String> _searching = {};
@@ -288,6 +323,27 @@ class AgentSidePanel extends ChangeNotifier {
     _repositories[p.normalize(root)] = folder;
     notifyListeners();
   }
+
+  /// The worktree of [folder]'s repository picked for [conversation]'s
+  /// changes; null while they follow its agent.
+  String? worktreeOf(Object conversation, String folder) =>
+      _worktrees[conversation]?[p.normalize(folder)];
+
+  /// Shows [path]'s changes for [folder]'s repository in [conversation];
+  /// null to follow its agent again.
+  void chooseWorktree(Object conversation, String folder, String? path) {
+    final chosen = _worktrees.putIfAbsent(conversation, () => {});
+    final key = p.normalize(folder);
+    if (chosen[key] == path) return;
+    if (path == null) {
+      chosen.remove(key);
+    } else {
+      chosen[key] = path;
+    }
+    notifyListeners();
+  }
+
+  final Map<Object, Map<String, String>> _worktrees = Map.identity();
 
   /// Goes up each time it is asked for: shown, or a page or a tab opened in
   /// it. The window's sidebar gives way to it then where the two do not
@@ -470,6 +526,35 @@ class AgentSidePanel extends ChangeNotifier {
     }
   }
 
+  /// Shows the folder at [directory] for [conversation] (a folder the
+  /// conversation names): the files page, its tree beside, the folder
+  /// selected and expanded there; once the tree is made if it is not yet.
+  void openFolder(Object conversation, String directory) {
+    _listShown = true;
+    _listAway = false;
+    _changed = true;
+    tabsOf(conversation).section = SidePanelSection.files;
+    if (!_revealFolder(directory)) _folderAsked = directory;
+    _showAsked();
+    onSave?.call();
+  }
+
+  /// A folder asked for before the tree that shows it was made.
+  String? _folderAsked;
+
+  /// Whether a tree shows [directory]: selected and expanded in it.
+  bool _revealFolder(String directory) {
+    var shown = false;
+    for (final explorer in _explorers.values) {
+      if (!explorer.shows(directory)) continue;
+      shown = true;
+      unawaited(
+        explorer.reveal(directory).then((_) => explorer.expand(directory)),
+      );
+    }
+    return shown;
+  }
+
   /// Keeps [tab] (a double click on it): the next look opens beside it.
   void pin(SidePanelTab tab) {
     if (!tab._preview) return;
@@ -490,6 +575,15 @@ class AgentSidePanel extends ChangeNotifier {
         ..section = SidePanelSection.files;
       _reveal(tab.path);
     }
+    notifyListeners();
+  }
+
+  /// The changes page's Git log for [conversation], its changes open kept
+  /// behind it.
+  void showLog(Object conversation) {
+    final tabs = tabsOf(conversation);
+    if (tabs.activeDiff == null) return;
+    tabs.activeDiff = null;
     notifyListeners();
   }
 
@@ -555,6 +649,7 @@ class AgentSidePanel extends ChangeNotifier {
     'listShown': _listShown,
     'changesAsTree': _changesAsTree,
     if (_atLeft) 'atLeft': true,
+    if (_keptSearches.isNotEmpty) 'searches': {..._keptSearches},
   };
 
   bool _disposed = false;

@@ -25,6 +25,7 @@ import '../../base/list_selection.dart';
 import '../../base/smooth_scroll.dart';
 import '../../chat/widgets/code_citation.dart' show MarkdownCodeBlock;
 import '../../chat/widgets/markdown_view.dart';
+import '../../l10n/l10n.dart';
 import '../../platform/svg_text_transform.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/workbench_theme.dart' show themeColors;
@@ -32,6 +33,8 @@ import 'markdown_block_editor.dart';
 import 'markdown_blocks.dart';
 import 'markdown_document.dart';
 import '../ide_hover.dart';
+import '../ide_menu.dart';
+import 'markdown_paste.dart';
 
 /// Whether [path] is a markdown file the preview shows.
 bool isMarkdownPath(String path) {
@@ -54,6 +57,8 @@ class IdeMarkdownPreview extends StatefulWidget {
     this.onEdit,
     this.onOpenFile,
     this.onOpenExternal,
+    this.onPaste,
+    this.onReveal,
   });
 
   final String path;
@@ -88,6 +93,13 @@ class IdeMarkdownPreview extends StatefulWidget {
 
   /// Opens a web or mail link.
   final void Function(Uri uri)? onOpenExternal;
+
+  /// A paste in the preview: files put beside the document and linked
+  /// to, as [MarkdownPaste] says.
+  final Future<MarkdownPasteOutcome> Function()? onPaste;
+
+  /// Shows the file [path] in the file manager: the right click's menu.
+  final void Function(String path)? onReveal;
 
   @override
   State<IdeMarkdownPreview> createState() => IdeMarkdownPreviewState();
@@ -177,6 +189,10 @@ class IdeMarkdownPreviewState extends State<IdeMarkdownPreview> {
     return blocks[index].start + 1;
   }
 
+  /// Where the preview was last left: there is no caret in it, so what
+  /// the workbench keeps of it is the line at its top.
+  ({int line, int column})? get caret => null;
+
   /// Shows the block [line] (one-based) is in at the top.
   void revealLine(int line, [int column = 1]) {
     final index = _source.blockAt(line - 1);
@@ -219,6 +235,67 @@ class IdeMarkdownPreviewState extends State<IdeMarkdownPreview> {
   static String _withLineBreak(String text, String lineBreak) =>
       text.replaceAll(RegExp('\r\n|\r|\n'), lineBreak);
 
+  /// Pastes into the document: the files put beside it and linked to;
+  /// text pastes as it does anywhere, which is no business of the
+  /// preview's.
+  Future<bool> _paste() async {
+    final paste = widget.onPaste;
+    if (paste == null || widget.readOnly) return false;
+    final version = widget.model.version;
+    final outcome = await paste();
+    if (!mounted) return true;
+    switch (outcome) {
+      case MarkdownPasteText():
+        return false;
+      case MarkdownPasteNothing():
+        return true;
+      case MarkdownPasteLinks(:final text):
+        // Where the last click was, unless the text changed meanwhile.
+        insert(
+          text,
+          position: widget.model.version == version ? _pressedAt : null,
+        );
+        return true;
+    }
+  }
+
+  /// The right click's menu: the file a link there goes to, or the
+  /// document, shown in the file manager.
+  Future<void> _menu(Offset global) async {
+    final reveal = widget.onReveal;
+    if (reveal == null) return;
+    await showIdeMenu(
+      context,
+      position: global,
+      entries: [
+        IdeMenuAction(
+          context.l10n.revealInFileManager,
+          onSelected: () => reveal(_fileAt(global) ?? widget.path),
+        ),
+      ],
+    );
+  }
+
+  /// The project's file a link in the block at [global] goes to, if one
+  /// does.
+  String? _fileAt(Offset global) {
+    final index = _blockAt(global);
+    if (index == null || index >= _source.blocks.length) return null;
+    final text = _source.source(_source.blocks[index]);
+    for (final match in _markdownLinks.allMatches(text)) {
+      final href = match.group(1);
+      if (href == null) continue;
+      final target = resolveMarkdownLink(href, widget.path, _context);
+      if (target case MarkdownFileLink(:final path)) return path;
+    }
+    return null;
+  }
+
+  static final _markdownLinks = RegExp(r'\]\(([^)\s]+)');
+
+  /// Where the last press was: where a paste goes.
+  Offset? _pressedAt;
+
   /// The block laid out at [global], if one is.
   int? _blockAt(Offset global) {
     for (final MapEntry(key: index, value: context) in _shown.entries) {
@@ -251,7 +328,12 @@ class IdeMarkdownPreviewState extends State<IdeMarkdownPreview> {
         event.kind != PointerDeviceKind.touch) {
       return;
     }
+    if (event.buttons == kSecondaryButton) {
+      unawaited(_menu(event.position));
+      return;
+    }
     if (event.buttons != kPrimaryButton) return;
+    _pressedAt = event.position;
     // The image's listener runs first: its clicks belong to the viewer.
     final imagePointer = _imagePointer;
     _imagePointer = null;
@@ -463,6 +545,12 @@ class IdeMarkdownPreviewState extends State<IdeMarkdownPreview> {
             if (widget.readOnly || !model.redo()) return null;
             _parseNow();
             widget.onEdited?.call();
+            return null;
+          },
+        ),
+        PasteTextIntent: CallbackAction<PasteTextIntent>(
+          onInvoke: (_) {
+            unawaited(_paste());
             return null;
           },
         ),
