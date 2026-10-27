@@ -48,7 +48,6 @@ import 'ide/file_service.dart'
         ideIsImagePath,
         readBytesThrough,
         readFileBytes;
-import 'ide/ide_agent_changes.dart';
 import 'ide/ide_agent_edits.dart';
 import 'ide/ide_chat_history.dart';
 import 'ide/ide_chat_title.dart';
@@ -2334,29 +2333,9 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
       for (final thread in _workspace.threads)
         if (thread.project.path == folder) thread,
     ];
-    // Reads and writes the setting live, as the IDE's own do.
-    final settings = widget.settings?.files?.settings;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // The agent's changes open as diffs in the editor as it makes them
-        // (Cursor-like), while this IDE shows; see [IdeAgentChanges].
-        ListenableBuilder(
-          listenable: settings ?? Listenable.merge(const []),
-          builder: (context, _) => current == null
-              ? const SizedBox.shrink()
-              : IdeAgentChanges(
-                  session: current.session,
-                  enabled:
-                      _showsIde &&
-                      _ideFolder == folder &&
-                      IdeAgentChanges.enabledBy(
-                        settings?[IdeAgentChanges.enabledSetting],
-                      ),
-                  open: (change, original) =>
-                      _openChange(current, change, original),
-                ),
-        ),
         ValueListenableBuilder(
           valueListenable: _ideHistory,
           builder: (context, historyFolder, _) => IdeChatTitle(

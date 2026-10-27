@@ -5542,13 +5542,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get generalSettingsIde => 'Fast IDE';
 
   @override
-  String get generalSettingsAutoOpenChanges => '以 Diff 显示智能体改动';
-
-  @override
-  String get generalSettingsAutoOpenChangesDescription =>
-      'IDE 显示时，智能体每改一个文件就在编辑器中以 Diff 形式打开（对比改动前后的内容），随改随看。';
-
-  @override
   String get explorerExcludeSetting => '隐藏的文件和文件夹';
 
   @override

@@ -115,6 +115,20 @@ class IdeMarkdownPreviewState extends State<IdeMarkdownPreview> {
   /// The images read, by path: read once while the preview shows.
   final Map<String, Future<Uint8List>> _images = {};
 
+  /// Those of [_images] read by now: a line built again (scrolled back
+  /// to) shows its image at once, as tall as it is.
+  final Map<String, Uint8List> _imagesRead = {};
+
+  Future<Uint8List> _readImage(String path) {
+    if (_images[path] case final reading?) return reading;
+    final reading = _images[path] = widget.readBytes(path);
+    reading.then((bytes) {
+      // Not one read again since (the images cleared).
+      if (identical(_images[path], reading)) _imagesRead[path] = bytes;
+    }, onError: (_) {});
+    return reading;
+  }
+
   /// Whether the caret was put somewhere (clicked, moved, revealed): where
   /// the source opens.
   bool _placed = false;
@@ -165,11 +179,13 @@ class IdeMarkdownPreviewState extends State<IdeMarkdownPreview> {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.model, widget.model)) {
       _images.clear();
+      _imagesRead.clear();
       final old = _controller;
       _controller = _controllerOf(widget.model);
       WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
     } else if (oldWidget.path != widget.path) {
       _images.clear();
+      _imagesRead.clear();
     }
   }
 
@@ -618,8 +634,8 @@ class _PreviewEmbeds extends MarkdownEmbeds {
       target: resolveMarkdownImage(run.href ?? '', widget.path, state._context),
       alt: alt,
       title: run.title,
-      read: (path) =>
-          state._images.putIfAbsent(path, () => widget.readBytes(path)),
+      read: state._readImage,
+      readNow: (path) => state._imagesRead[path],
     );
     if (width != null) image = SizedBox(width: width, child: image);
     return WidgetSpan(
@@ -692,12 +708,16 @@ class _MarkdownImage extends StatelessWidget {
     required this.alt,
     required this.title,
     required this.read,
+    required this.readNow,
   });
 
   final ({Uri? url, String? path})? target;
   final String alt;
   final String? title;
   final Future<Uint8List> Function(String path) read;
+
+  /// What [read] has read by now.
+  final Uint8List? Function(String path) readNow;
 
   void _preview(BuildContext context) {
     showDialog<void>(
@@ -763,6 +783,7 @@ class _MarkdownImage extends StatelessWidget {
     if (target?.path case final path?) {
       return FutureBuilder<Uint8List>(
         future: read(path),
+        initialData: readNow(path),
         builder: (context, snapshot) {
           if (snapshot.hasError) return _missing();
           final bytes = snapshot.data;

@@ -9543,18 +9543,6 @@ abstract class AppLocalizations {
   /// **'Fast IDE'**
   String get generalSettingsIde;
 
-  /// No description provided for @generalSettingsAutoOpenChanges.
-  ///
-  /// In en, this message translates to:
-  /// **'Show agent changes as diffs'**
-  String get generalSettingsAutoOpenChanges;
-
-  /// No description provided for @generalSettingsAutoOpenChangesDescription.
-  ///
-  /// In en, this message translates to:
-  /// **'While the IDE shows, a file the agent changes opens as a diff of it against its text before, as the agent edits it.'**
-  String get generalSettingsAutoOpenChangesDescription;
-
   /// No description provided for @explorerExcludeSetting.
   ///
   /// In en, this message translates to:

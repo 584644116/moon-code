@@ -5922,13 +5922,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get generalSettingsIde => 'Fast IDE';
 
   @override
-  String get generalSettingsAutoOpenChanges => 'Show agent changes as diffs';
-
-  @override
-  String get generalSettingsAutoOpenChangesDescription =>
-      'While the IDE shows, a file the agent changes opens as a diff of it against its text before, as the agent edits it.';
-
-  @override
   String get explorerExcludeSetting => 'Hidden files and folders';
 
   @override
