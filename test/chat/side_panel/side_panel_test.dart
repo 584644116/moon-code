@@ -27,9 +27,11 @@ import 'package:baocode/chat/widgets/fold_line.dart';
 import 'package:baocode/chat/widgets/markdown_view.dart';
 import 'package:baocode/chat/widgets/tool_call_row.dart';
 import 'package:baocode/ide/file_service.dart';
+import 'package:baocode/ide/git/ide_git_commit_panel.dart';
 import 'package:baocode/ide/git/commit_message.dart';
+import 'package:baocode/ide/git/git_model.dart';
 import 'package:baocode/ide/git/git_repository.dart';
-import 'package:baocode/ide/git/ide_scm_view.dart';
+import 'package:baocode/ide/git/ide_git_log_view.dart';
 import 'package:baocode/ide/ide_code_diff.dart';
 import 'package:baocode/ide/ide_code_editor.dart';
 import 'package:baocode/ide/ide_explorer.dart';
@@ -133,6 +135,7 @@ Future<({AgentSidePanel panel, ChatSession session, _Files files})> _pumpChat(
   TerminalService? terminals,
   IdeGitRepository? git,
   IdeCommitMessageModel? commitMessage,
+  IdeGitWorktreeChoice Function(IdeGitRepository git)? worktreesOf,
   double titleBarInset = 0,
   Widget? leading,
 }) async {
@@ -159,6 +162,7 @@ Future<({AgentSidePanel panel, ChatSession session, _Files files})> _pumpChat(
           terminals: terminals,
           git: git,
           commitMessage: commitMessage,
+          worktreesOf: worktreesOf,
           titleBarInset: titleBarInset,
           leading: leading,
         ),
@@ -584,6 +588,50 @@ void main() {
     expect(controller.position.maxScrollExtent, 0);
   });
 
+  testWidgets('lines selected and copied keep the empty ones between', (
+    tester,
+  ) async {
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    addTearDown(CopiedCode.clear);
+    await tester.pumpWidget(
+      _app(
+        FilePreview(
+          request: const FileOpenRequest('/p/a.dart', diff: true),
+          files: _Files({'/p/a.dart': 'one\n\ntwo\n\n\nthree'}),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final from = tester.getTopLeft(find.text('one')) - const Offset(1, -4);
+    final to = tester.getTopRight(find.text('three')) + const Offset(1, 4);
+    final drag = await tester.startGesture(from, kind: PointerDeviceKind.mouse);
+    await tester.pump();
+    await drag.moveTo(to);
+    await tester.pump();
+    await drag.up();
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pump();
+    expect(copied, 'one\n\ntwo\n\n\nthree');
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
   testWidgets('a diff shows in the IDE\'s diff editor; its lines copied '
       'paste into the composer as a reference to them', (tester) async {
     addTearDown(CopiedCode.clear);
@@ -921,10 +969,8 @@ void main() {
     expect(list, findsOneWidget);
   });
 
-  testWidgets('the changes page lists Git\'s changes as the Source Control '
-      'view does, and opens their diffs against HEAD and the index', (
-    tester,
-  ) async {
+  testWidgets('the changes page lists the local changes as JetBrains IDEs '
+      'do, and opens their diffs against HEAD and the index', (tester) async {
     final fake = FakeGit('/p')
       ..status =
           '## main\x00'
@@ -947,8 +993,8 @@ void main() {
     );
     panel.showSection(session, SidePanelSection.changes);
     await tester.pumpAndSettle();
-    final list = find.byType(IdeScmView);
-    String? letterOf(String name) => tester
+    final list = find.byType(IdeGitCommitPanel);
+    Color? colorOf(String name) => tester
         .widget<IdeResourceLabel>(
           find.descendant(
             of: list,
@@ -957,14 +1003,16 @@ void main() {
             ),
           ),
         )
-        .letter;
-    expect(
-      find.descendant(of: list, matching: find.text('Staged Changes')),
-      findsOneWidget,
-    );
-    expect(letterOf('staged.dart'), 'M');
-    expect(letterOf('main.dart'), 'M');
-    expect(letterOf('notes.md'), 'U');
+        .nameColor;
+    for (final group in ['Changes', 'Unversioned Files']) {
+      expect(
+        find.descendant(of: list, matching: find.text(group)),
+        findsOneWidget,
+      );
+    }
+    expect(colorOf('staged.dart'), IdeGitStatus.indexModified.color);
+    expect(colorOf('main.dart'), IdeGitStatus.modified.color);
+    expect(colorOf('notes.md'), IdeGitStatus.untracked.color);
 
     // The count of changes in the page's tab, in a badge as high as the
     // panel title's, not stretched to the bar's.
@@ -1054,19 +1102,11 @@ void main() {
     expect(compared(), ('before staging\n', 'staged text\n'));
     expect(panel.tabsOf(session).diffs, hasLength(2));
 
-    // As a list, from the Source Control view's View & Sort: each file with
-    // its folder, and the panel remembers it.
-    await drag.moveTo(
-      tester.getCenter(
-        find.descendant(of: list, matching: find.text('Changes')).first,
-      ),
+    // Not grouped by directory: each file with its folder, and the panel
+    // remembers it.
+    await tester.tap(
+      find.descendant(of: list, matching: find.byTooltip('Group by Directory')),
     );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('More Actions...').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('View & Sort'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('View as List'));
     await tester.pumpAndSettle();
     expect(panel.changesAsTree, isFalse);
     final main = tester.widget<IdeResourceLabel>(
@@ -1095,24 +1135,16 @@ void main() {
       ['/p/lib/staged.dart'],
     );
 
-    // A row's menu stages it.
-    await tester.tap(
-      find.descendant(
-        of: list,
-        matching: find.byWidgetPredicate(
-          (widget) => widget is IdeResourceLabel && widget.name == 'main.dart',
-        ),
-      ),
-      buttons: kSecondaryButton,
-    );
+    // An unversioned file's menu adds it to Git.
+    await tester.tap(row('notes.md'), buttons: kSecondaryButton);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Stage Changes'));
+    await tester.tap(find.text('Add to VCS'));
     await tester.pumpAndSettle();
-    expect(fake.callsTo('add').single, contains('lib/main.dart'));
+    expect(fake.callsTo('add').single, contains('notes.md'));
   });
 
-  testWidgets('a changed folder\'s menu puts it in the chat, reveals it, '
-      'copies its path and folds the tree; a file\'s opens it too', (
+  testWidgets('a changed folder\'s menu puts it in the chat, reveals it and '
+      'copies its path; a click folds it; a file\'s menu opens it too', (
     tester,
   ) async {
     final fake = FakeGit('/p')
@@ -1129,7 +1161,7 @@ void main() {
     );
     panel.showSection(session, SidePanelSection.changes);
     await tester.pumpAndSettle();
-    final list = find.byType(IdeScmView);
+    final list = find.byType(IdeGitCommitPanel);
     Finder row(String name) => find.descendant(
       of: list,
       matching: find.byWidgetPredicate(
@@ -1140,17 +1172,17 @@ void main() {
     await tester.tap(row('lib/a'), buttons: kSecondaryButton);
     await tester.pumpAndSettle();
     for (final item in [
-      'Discard Changes',
-      'Stage Changes',
+      'Rollback…',
       'Add to Chat',
       'Reveal in Files',
       'Copy Path',
       'Copy Relative Path',
-      'Collapse All',
     ]) {
       expect(find.text(item), findsOneWidget, reason: item);
     }
-    await tester.tap(find.text('Collapse All'));
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+    await tester.tap(row('lib/a'));
     await tester.pumpAndSettle();
     expect(row('main.dart'), findsNothing);
 
@@ -1178,8 +1210,8 @@ void main() {
     await tester.tap(row('main.dart'), buttons: kSecondaryButton);
     await tester.pumpAndSettle();
     for (final item in [
-      'Open Changes',
-      'Open File',
+      'Show Diff',
+      'Jump to Source',
       'Add to Chat',
       'Reveal in Files',
       'Copy Path',
@@ -1187,13 +1219,10 @@ void main() {
     ]) {
       expect(find.text(item), findsOneWidget, reason: item);
     }
-    expect(find.text('Collapse All'), findsNothing);
   });
 
-  testWidgets('under the changes, the Source Control view\'s graph: a '
-      'commit\'s files show once it is tapped, and a file opens', (
-    tester,
-  ) async {
+  testWidgets('the changes page is the Git log: a commit tapped shows its '
+      'files, and a file its changes in the log\'s place', (tester) async {
     final fake = FakeGit('/p')
       ..status = '## main\x00 M lib/main.dart\x00'
       ..log =
@@ -1201,6 +1230,8 @@ void main() {
           '${gitLogRecord('c1', [], 'First')}';
     fake.refs['HEAD'] = 'c2';
     fake.show['c2'] = 'M\x00lib/main.dart\x00';
+    fake.show['c1:lib/main.dart'] = 'first\n';
+    fake.show['c2:lib/main.dart'] = 'second\n';
     final git = fake.repository();
     addTearDown(git.dispose);
     final (:panel, :session, files: _) = await _pumpChat(
@@ -1210,40 +1241,86 @@ void main() {
     );
     panel.showSection(session, SidePanelSection.changes);
     await tester.pumpAndSettle();
-    expect(find.text('Graph'), findsOneWidget);
-    final second = find.textContaining('Second', findRichText: true);
-    expect(second, findsOneWidget);
-    expect(find.textContaining('First', findRichText: true), findsOneWidget);
-    const file = ValueKey('file:c2:/p/lib/main.dart');
-    expect(find.byKey(file), findsNothing);
+    // The local changes first, selected: their commit box and groups.
+    expect(find.text('Local Changes (1)'), findsOneWidget);
+    expect(find.byType(IdeGitCommitPanel), findsOneWidget);
+    expect(find.text('Second'), findsOneWidget);
+    expect(find.text('First'), findsOneWidget);
 
-    await tester.tap(second);
+    await tester.tap(find.text('Second'));
     await tester.pumpAndSettle();
-    // Under its folder, lib.
-    expect(find.byKey(const ValueKey('folder:c2:/p/lib')), findsOneWidget);
-    final changes = find.byKey(file).first;
-    expect(tester.getSize(changes).height, IdeListColors.rowHeight);
-    await tester.tap(
-      find
-          .descendant(
-            of: changes,
-            matching: find.byWidgetPredicate(
-              (widget) =>
-                  widget is IdeResourceLabel && widget.name == 'main.dart',
-            ),
-          )
-          .first,
+    expect(find.text('commit: c2'), findsOneWidget);
+    final file = find.byWidgetPredicate(
+      (widget) => widget is IdeResourceLabel && widget.name == 'main.dart',
     );
+    await tester.tap(file.last);
     await tester.pumpAndSettle();
-    expect(
-      [for (final tab in panel.tabsOf(session).files) tab.path],
-      ['/p/lib/main.dart'],
+    final tab = panel.tabsOf(session).activeDiff!;
+    expect(tab.path, '/p/lib/main.dart');
+    expect(tab.request.readOnly, isTrue);
+    final diff = tester.widget<IdeCodeDiff>(
+      find.descendant(
+        of: find.byType(FilePreview),
+        matching: find.byType(IdeCodeDiff),
+      ),
     );
+    expect((diff.original, diff.modified), ('first\n', 'second\n'));
+
+    // Back to the log, the change's tab kept.
+    await tester.tap(find.byTooltip('Back to Log'));
+    await tester.pumpAndSettle();
+    expect(panel.tabsOf(session).activeDiff, isNull);
+    expect(panel.tabsOf(session).diffs, hasLength(1));
+    // In the table, and as the message of the commit still selected.
+    expect(find.text('Second'), findsNWidgets(2));
   });
 
-  testWidgets('the changes page is the Source Control view: a message '
-      'wanted, written by the sparkle from the staged changes, then the '
-      'staged changes committed', (tester) async {
+  testWidgets('in a worktree where the agent works: its name, its branch '
+      'marked, the others to pick from', (tester) async {
+    final fake = FakeGit('/p-wt')
+      ..status = '## feature\x00 M lib/main.dart\x00'
+      ..worktrees =
+          'worktree /p\nHEAD ${'1' * 40}\nbranch refs/heads/main\n\n'
+          'worktree /p-wt\nHEAD ${'2' * 40}\nbranch refs/heads/feature\n'
+      ..log =
+          '${gitLogRecord('c2', ['c1'], 'Second', refs: 'HEAD -> refs/heads/feature')}\n'
+          '${gitLogRecord('c1', [], 'First', refs: 'refs/heads/main')}';
+    fake.refs['HEAD'] = 'c2';
+    final git = fake.repository();
+    addTearDown(git.dispose);
+    final picked = <String?>[];
+    final (:panel, :session, files: _) = await _pumpChat(
+      tester,
+      git: git,
+      texts: {'/p-wt/lib/main.dart': 'main\n'},
+      worktreesOf: (_) => IdeGitWorktreeChoice(
+        agentPath: '/p-wt/lib/main.dart',
+        onSelect: picked.add,
+      ),
+    );
+    panel.showSection(session, SidePanelSection.changes);
+    await tester.pumpAndSettle();
+    // Which worktree's changes, the agent's.
+    expect(
+      find.textContaining('p-wt · feature', findRichText: true),
+      findsOneWidget,
+    );
+    expect(find.byTooltip('The agent works here'), findsWidgets);
+    // main is checked out in the other.
+    expect(find.byTooltip('Checked out in worktree p\n/p'), findsOneWidget);
+
+    await tester.tap(find.text('p-wt'));
+    await tester.pumpAndSettle();
+    expect(find.text('Follow the Agent'), findsOneWidget);
+    expect(find.text('p-wt  ✦ AI'), findsOneWidget);
+    await tester.tap(find.text('p  (main worktree)'));
+    await tester.pumpAndSettle();
+    expect(picked, ['/p']);
+  });
+
+  testWidgets('the changes page commits as JetBrains IDEs do: a message '
+      'wanted, written by the sparkle from the files checked, then those '
+      'committed', (tester) async {
     final fake = FakeGit('/p')
       ..status =
           '## main\x00'
@@ -1264,22 +1341,29 @@ void main() {
     );
     panel.showSection(session, SidePanelSection.changes);
     await tester.pumpAndSettle();
-    expect(find.byType(IdeScmView), findsOneWidget);
+    expect(find.byType(IdeGitCommitPanel), findsOneWidget);
     // The panel's own title, not the view's.
     expect(find.text('Source Control'), findsNothing);
-    final commit = find.byTooltip('Commit Changes (Ctrl+Enter)');
+    final commit = find.descendant(
+      of: find.byType(IdeGitCommitPanel),
+      matching: find.text('Commit'),
+    );
 
     // No message: said so, nothing committed.
     await tester.tap(commit);
     await tester.pumpAndSettle();
-    expect(find.text('Please provide a commit message'), findsOneWidget);
+    expect(find.text('Enter a commit message.'), findsOneWidget);
     expect(fake.callsTo('commit'), isEmpty);
 
-    // The sparkle: the staged changes' diff to the model, its message in.
+    // The sparkle: the checked files' diff against HEAD to the model, its
+    // message in.
     await tester.tap(find.byTooltip('Generate Commit Message'));
     await tester.pumpAndSettle();
     expect(prompts.single.user, contains('+staged'));
-    expect(fake.callsTo('diff').single, contains('--cached'));
+    expect(
+      fake.callsTo('diff').single,
+      containsAllInOrder(['HEAD', '--', 'lib/main.dart', 'lib/staged.dart']),
+    );
     expect(panel.scmOf(git).message.text, 'Stage the staged file');
 
     await tester.tap(commit);
@@ -1289,6 +1373,10 @@ void main() {
       '--quiet',
       '-m',
       'Stage the staged file',
+      '--only',
+      '--',
+      'lib/main.dart',
+      'lib/staged.dart',
     ]);
     expect(panel.scmOf(git).message.text, isEmpty);
   });
@@ -2320,6 +2408,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<MarkdownEditor>(preview).readOnly, isTrue);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('a markdown file\'s changes, the text before not known, show '
+      'it rendered as it is', (tester) async {
+    _bigWindow(tester);
+    await tester.pumpWidget(
+      _app(
+        FilePreview(
+          request: const FileOpenRequest('/p/notes.md', diff: true),
+          files: _Files({'/p/notes.md': '# Notes\n\nhello\n'}),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final preview = find.byType(MarkdownEditor);
+    expect(preview, findsOneWidget);
+    expect(tester.widget<MarkdownEditor>(preview).readOnly, isTrue);
+
+    // Its source a click away.
+    await tester.tap(find.text('Source'));
+    await tester.pumpAndSettle();
+    expect(find.byType(MarkdownEditor), findsNothing);
+  });
 
   testWidgets('files dropped on a markdown file\'s preview are copied '
       'beside it and linked to, where they are let go', (tester) async {

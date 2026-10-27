@@ -16,6 +16,7 @@ import '../ide/search/text_search.dart';
 import '../ide/terminal/pty.dart';
 import '../ide/terminal/terminal_instance.dart';
 import '../ide/terminal/terminal_profiles.dart';
+import 'remote_location.dart';
 import 'ssh_host.dart';
 
 /// [open]'s items on [host]'s connection, opened again (after what
@@ -337,7 +338,7 @@ LspProcessStarter remoteLspStarter(SshHost host) => (launch) async {
     );
   } on RemoteException catch (error) {
     throw LspStartException(
-      'Could not start ${launch.serverId} on ${host.host}',
+      'Could not start ${launch.serverId} on ${RemoteLocation.hostName(host.host)}',
       detail: error.message,
     );
   }

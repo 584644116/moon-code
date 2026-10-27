@@ -361,8 +361,13 @@ class StashStore extends ChangeNotifier {
     // of them, a stash again, would be its double.
     for (final note in merging) {
       if (identical(note, kept)) continue;
+      final own = note.ownIssue;
       for (final link in note.issues) {
-        if (kept.issueOf(link.url) == null) kept.issues.add(link);
+        if (kept.issueOf(link.url) != null) continue;
+        // Its issue the same thing as this one's: closed as its duplicate?
+        kept.issues.add(
+          link.url == own ? link.copyWith(mergedFrom: note.id) : link,
+        );
       }
       for (final link in note.threads) {
         if (kept.threadOf(link.session) == null) kept.threads.add(link);

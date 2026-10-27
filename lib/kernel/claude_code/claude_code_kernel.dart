@@ -39,6 +39,8 @@ import 'claude_goal.dart';
 import 'claude_sdk_tools.dart';
 import 'turn_stats.dart';
 import 'control_channel.dart';
+import 'local_time_zone.dart';
+import 'usage_limit.dart';
 
 /// Reads a kept session: its conversation lines, oldest first, along the
 /// branch the session ended on.
@@ -106,6 +108,7 @@ class ClaudeCodeKernel
         SuggestsFiles,
         ReportsContext,
         ReportsUsage,
+        ReportsUsageLimit,
         RunsBackgroundTasks,
         QueuesMessages,
         RevertsChanges,
@@ -410,6 +413,11 @@ class ClaudeCodeKernel
   /// [_applyWindow]).
   String _launchedProvider = '';
   String? _reportedModel;
+
+  /// When the usage limit the last turn hit resets (see
+  /// [ReportsUsageLimit]): on the account's own plan only, a provider's
+  /// limits being its own.
+  DateTime? _limitResetsAt;
   // What the agent does (Agent, Ask, Plan) and how its actions are
   // approved, picked apart: the CLI runs the approvals as they are, but in
   // Plan, which is a permission mode of its own (see _cliMode). Ask is only
@@ -556,7 +564,7 @@ class ClaudeCodeKernel
       final (:model, :effort, provider: _) = target;
       // Through the proxy, the effort goes with the model's name; to
       // Anthropic's API, as Claude Code's own, if it is one of its.
-      final direct = custom == null || !custom.$1.protocol.proxied;
+      final direct = custom == null || !custom.$1.protocolOf(custom.$2).proxied;
       Map<String, String>? env;
       if ((custom, model) case ((final provider, _), final model?)) {
         try {
@@ -1042,6 +1050,7 @@ class ClaudeCodeKernel
 
   void _beginTurn(String id, {bool unprompted = false}) {
     _turn = id;
+    _limitHit(null);
     _turnStarted = DateTime.now();
     _translator.turnId = id;
     emit(TurnStarted(nextSeq, id, unprompted: unprompted));
@@ -1949,6 +1958,7 @@ class ClaudeCodeKernel
       case 'assistant':
         _noteToolUses(message);
         if (_countRequest(message)) _reportStats();
+        if (message['error'] == 'rate_limit') _limitSaid(message['message']);
         _translator.translate(message);
       case 'result':
         _result(message);
@@ -2130,6 +2140,7 @@ class ClaudeCodeKernel
     }
     if (message['is_error'] == true && message['result'] is String) {
       final error = message['result'] as String;
+      if (_limitResetsAt == null) _limitSaid(error);
       if (error.isNotEmpty) {
         final host = _remoteHost;
         emit(
@@ -2271,10 +2282,79 @@ class ClaudeCodeKernel
     _ => '$type',
   };
 
+  @override
+  DateTime? get usageLimitResetsAt => usageLimitApplies ? _limitResetsAt : null;
+
+  /// A provider's model picked: the next message goes there, the plan's
+  /// limit no bar to it.
+  @override
+  bool get usageLimitApplies => _providerKey.isEmpty;
+
+  @override
+  bool usageLimitAppliesTo(String model) => _providerKeyOf(model).isEmpty;
+
+  /// The usage limit is hit, to reset [at]; null, it no longer holds.
+  void _limitHit(DateTime? at) {
+    // A provider's limits are its own, and so is what it says of them.
+    if (at != null && _launchedProvider.isNotEmpty) return;
+    if (at == _limitResetsAt) return;
+    _limitResetsAt = at;
+    emitInfoChanged();
+  }
+
+  /// When the limit hit resets, as [said] (an error's text, or the
+  /// message it is in) says it; nothing where it does not.
+  void _limitSaid(Object? said) {
+    final text = switch (said) {
+      final String text => text,
+      {'content': final List<Object?> content} => [
+        for (final block in content)
+          if (block case {'type': 'text', 'text': final String text}) text,
+      ].join('\n'),
+      _ => '',
+    };
+    if (_limitResetsAt != null || text.isEmpty) return;
+    // A remote project's agent says the time in its host's zone.
+    final at = parseUsageLimitReset(
+      text,
+      now: DateTime.now(),
+      localZone: _remoteHost == null ? localTimeZone() : null,
+    );
+    if (at != null && (_remoteHost == null || _zoneSaid(text) == null)) {
+      _limitHit(at);
+    }
+  }
+
+  /// The zone a reset time is said in, if it says one.
+  static String? _zoneSaid(String text) =>
+      RegExp(r'resets [^(\n]*\(([^)]+)\)').firstMatch(text)?[1];
+
   /// From a `rate_limit_event`, sent as a reply changes the usage: the
-  /// windows, or near a limit just that one.
+  /// windows, or near a limit just that one. Rejected, the limit is hit:
+  /// it says when it resets.
   void _rateLimits(Object? info) {
     if (info is! Map) return;
+    if (info['status'] == 'rejected') {
+      final resets = [
+        if (info['resetsAt'] case final int at) at,
+        if (info['unifiedWindows'] case final Map<Object?, Object?> windows)
+          for (final window in windows.values)
+            // The windows used up: those that hold it back.
+            if (window case {'resetsAt': final int at} && final Map used
+                when used['status'] == 'rejected' ||
+                    switch (used['utilization']) {
+                      final num utilization => utilization >= 1,
+                      _ => false,
+                    })
+              at,
+      ];
+      if (resets.isNotEmpty) {
+        _limitResetsAt = null;
+        _limitHit(
+          DateTime.fromMillisecondsSinceEpoch(resets.reduce(math.max) * 1000),
+        );
+      }
+    }
     RateLimitWindow window(Object? type, Object? utilization, Object? resets) =>
         RateLimitWindow(
           _limitLabel(type),
@@ -3024,7 +3104,7 @@ class ClaudeCodeKernel
             ),
           },
         ),
-        if (!provider.protocol.proxied) ?_thinkingSettings(effort),
+        if (!provider.protocolOf(info).proxied) ?_thinkingSettings(effort),
       ]);
       // Whether auto runs on the CLI's classifier may have changed with
       // the model: told the mode it is now (see _cliApproval).
@@ -3066,11 +3146,11 @@ class ClaudeCodeKernel
   static List<String> _requestedModels(ModelProvider provider) => {
     for (final info in provider.enabledModels) ...[
       requestedModel(provider, info),
-      if (provider.protocol.proxied)
+      if (provider.protocolOf(info).proxied)
         for (final effort in info.effortLevels)
           requestedModel(provider, info, effort: effort),
-      if (provider.protocol == ProviderProtocol.openaiResponses ||
-          provider.protocol == ProviderProtocol.codex) ...[
+      if (provider.protocolOf(info)
+          case ProviderProtocol.openaiResponses || ProviderProtocol.codex) ...[
         requestedModel(provider, info, fast: true),
         for (final effort in info.effortLevels)
           requestedModel(provider, info, effort: effort, fast: true),
@@ -3585,7 +3665,7 @@ class ClaudeCodeKernel
         // Through the proxy, the effort goes with the model's name;
         // to Anthropic's API, as Claude Code's own setting.
         _change([
-          if (provider.protocol.proxied)
+          if (provider.protocolOf(info).proxied)
             (
               'set_model',
               {
@@ -3628,9 +3708,9 @@ class ClaudeCodeKernel
   late final ModelSetting fast = _ModelSetting(
     toggle: true,
     optionsFor: (model) => switch (_providers.resolve(model)) {
-      (final provider, _)
-          when provider.protocol == ProviderProtocol.openaiResponses ||
-              provider.protocol == ProviderProtocol.codex =>
+      (final provider, final info)
+          when provider.protocolOf(info) == ProviderProtocol.openaiResponses ||
+              provider.protocolOf(info) == ProviderProtocol.codex =>
         const [KernelOption('fast', 'Fast', Icons.bolt_rounded, '')],
       _ => const [],
     },

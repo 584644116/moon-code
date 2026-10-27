@@ -2910,7 +2910,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get stripChangeUntracked =>
-      'What it was before is not known (the agent did not tell, it is too large, or outside the project): it can be kept, not undone.';
+      'What it was before is not known (it is ignored or too large and the agent did not tell, or it is outside the project): it can be kept, not undone.';
 
   @override
   String get stripChangesDiff => 'Agent Changes';
@@ -6832,7 +6832,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelsRolesDescription =>
-      'Which model Claude Code uses for each part of its work. Unset, the model picked stands in.';
+      'Which model Claude Code uses for each part of its work. Unset, the model picked stands in. All but the main model may be another upstream\'s: BaoCode\'s local proxy sends their requests there.';
 
   @override
   String get modelsRoleUnset => 'Unset';
@@ -7802,28 +7802,28 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String remoteStatus(String host) {
-    return 'SSH: $host';
+  String remoteStatus(String kind, String host) {
+    return '$kind: $host';
   }
 
   @override
-  String remoteStatusConnecting(String host) {
-    return 'SSH: $host (connecting...)';
+  String remoteStatusConnecting(String kind, String host) {
+    return '$kind: $host (connecting...)';
   }
 
   @override
-  String remoteStatusReconnecting(String host) {
-    return 'SSH: $host (reconnecting...)';
+  String remoteStatusReconnecting(String kind, String host) {
+    return '$kind: $host (reconnecting...)';
   }
 
   @override
-  String remoteStatusFailed(String host) {
-    return 'SSH: $host (disconnected)';
+  String remoteStatusFailed(String kind, String host) {
+    return '$kind: $host (disconnected)';
   }
 
   @override
-  String remoteStatusInstalling(String host, int percent) {
-    return 'SSH: $host (installing Claude Code $percent%)';
+  String remoteStatusInstalling(String kind, String host, int percent) {
+    return '$kind: $host (installing Claude Code $percent%)';
   }
 
   @override
@@ -7847,8 +7847,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String remoteStatusTooltip(String host) {
-    return 'Connected to $host over SSH';
+  String remoteStatusTooltip(String kind, String host) {
+    return 'Connected to $host over $kind';
   }
 
   @override
@@ -7865,8 +7865,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get remoteReconnect => 'Reconnect';
 
   @override
-  String remoteProjectTooltip(String host) {
-    return 'On $host, over SSH';
+  String remoteProjectTooltip(String kind, String host) {
+    return 'On $host, over $kind';
   }
 
   @override

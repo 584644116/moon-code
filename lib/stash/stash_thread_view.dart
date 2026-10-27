@@ -35,6 +35,13 @@ SidebarStashes sidebarStashes(
   open: open,
   pulls: (session) => _pullsOf(controller, session),
   openPull: (url) => unawaited(openExternal(url)),
+  news: () => controller.forge == null
+      ? 0
+      : controller.store.notes
+            .where(
+              (note) => note.news != null && note.newsMine && !note.isBlank,
+            )
+            .length,
 );
 
 List<SidebarPull> _pullsOf(StashController controller, String session) {

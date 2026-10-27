@@ -547,6 +547,16 @@ class StashController extends ChangeNotifier {
     null => null,
   };
 
+  /// Whether [note] is about [project]: its own, or (a workspace) about
+  /// one of its folders, as the issues of a folder that is a project of
+  /// its own are.
+  bool isAbout(StashNote note, String project) {
+    final own = note.project;
+    if (own == null) return false;
+    if (own == project) return true;
+    return workspace.workspaceAt(project)?.folders.contains(own) ?? false;
+  }
+
   /// What `[[`, `@` and `#` offer in a stash's text, links followed by
   /// [open].
   StashRefs refs(void Function(String href) open) => StashRefs(

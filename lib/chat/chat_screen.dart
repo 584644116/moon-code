@@ -29,6 +29,7 @@ import 'chat_keys.dart';
 import 'chat_models.dart';
 import 'chat_session.dart';
 import 'open_editor.dart';
+import 'resume_after_reset.dart';
 import 'session_export_action.dart';
 import 'chat_width.dart';
 import 'composer/command_details.dart';
@@ -40,6 +41,7 @@ import 'panels/activity_strip.dart';
 import 'panels/claude_core_hint.dart';
 import 'panels/health_banner.dart';
 import 'panels/interaction_panel.dart';
+import 'panels/limit_reset_panel.dart';
 import 'panels/context_usage_panel.dart';
 import 'panels/goal_panel.dart';
 import 'panels/queue_panel.dart';
@@ -820,6 +822,7 @@ class _ChatScreenState extends State<ChatScreen>
             inPanel: links.inPanel,
             onOpenInIde: links.openInIde,
             onShowBrowserTab: links.showBrowserTab,
+            onOpenFolder: links.openFolder,
             roots: links.roots?.call() ?? const [],
             seen: _session.filesSeen,
             local: switch (_session.kernelContext.cwd) {
@@ -1024,6 +1027,16 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
+  /// The usage limit the agent stopped at, while it holds and the agent is
+  /// to go on once it resets: when. Nothing with the setting off.
+  Widget? _buildLimitPanel() {
+    final (at, id) = (_session.usageLimitResetsAt, _session.sessionId);
+    if (at == null || id == null) return null;
+    final resumes = ResumeAfterReset.current;
+    if (!resumes.enabled || resumes[id] == null) return null;
+    return LimitResetPanel(key: ValueKey(('limit', id)), resetsAt: at);
+  }
+
   /// Under the session's own conversation: its panels and the composer.
   Widget _buildDock() {
     return Column(
@@ -1031,6 +1044,11 @@ class _ChatScreenState extends State<ChatScreen>
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Before all: the agent stopped, till the usage limit resets.
+        ListenableBuilder(
+          listenable: ResumeAfterReset.current,
+          builder: (context, _) => _PanelSlot(child: _buildLimitPanel()),
+        ),
         // First: what all the rest works toward.
         _PanelSlot(
           child: switch (_session.goal) {

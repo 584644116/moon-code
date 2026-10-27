@@ -31,8 +31,11 @@ enum AgentEngine {
 
   static const settingKey = 'agent.engine';
 
-  /// When the setting is unset, or not one of these.
-  static const fallback = claudeCli;
+  /// When the setting is unset, or not one of these: the CLI where Claude
+  /// Code is on this machine, else the built-in core (which suggests the
+  /// CLI): nothing is downloaded unasked.
+  static AgentEngine get fallback =>
+      ClaudeCore.fallback == ClaudeCore.cli ? claudeCli : claudeBuiltin;
 
   static AgentEngine parse(Object? setting) =>
       values.where((value) => value.name == setting).firstOrNull ?? fallback;

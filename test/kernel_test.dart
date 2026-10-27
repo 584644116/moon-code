@@ -840,6 +840,107 @@ void main() {
       expect(edits['/p/untold.txt'], isNull);
     });
 
+    test("a subagent's edits, sent without their patches, are told from "
+        'their input; its commands and its end, as files that may have '
+        'changed', () {
+      final events = <KernelEvent>[];
+      var seq = 0;
+      final translator = ClaudeTranslator(
+        emit: events.add,
+        nextSeq: () => ++seq,
+      );
+      void call(
+        String id,
+        String name,
+        Map<String, Object?> input, {
+        String? parent,
+        Object? result,
+      }) {
+        translator
+          ..translate({
+            'type': 'assistant',
+            'parent_tool_use_id': parent,
+            'message': {
+              'id': 'msg-$id',
+              'role': 'assistant',
+              'content': [
+                {'type': 'tool_use', 'id': id, 'name': name, 'input': input},
+              ],
+            },
+          })
+          ..translate({
+            'type': 'user',
+            'parent_tool_use_id': parent,
+            'message': {
+              'role': 'user',
+              'content': [
+                {'type': 'tool_result', 'tool_use_id': id, 'content': 'ok'},
+              ],
+            },
+            'tool_use_result': ?result,
+          });
+      }
+
+      translator.translate({
+        'type': 'assistant',
+        'parent_tool_use_id': null,
+        'message': {
+          'id': 'msg-agent',
+          'role': 'assistant',
+          'content': [
+            {
+              'type': 'tool_use',
+              'id': 'agent-1',
+              'name': 'Agent',
+              'input': {'description': 'Make files', 'prompt': 'make them'},
+            },
+          ],
+        },
+      });
+      call('w1', 'Write', {
+        'file_path': '/p/a.txt',
+        'content': 'one\ntwo\n',
+      }, parent: 'agent-1');
+      call('e1', 'Edit', {
+        'file_path': '/p/b.txt',
+        'old_string': 'x',
+        'new_string': 'y\nz',
+      }, parent: 'agent-1');
+      expect(
+        [
+          for (final event in events.whereType<FileEdited>())
+            (event.change.path, event.change.added, event.change.removed),
+        ],
+        [('/p/a.txt', 2, 0), ('/p/b.txt', 2, 1)],
+      );
+      // A Write's file before is not known; an Edit's, by its texts.
+      final originals = [
+        for (final event in events.whereType<FileEdited>()) event.original,
+      ];
+      expect(originals.first, isNull);
+      expect(
+        (originals.last! as OriginalByEdits).edits,
+        [(before: 'x', after: 'y\nz')],
+      );
+      expect(events.whereType<FilesMayHaveChanged>(), isEmpty);
+
+      call('b1', 'Bash', {'command': 'echo c > c.txt'}, parent: 'agent-1');
+      expect(events.whereType<FilesMayHaveChanged>(), hasLength(1));
+      call('agent-1', 'Agent', {
+        'description': 'Make files',
+        'prompt': 'make them',
+      }, result: {'status': 'completed', 'content': []});
+      expect(events.whereType<FilesMayHaveChanged>(), hasLength(2));
+
+      // A kept session's, replayed: nothing to look at.
+      events.clear();
+      translator.replaying = true;
+      call('w2', 'Write', {'file_path': '/p/d.txt', 'content': 'd'});
+      call('b2', 'Bash', {'command': 'true'});
+      expect(events.whereType<FileEdited>(), isEmpty);
+      expect(events.whereType<FilesMayHaveChanged>(), isEmpty);
+    });
+
     test('each round of planning is one card; a plan sent back gives way '
         'to the next', () {
       final transcript = Transcript();
@@ -5263,10 +5364,18 @@ void main() {
   });
 
   group('commit attribution', () {
-    /// What `--settings` gives Claude Code, if it is passed.
+    /// What `--settings` gives Claude Code besides the environment always
+    /// unset, if anything.
     Object? flagSettings(ClaudeLaunch launch) {
       final at = launch.arguments.indexOf('--settings');
-      return at < 0 ? null : jsonDecode(launch.arguments[at + 1]);
+      final settings = Map.of(
+        jsonDecode(launch.arguments[at + 1]) as Map<String, Object?>,
+      );
+      if (jsonEncode(settings['env']) ==
+          jsonEncode(ClaudeLaunch.unsetEnvironment)) {
+        settings.remove('env');
+      }
+      return settings.isEmpty ? null : settings;
     }
 
     test('is the setting\'s, BaoCode when unset or unknown', () {
@@ -5910,6 +6019,52 @@ exec /usr/bin/env "\$@"
       ]);
       expect(storage.fork(id, into, before: 'nope'), throwsStateError);
       expect(storage.fork('../p', into), throwsArgumentError);
+    });
+
+    test('a folder\'s sessions move to another\'s, with what is kept beside '
+        'them and its memory; a folder dashed alike keeps its own', () async {
+      final root = await Directory.systemTemp.createTemp('baocode-move-');
+      addTearDown(() => root.delete(recursive: true));
+      final config = '${root.path}/config';
+      final from = '${root.path}/old/app';
+      final alike = '${root.path}/old-app';
+      final to = '${root.path}/new/app';
+      Directory(to).createSync(recursive: true);
+      String dir(String cwd) =>
+          '$config/projects/${cwd.replaceAll(RegExp('[^a-zA-Z0-9]'), '-')}';
+      void session(String id, String cwd) => File('${dir(from)}/$id.jsonl')
+        ..createSync(recursive: true)
+        ..writeAsStringSync(
+          [
+            {'type': 'custom-title', 'customTitle': 'T', 'sessionId': id},
+            {
+              'type': 'user',
+              'cwd': cwd,
+              'message': {'role': 'user', 'content': 'hi'},
+            },
+            {'type': 'assistant', 'cwd': '$cwd/lib', 'message': {}},
+          ].map((line) => '${jsonEncode(line)}\n').join(),
+        );
+      session('mine', from);
+      session('theirs', alike);
+      File('${dir(from)}/mine/subagents/a.jsonl').createSync(recursive: true);
+      File('${dir(from)}/memory/MEMORY.md').createSync(recursive: true);
+
+      final moved = await ClaudeStorage(configDir: config)
+          .moveSessions(from, to);
+
+      expect(moved, 1);
+      final file = File('${dir(to)}/mine.jsonl');
+      final lines = [
+        for (final line in file.readAsLinesSync())
+          (jsonDecode(line) as Map).cast<String, Object?>(),
+      ];
+      expect(lines.map((line) => line['cwd']), [null, to, '$to/lib']);
+      expect(lines.first['customTitle'], 'T');
+      expect(File('${dir(to)}/mine/subagents/a.jsonl').existsSync(), isTrue);
+      expect(File('${dir(to)}/memory/MEMORY.md').existsSync(), isTrue);
+      expect(File('${dir(from)}/mine.jsonl').existsSync(), isFalse);
+      expect(File('${dir(from)}/theirs.jsonl').existsSync(), isTrue);
     });
   });
 

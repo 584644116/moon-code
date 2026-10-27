@@ -2806,7 +2806,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get stripChangeConflict => '智能体改完后这个文件又被改过，无法自动撤销智能体的改动。请手动处理后再保留。';
 
   @override
-  String get stripChangeUntracked => '不知道改动前的内容（智能体没有提供、文件过大或在项目之外）：只能保留，无法撤销。';
+  String get stripChangeUntracked =>
+      '不知道改动前的内容（文件被忽略或过大、不在项目快照中，智能体也没有提供；或在项目之外）：只能保留，无法撤销。';
 
   @override
   String get stripChangesDiff => '智能体改动';
@@ -6410,7 +6411,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelsRoles => '角色映射';
 
   @override
-  String get modelsRolesDescription => 'Claude Code 在各类工作中使用的模型；未设置时使用当前所选模型。';
+  String get modelsRolesDescription =>
+      'Claude Code 在各类工作中使用的模型；未设置时使用当前所选模型。除主模型外，都可以选其他上游的模型，请求会经 BaoCode 的本地代理发过去。';
 
   @override
   String get modelsRoleUnset => '未设置';
@@ -7341,28 +7343,28 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String remoteStatus(String host) {
-    return 'SSH: $host';
+  String remoteStatus(String kind, String host) {
+    return '$kind: $host';
   }
 
   @override
-  String remoteStatusConnecting(String host) {
-    return 'SSH: $host（正在连接...）';
+  String remoteStatusConnecting(String kind, String host) {
+    return '$kind: $host（正在连接...）';
   }
 
   @override
-  String remoteStatusReconnecting(String host) {
-    return 'SSH: $host（正在重连...）';
+  String remoteStatusReconnecting(String kind, String host) {
+    return '$kind: $host（正在重连...）';
   }
 
   @override
-  String remoteStatusFailed(String host) {
-    return 'SSH: $host（已断开）';
+  String remoteStatusFailed(String kind, String host) {
+    return '$kind: $host（已断开）';
   }
 
   @override
-  String remoteStatusInstalling(String host, int percent) {
-    return 'SSH: $host（正在安装 Claude Code $percent%）';
+  String remoteStatusInstalling(String kind, String host, int percent) {
+    return '$kind: $host（正在安装 Claude Code $percent%）';
   }
 
   @override
@@ -7386,8 +7388,8 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String remoteStatusTooltip(String host) {
-    return '已通过 SSH 连接到 $host';
+  String remoteStatusTooltip(String kind, String host) {
+    return '已通过 $kind 连接到 $host';
   }
 
   @override
@@ -7404,8 +7406,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get remoteReconnect => '重新连接';
 
   @override
-  String remoteProjectTooltip(String host) {
-    return '位于 $host（通过 SSH）';
+  String remoteProjectTooltip(String kind, String host) {
+    return '位于 $host（通过 $kind）';
   }
 
   @override

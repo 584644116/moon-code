@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show max;
 
 import 'package:flutter/foundation.dart';
 
@@ -31,7 +32,7 @@ class StashForge extends ChangeNotifier {
     StashIssueSync Function()? issueSync,
   }) : _clock = clock ?? DateTime.now,
        _remotes = remotes ?? io.gitRemoteUrls,
-       _issueSync = issueSync ?? (() => StashIssueSync.auto);
+       _issueSync = issueSync ?? (() => StashIssueSync.all);
 
   /// The app's, once main() has made it.
   static StashForge? current;
@@ -109,7 +110,8 @@ class StashForge extends ChangeNotifier {
   void _accountsChanged() {
     _failures.clear();
     _asked.clear();
-    _pushable.clear();
+    _syncedAt.clear();
+    _syncFailures.clear();
     notifyListeners();
     unawaited(_collect());
     unawaited(sync());
@@ -158,11 +160,12 @@ class StashForge extends ChangeNotifier {
       ? _refresh(true)
       : _refreshing ??= _refresh(false).whenComplete(() => _refreshing = null);
 
-  /// Asks [id]'s stash's again, now (shown, it should be current).
-  Future<void> refreshNote(int id) async {
+  /// Asks [id]'s stash's again, now (shown, it should be current); even
+  /// those asked lately when [force]d.
+  Future<void> refreshNote(int id, {bool force = false}) async {
     final note = store.byId(id);
     if (note == null) return;
-    await _ask([for (final link in note.issues) link.url], force: false);
+    await _ask([for (final link in note.issues) link.url], force: force);
   }
 
   Future<void> _refresh(bool force) => _ask([
@@ -181,6 +184,11 @@ class StashForge extends ChangeNotifier {
         if (force || !(_asked[url]?.isAfter(now.subtract(fresh)) ?? false)) url,
     };
     final answers = <String, ForgeItem>{};
+    final started = asking.difference(_inFlight);
+    if (started.isNotEmpty) {
+      _inFlight.addAll(started);
+      notifyListeners();
+    }
     await Future.wait([
       for (final url in asking)
         if (refOf(url) case final ref?)
@@ -198,11 +206,16 @@ class StashForge extends ChangeNotifier {
                 })
                 .whenComplete(() => _asked[url] = now),
     ]);
+    _inFlight.removeAll(started);
     if (_disposed) return;
     _items.addAll(answers);
     notifyListeners();
     await _keep(answers);
   }
+
+  /// Whether [url] is being asked now (its row shows it loading).
+  bool asking(String url) => _inFlight.contains(url);
+  final Set<String> _inFlight = {};
 
   /// Keeps what [answers] say with the links (their title, state and
   /// checks), for when they cannot be asked; and a stash's own issue's
@@ -212,7 +225,10 @@ class StashForge extends ChangeNotifier {
     bool differs(StashIssueLink link, ForgeItem item) =>
         link.title != item.title ||
         link.state != item.state.name ||
-        link.checks != item.checks?.name;
+        link.checks != item.checks?.name ||
+        link.review != item.review?.name ||
+        link.comments != item.comments ||
+        link.updated != item.updated?.toIso8601String();
     bool ownDiffers(StashNote note) => switch (note.ownIssue) {
       final url? => switch (answers[url]) {
         final item? => _remoteHash(item) != note.syncedRemote,
@@ -232,6 +248,9 @@ class StashForge extends ChangeNotifier {
     )) {
       return;
     }
+    // Who wrote what is new on them, whether it names the user: asked
+    // before the stashes are read anew, not while they are.
+    final said = await _newComments(answers);
     await store.reload();
     for (final note in store.notes) {
       var changed = false;
@@ -239,17 +258,62 @@ class StashForge extends ChangeNotifier {
       for (final (i, link) in note.issues.indexed) {
         final item = answers[link.url];
         if (item == null || !differs(link, item)) continue;
+        // The user's own doing, here: not news to them.
+        final writing = _writing.contains(link.url);
+        final about = _aboutMe(item, session: link.session);
         // Its own issue closed or opened again: so is it.
         if (link.url == own && link.state != null) {
           final was = ForgeState.parse(link.state)?.isOpen;
           if (was == true && !item.state.isOpen) {
             note.status = StashStatus.done;
-          } else if (was == false &&
-              item.state.isOpen &&
-              note.status == StashStatus.done) {
-            note.status = note.threads.isNotEmpty
-                ? StashStatus.implementing
-                : StashStatus.collected;
+            if (!writing) note.tell(StashNews.closed, mine: about);
+          } else if (was == false && item.state.isOpen) {
+            if (note.status == StashStatus.done) {
+              note.status = note.threads.isNotEmpty
+                  ? StashStatus.implementing
+                  : StashStatus.collected;
+            }
+            if (!writing) note.tell(StashNews.reopened, mine: about);
+          }
+        }
+        // A pull request of it: merged, closed, failing, changes asked.
+        if (item.ref.kind == ForgeItemKind.pull &&
+            link.state != null &&
+            !writing) {
+          final was = ForgeState.parse(link.state);
+          if (was != ForgeState.merged && item.state == ForgeState.merged) {
+            note.tell(StashNews.merged, mine: about);
+          } else if ((was?.isOpen ?? false) &&
+              item.state == ForgeState.closed) {
+            note.tell(StashNews.closed, mine: about);
+          }
+          if (item.checks == ForgeChecks.failure &&
+              link.checks != ForgeChecks.failure.name) {
+            note.tell(StashNews.checksFailed, mine: about);
+          }
+          if (item.review == ForgeReview.changesRequested &&
+              link.review != ForgeReview.changesRequested.name) {
+            note.tell(StashNews.changesRequested, mine: about);
+          }
+        }
+        // Said more about: by others (theirs as far as known).
+        final comments = said[link.url];
+        if (!writing && _followed(note, link)) {
+          if (comments != null) {
+            if (comments.others.isNotEmpty) {
+              final me = _me(item.ref);
+              note.tell(
+                StashNews.commented,
+                mine:
+                    about ||
+                    me != null &&
+                        comments.others.any(
+                          (comment) => _names(comment.body, me),
+                        ),
+              );
+            }
+          } else if (link.comments != null && item.comments > link.comments!) {
+            note.tell(StashNews.commented, mine: about);
           }
         }
         note.issues[i] = StashIssueLink(
@@ -258,8 +322,17 @@ class StashForge extends ChangeNotifier {
           state: item.state.name,
           checks: item.checks?.name,
           session: link.session,
-          // A state that changed asks anew.
-          answered: link.state == item.state.name && link.answered,
+          // What it asks, changed, asks anew.
+          answered:
+              link.state == item.state.name &&
+              link.checks == item.checks?.name &&
+              link.review == item.review?.name &&
+              link.answered,
+          comments: item.comments,
+          mergedFrom: link.mergedFrom,
+          review: item.review?.name,
+          updated: item.updated?.toIso8601String(),
+          commentAt: comments?.latest?.toIso8601String() ?? link.commentAt,
         );
         changed = true;
       }
@@ -268,6 +341,104 @@ class StashForge extends ChangeNotifier {
       }
       if (changed) await store.save(note, touch: false);
     }
+  }
+
+  /// Whether what is new on [link] is told: [note]'s own issue's, its
+  /// pull requests'.
+  bool _followed(StashNote note, StashIssueLink link) =>
+      link.url == note.ownIssue || refOf(link.url)?.kind == ForgeItemKind.pull;
+
+  /// The user, as [ref]'s forge knows them.
+  String? _me(ForgeRef ref) => accounts.accountFor(ref.repo.host)?.login;
+
+  /// Whether [item] is the user's: theirs, assigned to them, or (a pull
+  /// request) opened from their conversation, [session].
+  bool _aboutMe(ForgeItem item, {String? session}) {
+    if (session != null) return true;
+    final me = _me(item.ref);
+    if (me == null) return false;
+    bool same(String? login) => login?.toLowerCase() == me.toLowerCase();
+    return same(item.author) || item.assignees.any(same);
+  }
+
+  /// Whether [text] names [me]: `@me`.
+  static bool _names(String text, String me) => RegExp(
+    '(?:^|[^\\w@/])@${RegExp.escape(me)}(?![\\w-])',
+    caseSensitive: false,
+  ).hasMatch(text);
+
+  /// The comments new on the links [answers] are of that are followed
+  /// (see [_followed]): more of them than kept, or (as many) it changed
+  /// otherwise unseen, one perhaps gone and another written. Those not by
+  /// the user, and when the latest was written; none where they could
+  /// not be asked (then told by their number).
+  Future<Map<String, ({List<ForgeComment> others, DateTime? latest})>>
+  _newComments(Map<String, ForgeItem> answers) async {
+    final asking = <String, StashIssueLink>{};
+    for (final note in store.notes) {
+      for (final link in note.issues) {
+        final item = answers[link.url];
+        final known = link.comments;
+        if (item == null ||
+            known == null ||
+            item.comments == 0 ||
+            _writing.contains(link.url) ||
+            !_followed(note, link)) {
+          continue;
+        }
+        final more = item.comments > known;
+        final unseen =
+            item.comments == known &&
+            link.commentAt != null &&
+            link.updated != null &&
+            link.updated != item.updated?.toIso8601String() &&
+            link.title == item.title &&
+            link.state == item.state.name &&
+            (link.url != note.ownIssue ||
+                _remoteHash(item) == note.syncedRemote);
+        if (more || unseen) asking[link.url] = link;
+      }
+    }
+    final said = <String, ({List<ForgeComment> others, DateTime? latest})>{};
+    await Future.wait([
+      for (final MapEntry(key: url, value: link) in asking.entries)
+        if (refOf(url) case final ref?)
+          if (accounts.apiOf(ref) case final api?)
+            () async {
+              final item = answers[url]!;
+              try {
+                final comments = await api.comments(ref, total: item.comments);
+                _comments[url] = (
+                  at: _clock(),
+                  total: item.comments,
+                  comments: Future.value(comments),
+                );
+                final after = DateTime.tryParse(link.commentAt ?? '');
+                final fresh = after == null
+                    ? comments.sublist(
+                        max(
+                          0,
+                          comments.length - (item.comments - link.comments!),
+                        ),
+                      )
+                    : [
+                        for (final comment in comments)
+                          if (comment.created?.isAfter(after) ?? false) comment,
+                      ];
+                final me = _me(ref)?.toLowerCase();
+                said[url] = (
+                  others: [
+                    for (final comment in fresh)
+                      if (comment.author.toLowerCase() != me) comment,
+                  ],
+                  latest: comments.lastOrNull?.created ?? after,
+                );
+              } on Object {
+                // Told by their number.
+              }
+            }(),
+    ]);
+    return said;
   }
 
   static String _remoteHash(ForgeItem item) =>
@@ -288,6 +459,10 @@ class StashForge extends ChangeNotifier {
       return true;
     }
     if (note.changedHere) return false;
+    // Changed since it was last seen the same: news (not the first time).
+    if (note.syncedRemote != null) {
+      note.tell(StashNews.changed, mine: _aboutMe(item));
+    }
     note
       ..title = item.title
       ..body = note.withIssueText(item.body)
@@ -328,11 +503,120 @@ class StashForge extends ChangeNotifier {
     if (note.status == StashStatus.done)
       for (final link in note.issues)
         if (!link.answered &&
+            // Asked of as duplicates, by [duplicateIssues].
+            (link.mergedFrom == null || link.url == note.ownIssue) &&
             refOf(link.url)?.kind == ForgeItemKind.issue &&
             (stateOf(link)?.isOpen ?? false) &&
             canAsk(link.url))
           link,
   ];
+
+  /// [note]'s pull requests still open whose checks failed, or of which
+  /// changes were asked: to be fixed, where they were made?
+  List<StashIssueLink> pullsToFix(StashNote note) => [
+    for (final link in note.issues)
+      if (!link.answered &&
+          refOf(link.url)?.kind == ForgeItemKind.pull &&
+          (stateOf(link)?.isOpen ?? false) &&
+          (checksOf(link) == ForgeChecks.failure ||
+              reviewOf(link) == ForgeReview.changesRequested))
+        link,
+  ];
+
+  /// [note]'s pull requests merged while it is not done: is it?
+  List<StashIssueLink> mergedPulls(StashNote note) => [
+    if (note.status != StashStatus.done)
+      for (final link in note.issues)
+        if (!link.answered &&
+            refOf(link.url)?.kind == ForgeItemKind.pull &&
+            stateOf(link) == ForgeState.merged)
+          link,
+  ];
+
+  /// [link]'s checks, [review]: as just asked, else as kept.
+  ForgeChecks? checksOf(StashIssueLink link) => _items.containsKey(link.url)
+      ? _items[link.url]!.checks
+      : ForgeChecks.parse(link.checks);
+  ForgeReview? reviewOf(StashIssueLink link) => _items.containsKey(link.url)
+      ? _items[link.url]!.review
+      : ForgeReview.parse(link.review);
+
+  /// The conversation [session] is, if it is listed.
+  AgentThread? threadOf(String session) {
+    for (final thread in workspace.threads) {
+      if (thread.id == session) return thread;
+    }
+    return null;
+  }
+
+  /// [note]'s issues that were those of stashes merged into it, still
+  /// open: the same thing, to close as its duplicates? (Asked once.)
+  List<StashIssueLink> duplicateIssues(StashNote note) => [
+    for (final link in note.issues)
+      if (link.mergedFrom != null &&
+          !link.answered &&
+          link.url != note.ownIssue &&
+          refOf(link.url)?.kind == ForgeItemKind.issue &&
+          (stateOf(link)?.isOpen ?? false) &&
+          canAsk(link.url))
+        link,
+  ];
+
+  /// [url]'s last comments, as asked lately (in [fresh]); asked again when
+  /// [force]d, or when it has more than then. [total], how many it has as
+  /// last synced, where it was not asked since.
+  Future<List<ForgeComment>> commentsOf(
+    String url, {
+    bool force = false,
+    int? total,
+  }) {
+    final ref = refOf(url);
+    final api = ref == null ? null : accounts.apiOf(ref);
+    if (ref == null || api == null) {
+      return Future.error(const ForgeException('Not signed in.', status: 401));
+    }
+    total = _items[url]?.comments ?? total;
+    final known = _comments[url];
+    if (!force &&
+        known != null &&
+        known.total == total &&
+        _clock().difference(known.at) < fresh) {
+      return known.comments;
+    }
+    final asked = api.comments(ref, total: total);
+    _comments[url] = (at: _clock(), total: total, comments: asked);
+    // Failed: asked again next time.
+    unawaited(
+      asked.then<void>(
+        (_) {},
+        onError: (Object _) {
+          if (identical(_comments[url]?.comments, asked)) {
+            _comments.remove(url);
+          }
+        },
+      ),
+    );
+    return asked;
+  }
+
+  final Map<
+    String,
+    ({DateTime at, int? total, Future<List<ForgeComment>> comments})
+  >
+  _comments = {};
+
+  /// [id]'s stash's news seen (its detail shown).
+  Future<void> seen(int id) async {
+    if (store.byId(id)?.news == null) return;
+    await store.update(id, (note) => note.seen(), touch: false);
+  }
+
+  /// [id]'s stash marked as having news, to come back to.
+  Future<void> markUnseen(int id) => store.update(
+    id,
+    (note) => note.tell(StashNews.marked, mine: true),
+    touch: false,
+  );
 
   /// What [links] of [id]'s stash asked was answered (or set aside).
   Future<void> answer(int id, Iterable<String> links) async {
@@ -366,19 +650,32 @@ class StashForge extends ChangeNotifier {
     String url, {
     String text = '',
     bool close = false,
+    bool duplicate = false,
   }) async {
     final ref = refOf(url);
     final api = ref == null ? null : accounts.apiOf(ref);
     if (ref == null || api == null) {
       throw const ForgeException('Not signed in.', status: 401);
     }
-    if (text.trim().isNotEmpty) await api.comment(ref, text.trim());
-    if (close && ref.kind == ForgeItemKind.issue) await api.close(ref);
-    // As it is now first: a state changed asks anew, but this one the user
-    // just answered.
-    await _ask([url], force: true);
+    // What changes there, from here till it is asked anew, the user's:
+    // not news to them (a sync between asking too).
+    _writing.add(url);
+    try {
+      if (text.trim().isNotEmpty) await api.comment(ref, text.trim());
+      if (close && ref.kind == ForgeItemKind.issue) {
+        await api.close(ref, duplicate: duplicate);
+      }
+      // As it is now first: a state changed asks anew, but this one the
+      // user just answered.
+      await _ask([url], force: true);
+    } finally {
+      _writing.remove(url);
+    }
     await answer(id, [url]);
   }
+
+  /// What the user is writing on: its changes theirs, not news.
+  final Set<String> _writing = {};
 
   /// What should not go out in [text] before the user says so: paths on
   /// this machine, and what looks like a secret (an API key, a token, a
@@ -446,6 +743,33 @@ class StashForge extends ChangeNotifier {
       {for (final folder in foldersOf(project)) ...await _reposIn(folder)}
           .toList();
 
+  /// [project]'s repositories as last found, for what shows them at once:
+  /// null till they are (asked then, and told when found).
+  List<ForgeRepo>? knownReposOf(String project) {
+    final folders = foldersOf(project);
+    final now = _clock();
+    final known = [
+      for (final folder in folders)
+        if (_remotesOf[folder] case final found?
+            when now.difference(found.at) < refreshEvery)
+          found.repos,
+    ];
+    if (known.length == folders.length) {
+      return {for (final repos in known) ...repos}.toList();
+    }
+    if (_findingRepos.add(project)) {
+      unawaited(
+        reposOf(project).whenComplete(() {
+          _findingRepos.remove(project);
+          if (!_disposed) notifyListeners();
+        }),
+      );
+    }
+    return null;
+  }
+
+  final Set<String> _findingRepos = {};
+
   /// The repositories the projects are of (by their folders' Git remotes,
   /// on hosts known), each with its project: a folder's own, before a
   /// workspace it is in; those with an account first.
@@ -475,39 +799,88 @@ class StashForge extends ChangeNotifier {
 
   // --- The projects' issues, as stashes ----------------------------------------
 
-  /// Whether each repository can be pushed to by the user, as asked.
-  final Map<ForgeRepo, bool> _pushable = {};
-
   Future<void>? _syncing;
+
+  /// Whether [sync] is going on; [syncProgress] how far.
+  bool get syncing => _syncing != null;
+
+  /// The repositories [sync] went through, of how many, while it goes.
+  ({int done, int total, ForgeRepo? repo})? get syncProgress => _progress;
+  ({int done, int total, ForgeRepo? repo})? _progress;
+
+  /// When [sync] last went through every repository.
+  DateTime? get lastSynced => _lastSynced;
+  DateTime? _lastSynced;
+
+  /// Why each repository could not be synced last time, if it could not.
+  Map<ForgeRepo, ForgeException> get syncFailures =>
+      Map.unmodifiable(_syncFailures);
+  final Map<ForgeRepo, ForgeException> _syncFailures = {};
+
+  /// The projects' repositories on a forge the user is not signed in to:
+  /// their issues not stashes till they are.
+  List<ForgeRepo> get unsignedRepos => List.unmodifiable(_unsigned);
+  List<ForgeRepo> _unsigned = const [];
+
+  /// When each repository was last synced whole: after that, only what
+  /// changed since is asked (closed ones among it).
+  final Map<ForgeRepo, DateTime> _syncedAt = {};
 
   /// Makes the projects' open issues stashes (those the settings say: see
   /// [StashIssueSync]), each once: the stash its issue is, else one that
   /// links it, else a new one; never one whose stash was deleted, or that
   /// was unlinked from it ([StashStore.ignoredIssues]). Those already
-  /// stashes are kept in step (see [_keep]).
-  Future<void> sync() =>
-      _syncing ??= _sync().whenComplete(() => _syncing = null);
+  /// stashes are kept in step (see [_keep]). Every open one asked the
+  /// first time, then those changed since; all again when [full].
+  Future<void> sync({bool full = false}) {
+    if (full) _syncedAt.clear();
+    return _syncing ??= _sync().whenComplete(() {
+      _syncing = null;
+      _progress = null;
+      if (!_disposed) notifyListeners();
+    });
+  }
 
   Future<void> _sync() async {
     final mode = _issueSync();
     if (_disposed || mode == StashIssueSync.off || !store.loaded) return;
+    final repos = await repositories();
+    final signed = [
+      for (final entry in repos)
+        if (accounts.apiFor(entry.repo.host) != null) entry,
+    ];
+    _unsigned = [
+      for (final (:repo, project: _) in repos)
+        if (accounts.apiFor(repo.host) == null) repo,
+    ];
+    _progress = (done: 0, total: signed.length, repo: null);
+    notifyListeners();
     final answers = <String, ForgeItem>{};
-    for (final (:repo, :project) in await repositories()) {
-      final api = accounts.apiFor(repo.host);
-      if (api == null) continue;
+    for (final (i, (:repo, :project)) in signed.indexed) {
+      if (_disposed) return;
+      final api = accounts.apiFor(repo.host)!;
+      _progress = (done: i, total: signed.length, repo: repo);
+      notifyListeners();
+      final started = _clock();
       try {
-        final all =
-            mode == StashIssueSync.auto &&
-            (_pushable[repo] ??= await api
-                .canPush(repo)
-                .catchError((Object _) => false));
+        final since = _syncedAt[repo];
         final items = <String, ForgeItem>{};
-        for (final filter
-            in all
-                ? const [ForgeIssueFilter.all]
-                : const [ForgeIssueFilter.assigned, ForgeIssueFilter.created]) {
-          for (final item in await api.issues(repo, filter: filter)) {
+        if (mode == StashIssueSync.all) {
+          for (final item in await api.allIssues(
+            repo,
+            // A minute back: what changed as it was asked.
+            since: since?.subtract(const Duration(minutes: 1)),
+          )) {
             items[item.ref.url.toString()] = item;
+          }
+        } else {
+          for (final filter in const [
+            ForgeIssueFilter.assigned,
+            ForgeIssueFilter.created,
+          ]) {
+            for (final item in await api.issues(repo, filter: filter)) {
+              items[item.ref.url.toString()] = item;
+            }
           }
         }
         for (final MapEntry(key: url, value: item) in items.entries) {
@@ -528,13 +901,20 @@ class StashForge extends ChangeNotifier {
             }
             continue;
           }
-          await _create(item, project: project.path);
+          // Closed before it was a stash: none.
+          if (!item.state.isOpen) continue;
+          // Not the first time: one opened since, news to the user.
+          await _create(item, project: project.path, news: since != null);
         }
+        _syncedAt[repo] = started;
+        _syncFailures.remove(repo);
       } on ForgeException catch (error) {
+        _syncFailures[repo] = error;
         debugPrint('stash: issues of ${repo.path}: ${error.message}');
       }
     }
     if (_disposed) return;
+    _lastSynced = _clock();
     _items.addAll(answers);
     final now = _clock();
     for (final url in answers.keys) {
@@ -546,7 +926,11 @@ class StashForge extends ChangeNotifier {
 
   /// A stash that is [item]'s issue, about [project]: its title and text
   /// the issue's.
-  Future<StashNote> _create(ForgeItem item, {String? project}) async {
+  Future<StashNote> _create(
+    ForgeItem item, {
+    String? project,
+    bool news = false,
+  }) async {
     final url = item.ref.url.toString();
     final note = await store.create(body: item.body.trim(), project: project);
     await store.update(note.id, (note) {
@@ -555,8 +939,21 @@ class StashForge extends ChangeNotifier {
         ..issue = url
         ..synced = StashNote.syncHash(item.title, item.body)
         ..syncedRemote = _remoteHash(item);
+      if (news) {
+        final me = _me(item.ref);
+        note.tell(
+          StashNews.opened,
+          mine: _aboutMe(item) || me != null && _names(item.body, me),
+        );
+      }
       note.issues.add(
-        StashIssueLink(url: url, title: item.title, state: item.state.name),
+        StashIssueLink(
+          url: url,
+          title: item.title,
+          state: item.state.name,
+          comments: item.comments,
+          updated: item.updated?.toIso8601String(),
+        ),
       );
     }, touch: false);
     _items[url] = item;
@@ -643,6 +1040,8 @@ class StashForge extends ChangeNotifier {
       note.syncedRemote = null;
       note.synced = null;
       _takeOwn(note, item!);
+      // Asked for: not news.
+      note.seen();
     });
     notifyListeners();
   }

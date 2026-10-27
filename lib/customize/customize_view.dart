@@ -454,36 +454,30 @@ class CustomizeViewState extends State<CustomizeView> {
         ],
       ],
     ];
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760),
-        child: ListView(
-          controller: _scroll,
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-          children: [
-            _SearchBox(controller: _query),
-            const SizedBox(height: 12),
-            _buildChips(l10n),
-            if (_error case final error?) ...[
-              const SizedBox(height: 12),
-              Text(
-                l10n.customizeLoadFailed('$error'),
-                style: TextStyle(
-                  color: themeColors['errorForeground'],
-                  fontSize: 12,
-                ),
-              ),
-            ],
-            if (_items != null)
-              for (final scope in scopes)
-                ..._buildGroup(l10n, scope, [
-                  for (final item in items)
-                    if (item.scope == scope) item,
-                ]),
-          ],
-        ),
-      ),
+    return ListView(
+      controller: _scroll,
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      children: [
+        _SearchBox(controller: _query),
+        const SizedBox(height: 12),
+        _buildChips(l10n),
+        if (_error case final error?) ...[
+          const SizedBox(height: 12),
+          Text(
+            l10n.customizeLoadFailed('$error'),
+            style: TextStyle(
+              color: themeColors['errorForeground'],
+              fontSize: 12,
+            ),
+          ),
+        ],
+        if (_items != null)
+          for (final scope in scopes)
+            ..._buildGroup(l10n, scope, [
+              for (final item in items)
+                if (item.scope == scope) item,
+            ]),
+      ],
     );
   }
 
@@ -1185,167 +1179,168 @@ class _CustomizationEditorState extends State<_CustomizationEditor> {
     final command = AppPlatform.isMacOS
         ? const SingleActivator(LogicalKeyboardKey.keyS, meta: true)
         : const SingleActivator(LogicalKeyboardKey.keyS, control: true);
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 900),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 24, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  SidebarIconButton(
-                    icon: Codicons.arrowLeft,
-                    tooltip: l10n.customizeBack,
-                    onTap: () => unawaited(_back()),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(_item.kind.icon, size: 15, color: AppColors.textMuted),
-                  const SizedBox(width: 8),
-                  // The name and its save state take the rest of the row
-                  // together, so the actions sit flush right: a loose
-                  // Flexible next to a Spacer would leave half the slack
-                  // after them.
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            _item.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
+    // Open on the right and below: the markdown's scroll bar on the page's
+    // edge; all else kept off it.
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 0, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 24),
+            child: Row(
+              children: [
+                SidebarIconButton(
+                  icon: Codicons.arrowLeft,
+                  tooltip: l10n.customizeBack,
+                  onTap: () => unawaited(_back()),
+                ),
+                const SizedBox(width: 8),
+                Icon(_item.kind.icon, size: 15, color: AppColors.textMuted),
+                const SizedBox(width: 8),
+                // The name and its save state take the rest of the row
+                // together, so the actions sit flush right: a loose
+                // Flexible next to a Spacer would leave half the slack
+                // after them.
+                Expanded(
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          _item.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        if (_item.editable)
-                          Text(
-                            _dirty
-                                ? l10n.customizeUnsaved
-                                : _justSaved
-                                ? l10n.customizeSaved
-                                : '',
-                            style: TextStyle(
-                              color: AppColors.textFaint,
-                              fontSize: 12,
-                            ),
+                      ),
+                      const SizedBox(width: 12),
+                      if (_item.editable)
+                        Text(
+                          _dirty
+                              ? l10n.customizeUnsaved
+                              : _justSaved
+                              ? l10n.customizeSaved
+                              : '',
+                          style: TextStyle(
+                            color: AppColors.textFaint,
+                            fontSize: 12,
                           ),
-                      ],
-                    ),
-                  ),
-                  // What saves shows while there is something to save,
-                  // left of the switch and the menu, which stay put.
-                  if (_savable) ...[
-                    if (_dirty) ...[
-                      _Button(label: l10n.customizeRevert, onTap: _revert),
-                      const SizedBox(width: 6),
+                        ),
                     ],
-                    _Button(
-                      label: l10n.customizeSave,
-                      primary: true,
-                      onTap: () => unawaited(_save()),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                  if (_markdown) ...[
-                    Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.partBorder),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: MarkdownSwitch(
-                        preview: !_source,
-                        onChanged: (preview) =>
-                            setState(() => _source = !preview),
-                        padding: EdgeInsets.zero,
-                      ),
-                    ),
+                  ),
+                ),
+                // What saves shows while there is something to save,
+                // left of the switch and the menu, which stay put.
+                if (_savable) ...[
+                  if (_dirty) ...[
+                    _Button(label: l10n.customizeRevert, onTap: _revert),
                     const SizedBox(width: 6),
                   ],
-                  SidebarMenu(
-                    items: widget.menu,
-                    placement: (
-                      side: FloatingSide.bottom,
-                      align: FloatingAlign.end,
-                    ),
-                    builder: (context, menu) => SidebarIconButton(
-                      icon: Icons.more_horiz_rounded,
-                      tooltip: l10n.sidebarMoreActions,
-                      onTap: menu.open,
-                    ),
+                  _Button(
+                    label: l10n.customizeSave,
+                    primary: true,
+                    onTap: () => unawaited(_save()),
                   ),
+                  const SizedBox(width: 12),
                 ],
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 32, top: 2, bottom: 10),
-                child: SelectableText(
-                  _item.editable
-                      ? _item.path
-                      : _item.scope != CustomizationScope.synced
-                      ? l10n.customizeReadOnly
-                      : _item.kind == CustomizationKind.mcps
-                      ? l10n.customizeConnectorReadOnly
-                      : l10n.customizeSyncedReadOnly,
-                  maxLines: 1,
-                  style: TextStyle(color: AppColors.textFaint, fontSize: 11.5),
-                ),
-              ),
-              if (_error case final error?)
-                Padding(
-                  padding: const EdgeInsets.only(left: 32, bottom: 8),
-                  child: Text(
-                    _saved == null
-                        ? l10n.customizeLoadFailed('$error')
-                        : l10n.customizeSaveFailed('$error'),
-                    style: TextStyle(
-                      color: colors['errorForeground'],
-                      fontSize: 12,
+                if (_markdown) ...[
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.partBorder),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: MarkdownSwitch(
+                      preview: !_source,
+                      onChanged: (preview) =>
+                          setState(() => _source = !preview),
+                      padding: EdgeInsets.zero,
                     ),
                   ),
+                  const SizedBox(width: 6),
+                ],
+                SidebarMenu(
+                  items: widget.menu,
+                  placement: (
+                    side: FloatingSide.bottom,
+                    align: FloatingAlign.end,
+                  ),
+                  builder: (context, menu) => SidebarIconButton(
+                    icon: Icons.more_horiz_rounded,
+                    tooltip: l10n.sidebarMoreActions,
+                    onTap: menu.open,
+                  ),
                 ),
-              if (widget.status case final status?)
-                Padding(
-                  padding: const EdgeInsets.only(left: 32, bottom: 10),
-                  child: status,
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(
+              left: 32,
+              top: 2,
+              right: 24,
+              bottom: 10,
+            ),
+            child: SelectableText(
+              _item.editable
+                  ? _item.path
+                  : _item.scope != CustomizationScope.synced
+                  ? l10n.customizeReadOnly
+                  : _item.kind == CustomizationKind.mcps
+                  ? l10n.customizeConnectorReadOnly
+                  : l10n.customizeSyncedReadOnly,
+              maxLines: 1,
+              style: TextStyle(color: AppColors.textFaint, fontSize: 11.5),
+            ),
+          ),
+          if (_error case final error?)
+            Padding(
+              padding: const EdgeInsets.only(left: 32, right: 24, bottom: 8),
+              child: Text(
+                _saved == null
+                    ? l10n.customizeLoadFailed('$error')
+                    : l10n.customizeSaveFailed('$error'),
+                style: TextStyle(
+                  color: colors['errorForeground'],
+                  fontSize: 12,
                 ),
-              Expanded(
-                child: CallbackShortcuts(
-                  bindings: {command: () => unawaited(_save())},
-                  // On the page, under a rule across it: markdown as it
-                  // reads, its text under the title's; other text in the
-                  // IDE's editor, its line numbers under the arrow.
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(color: AppColors.partBorder),
+              ),
+            ),
+          if (widget.status case final status?)
+            Padding(
+              padding: const EdgeInsets.only(left: 32, right: 24, bottom: 10),
+              child: status,
+            ),
+          Padding(
+            padding: const EdgeInsets.only(right: 24),
+            child: Divider(height: 1, color: AppColors.partBorder),
+          ),
+          Expanded(
+            child: CallbackShortcuts(
+              bindings: {command: () => unawaited(_save())},
+              // On the page, under a rule across it: markdown as it
+              // reads, its text under the title's; other text in the
+              // IDE's editor, its line numbers under the arrow.
+              child: _markdown && !_source
+                  ? _preview()
+                  : Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 8, 24, 20),
+                      child: IdeCodeEditor(
+                        controller: _text,
+                        path: _item.path,
+                        focusNode: _focus,
+                        readOnly: !_item.editable,
+                        background: Colors.transparent,
+                        glyphMargin: false,
                       ),
                     ),
-                    child: _markdown && !_source
-                        ? _preview()
-                        : Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: IdeCodeEditor(
-                              controller: _text,
-                              path: _item.path,
-                              focusNode: _focus,
-                              readOnly: !_item.editable,
-                              background: Colors.transparent,
-                              glyphMargin: false,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

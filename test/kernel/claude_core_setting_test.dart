@@ -17,7 +17,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 void main() {
-  test('the core: as picked; unset, the CLI', () {
+  test('the core: as picked; unset, the CLI where Claude Code is '
+      'installed, else built-in (nothing downloaded unasked)', () {
+    expect(ClaudeCore.parse(null), ClaudeCore.builtin);
+    expect(ClaudeCore.parse('builtin'), ClaudeCore.builtin);
+    expect(ClaudeCore.parse('cli'), ClaudeCore.cli);
+    expect(ClaudeCore.parse('nonsense'), ClaudeCore.builtin);
+    expect(ClaudeCore.parse(true), ClaudeCore.builtin);
+
+    ClaudeCore.cliInstalled = () => true;
+    addTearDown(() => ClaudeCore.cliInstalled = () => false);
     expect(ClaudeCore.parse(null), ClaudeCore.cli);
     expect(ClaudeCore.parse('builtin'), ClaudeCore.builtin);
     expect(ClaudeCore.parse('cli'), ClaudeCore.cli);

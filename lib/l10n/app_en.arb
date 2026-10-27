@@ -1800,7 +1800,7 @@
   "stripChangeModified": "Modified",
   "stripChangeDeleted": "Deleted",
   "stripChangeConflict": "Changed again since the agent left it, so Undo could not take the agent's change out. Undo it by hand, then keep it.",
-  "stripChangeUntracked": "What it was before is not known (the agent did not tell, it is too large, or outside the project): it can be kept, not undone.",
+  "stripChangeUntracked": "What it was before is not known (it is ignored or too large and the agent did not tell, or it is outside the project): it can be kept, not undone.",
   "stripChangesDiff": "Agent Changes",
   "@stripChangesDiff": {
     "description": "Label of the diff editor comparing a file before the agent changed it with the file now."
@@ -4870,7 +4870,7 @@
     }
   },
   "modelsRoles": "Roles",
-  "modelsRolesDescription": "Which model Claude Code uses for each part of its work. Unset, the model picked stands in.",
+  "modelsRolesDescription": "Which model Claude Code uses for each part of its work. Unset, the model picked stands in. All but the main model may be another upstream's: BaoCode's local proxy sends their requests there.",
   "modelsRoleUnset": "Unset",
   "modelsRoleMain": "Main Model",
   "modelsRoleMainDescription": "Used when the model a session picked of this upstream is gone.",
@@ -5540,41 +5540,61 @@
       }
     }
   },
-  "remoteStatus": "SSH: {host}",
+  "remoteStatus": "{kind}: {host}",
   "@remoteStatus": {
     "placeholders": {
+      "kind": {
+        "type": "String",
+        "description": "How the host is reached: SSH, or WSL for a WSL distribution."
+      },
       "host": {
         "type": "String"
       }
     }
   },
-  "remoteStatusConnecting": "SSH: {host} (connecting...)",
+  "remoteStatusConnecting": "{kind}: {host} (connecting...)",
   "@remoteStatusConnecting": {
     "placeholders": {
+      "kind": {
+        "type": "String",
+        "description": "How the host is reached: SSH, or WSL for a WSL distribution."
+      },
       "host": {
         "type": "String"
       }
     }
   },
-  "remoteStatusReconnecting": "SSH: {host} (reconnecting...)",
+  "remoteStatusReconnecting": "{kind}: {host} (reconnecting...)",
   "@remoteStatusReconnecting": {
     "placeholders": {
+      "kind": {
+        "type": "String",
+        "description": "How the host is reached: SSH, or WSL for a WSL distribution."
+      },
       "host": {
         "type": "String"
       }
     }
   },
-  "remoteStatusFailed": "SSH: {host} (disconnected)",
+  "remoteStatusFailed": "{kind}: {host} (disconnected)",
   "@remoteStatusFailed": {
     "placeholders": {
+      "kind": {
+        "type": "String",
+        "description": "How the host is reached: SSH, or WSL for a WSL distribution."
+      },
       "host": {
         "type": "String"
       }
     }
   },
-  "remoteStatusInstalling": "SSH: {host} (installing Claude Code {percent}%)",
+  "remoteStatusInstalling": "{kind}: {host} (installing Claude Code {percent}%)",
   "@remoteStatusInstalling": {
     "placeholders": {
+      "kind": {
+        "type": "String",
+        "description": "How the host is reached: SSH, or WSL for a WSL distribution."
+      },
       "host": {
         "type": "String"
       },
@@ -5624,9 +5644,13 @@
       }
     }
   },
-  "remoteStatusTooltip": "Connected to {host} over SSH",
+  "remoteStatusTooltip": "Connected to {host} over {kind}",
   "@remoteStatusTooltip": {
     "placeholders": {
+      "kind": {
+        "type": "String",
+        "description": "How the host is reached: SSH, or WSL for a WSL distribution."
+      },
       "host": {
         "type": "String"
       }
@@ -5649,9 +5673,13 @@
     }
   },
   "remoteReconnect": "Reconnect",
-  "remoteProjectTooltip": "On {host}, over SSH",
+  "remoteProjectTooltip": "On {host}, over {kind}",
   "@remoteProjectTooltip": {
     "placeholders": {
+      "kind": {
+        "type": "String",
+        "description": "How the host is reached: SSH, or WSL for a WSL distribution."
+      },
       "host": {
         "type": "String"
       }

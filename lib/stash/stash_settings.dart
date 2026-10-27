@@ -3,10 +3,10 @@
 enum StashSort { manual, updated, created, number }
 
 /// Which of the projects' issues are stashes, kept in step with them (see
-/// StashForge.sync): of a repository the user can push to all open ones,
-/// elsewhere theirs ([auto]); only theirs ([mine]: assigned to them or
-/// opened by them); none ([off]: imported, or published, ones only).
-enum StashIssueSync { auto, mine, off }
+/// StashForge.sync): every open one ([all]); only the user's ([mine]:
+/// assigned to them or opened by them); none ([off]: imported, or
+/// published, ones only).
+enum StashIssueSync { all, mine, off }
 
 /// The `stash.*` settings of settings.json (see docs/stash.md).
 class StashSettings {
@@ -16,7 +16,7 @@ class StashSettings {
     this.directory,
     this.sort = StashSort.updated,
     this.pinned = false,
-    this.issueSync = StashIssueSync.auto,
+    this.issueSync = StashIssueSync.all,
   });
 
   static const hotkeyKey = 'stash.hotkey';
@@ -70,8 +70,8 @@ class StashSettings {
     pinned: settings[pinnedKey] == true,
     issueSync: switch (settings[issueSyncKey]) {
       final String mode =>
-        StashIssueSync.values.asNameMap()[mode] ?? StashIssueSync.auto,
-      _ => StashIssueSync.auto,
+        StashIssueSync.values.asNameMap()[mode] ?? StashIssueSync.all,
+      _ => StashIssueSync.all,
     },
   );
 

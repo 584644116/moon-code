@@ -393,7 +393,7 @@ class _TopBar extends StatelessWidget {
   final Widget Function(bool compact)? clarify;
 
   /// Carries it out in MoonCode, its menus under [Rect]; none while there
-  /// is nothing written.
+  /// is nothing written (its pill there, faint).
   final void Function(Rect anchor)? implement;
 
   /// Whether the panel stays over other apps' windows; the pin changes it.
@@ -437,19 +437,23 @@ class _TopBar extends StatelessWidget {
         },
       ),
     );
-    Widget implementPill(
-      void Function(Rect anchor) implement, {
-      required bool compact,
-    }) => Builder(
+    // Always there: faint till something is written to carry out.
+    final implement = this.implement;
+    Widget implementPill({required bool compact}) => Builder(
       builder: (context) => _PillButton(
         leading: const BaoCodeLogo(size: 13),
         label: compact ? null : l10n.stashImplementShort,
-        tooltip: l10n.stashImplement,
-        onTap: () {
-          final box = context.findRenderObject() as RenderBox?;
-          if (box == null) return;
-          implement(box.localToGlobal(Offset.zero) & box.size);
-        },
+        tooltip: implement == null
+            ? l10n.stashImplementEmpty
+            : l10n.stashImplement,
+        faint: implement == null,
+        onTap: implement == null
+            ? null
+            : () {
+                final box = context.findRenderObject() as RenderBox?;
+                if (box == null) return;
+                implement(box.localToGlobal(Offset.zero) & box.size);
+              },
       ),
     );
     return GestureDetector(
@@ -464,8 +468,8 @@ class _TopBar extends StatelessWidget {
         height: _barHeight,
         padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
         // Too narrow, the pills give way to their icons, All's first, then
-        // New's, Say Clearly's, the project's; then the stash's number. The
-        // pin and the close button never do.
+        // New's, Say Clearly's, the project's; then the stash's number, and
+        // Implement's words. The pin and the close button never do.
         child: GiveWayRow(
           children: [
             if (onAll case final onAll?)
@@ -547,18 +551,18 @@ class _TopBar extends StatelessWidget {
                   child: clarify(false),
                 ),
               ),
-            if (implement case final implement?)
-              GiveWay(
-                priority: 3,
-                compact: Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: implementPill(implement, compact: true),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: implementPill(implement, compact: false),
-                ),
+            // The last to give way of those that do.
+            GiveWay(
+              priority: 5,
+              compact: Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: implementPill(compact: true),
               ),
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: implementPill(compact: false),
+              ),
+            ),
             GiveWay(
               priority: 3,
               compact: Padding(
@@ -701,7 +705,7 @@ class _AllStashesState extends State<_AllStashes> {
       final project = switch (_project) {
         null => true,
         '' => note.project == null,
-        final project => note.project == project,
+        final project => _controller.isAbout(note, project),
       };
       return shown && project;
     });
@@ -1622,7 +1626,9 @@ class _PillButton extends StatelessWidget {
   final Widget? leading;
   final String? label;
   final String tooltip;
-  final VoidCallback onTap;
+
+  /// Null: it does nothing now (not lit on hover).
+  final VoidCallback? onTap;
   final bool faint;
   final bool active;
 
@@ -1630,10 +1636,10 @@ class _PillButton extends StatelessWidget {
   Widget build(BuildContext context) => IdeHover(
     message: tooltip,
     child: HoverBuilder(
-      cursor: SystemMouseCursors.click,
+      cursor: onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
       builder: (context, hovered) {
         final label = this.label;
-        final lit = active || hovered;
+        final lit = active || hovered && onTap != null;
         final color = faint && !lit
             ? AppColors.textFaint
             : lit

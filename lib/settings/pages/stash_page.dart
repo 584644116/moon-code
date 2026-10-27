@@ -114,7 +114,7 @@ class _StashSettingsPageState extends State<StashSettingsPage> {
                       checked: mode == current.issueSync,
                       onSelected: () => _write(
                         StashSettings.issueSyncKey,
-                        mode == StashIssueSync.auto ? null : mode.name,
+                        mode == StashIssueSync.all ? null : mode.name,
                       ),
                     ),
                 ],
@@ -128,7 +128,7 @@ class _StashSettingsPageState extends State<StashSettingsPage> {
 
   static String _issueSyncLabel(AppLocalizations l10n, StashIssueSync mode) =>
       switch (mode) {
-        StashIssueSync.auto => l10n.stashIssueSyncAuto,
+        StashIssueSync.all => l10n.stashIssueSyncAll,
         StashIssueSync.mine => l10n.stashIssueSyncMine,
         StashIssueSync.off => l10n.stashIssueSyncOff,
       };

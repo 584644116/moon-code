@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:baocode/forge/forge_accounts.dart';
 import 'package:baocode/ide/ide_list.dart' show IdeListColors;
 import 'package:baocode/l10n/l10n.dart';
 import 'package:baocode/models/model_providers.dart';
+import 'package:baocode/models/secret_store.dart';
 import 'package:baocode/stash/stash_ai.dart';
 import 'package:baocode/stash/stash_controller.dart';
 import 'package:baocode/stash/stash_disk.dart';
@@ -19,9 +21,13 @@ import 'package:baocode/theme/app_theme.dart';
 import 'package:baocode/theme/codicons.dart';
 import 'package:baocode/workspace/workspace.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../forge/forge_test.dart' show FakeForgeHttp;
+import '../workspace/project_workspace_test.dart' show FakeWorkspaceDirectories;
 
 void main() {
   late StashStore store;
@@ -549,6 +555,162 @@ void main() {
     expect(opened, isNull);
     await tester.tap(inList('Uploads retry three times now.'));
     expect(opened, thread);
+    await unmount(tester);
+  });
+
+  test('a workspace\'s stashes are its folders\' too', () async {
+    final workspace = Workspace(
+      projects: const [Project('api', '/code/api')],
+      workspaceDirectories: FakeWorkspaceDirectories(),
+    );
+    final made = workspace.createWorkspace('web', ['/code/site', '/code/api'])!;
+    final about = StashController(
+      store: store,
+      workspace: workspace,
+      host: StashHost(channel: const MethodChannel('test/stash-about')),
+    );
+    addTearDown(about.dispose);
+    final api = await store.create(body: 'a', project: '/code/api');
+    final elsewhere = await store.create(body: 'b', project: '/code/other');
+    expect(about.isAbout(api, made.path), isTrue);
+    expect(about.isAbout(api, '/code/api'), isTrue);
+    expect(about.isAbout(elsewhere, made.path), isFalse);
+  });
+
+  testWidgets('a row hovered offers what is done with it: done, and back', (
+    tester,
+  ) async {
+    final note = (await tester.runAsync(
+      () => store.create(body: 'Retry uploads'),
+    ))!;
+    await pumpView(tester);
+    final row = find.text('Retry uploads').first;
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+    await mouse.addPointer(location: Offset.zero);
+    await mouse.moveTo(tester.getCenter(row));
+    await tester.pump();
+    Finder action(String tooltip) => find.byWidgetPredicate(
+      (widget) => widget is IdeHover && widget.message == tooltip,
+    );
+    expect(action('Implement in MoonCode'), findsOneWidget);
+    expect(action('More'), findsWidgets);
+    await tester.tap(action('Mark Done'));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pump();
+    expect(store.byId(note.id)!.status, StashStatus.done);
+    await unmount(tester);
+  });
+
+  testWidgets('what is new about a stash\'s issue is told on its row and '
+      'over the list till it is shown', (tester) async {
+    controller.dispose();
+    controller = StashController(
+      store: store,
+      workspace: Workspace.mock(),
+      host: StashHost(channel: const MethodChannel('test/stash-view')),
+      accounts: ForgeAccounts(
+        http: FakeForgeHttp(),
+        secrets: MemorySecretStore(),
+      ),
+    );
+    final ids = (await tester.runAsync(() async {
+      final quiet = await store.create(body: 'Quiet one');
+      // News, but not about the user: not counted, quieter.
+      await store.update(quiet.id, (note) {
+        note.issue = 'https://github.com/o/r/issues/4';
+        note.issues.add(
+          const StashIssueLink(
+            url: 'https://github.com/o/r/issues/4',
+            state: 'open',
+          ),
+        );
+        note.tell(StashNews.changed, mine: false);
+      });
+      final told = await store.create(body: 'Told one');
+      await store.update(told.id, (note) {
+        // Not two collected: no merge asked of the model.
+        note.status = StashStatus.requirement;
+        note.issues.add(
+          const StashIssueLink(
+            url: 'https://github.com/o/r/issues/3',
+            state: 'open',
+            comments: 2,
+          ),
+        );
+        note.issue = 'https://github.com/o/r/issues/3';
+        note.tell(StashNews.commented, mine: true);
+      });
+      return [quiet.id, told.id];
+    }))!;
+    await pumpView(tester);
+    expect(find.text('1 update'), findsOneWidget);
+    expect(controller.store.byId(ids.first)!.news, StashNews.changed);
+    expect(find.textContaining('2 comments'), findsOneWidget);
+
+    // Only those with news, then all again.
+    await tester.tap(find.text('1 update'));
+    await tester.pump();
+    expect(find.text('Quiet one'), findsNothing);
+    await tester.tap(find.text('1 update'));
+    await tester.pump();
+    expect(find.text('Quiet one'), findsOneWidget);
+
+    await tester.tap(find.text('Told one'));
+    await tester.pump();
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pump();
+    expect(store.byId(ids.last)!.news, isNull);
+    expect(store.byId(ids.first)!.news, StashNews.changed);
+    expect(find.text('1 update'), findsNothing);
+    // Still said in the stash while it shows.
+    expect(find.text('New comments'), findsOneWidget);
+    await unmount(tester);
+  });
+
+  testWidgets('news of a stash the filters hide shows when its count is '
+      'tapped, and is seen there', (tester) async {
+    controller.dispose();
+    controller = StashController(
+      store: store,
+      workspace: Workspace.mock(),
+      host: StashHost(channel: const MethodChannel('test/stash-view')),
+      accounts: ForgeAccounts(
+        http: FakeForgeHttp(),
+        secrets: MemorySecretStore(),
+      ),
+    );
+    final id = (await tester.runAsync(() async {
+      await store.create(body: 'Open one');
+      // Its issue closed: done, and not among those not done, which the
+      // list shows at first.
+      final closed = await store.create(body: 'Closed one');
+      await store.update(closed.id, (note) {
+        note.status = StashStatus.done;
+        note.issues.add(
+          const StashIssueLink(
+            url: 'https://github.com/o/r/issues/5',
+            state: 'closed',
+          ),
+        );
+        note.issue = 'https://github.com/o/r/issues/5';
+        note.tell(StashNews.closed, mine: true);
+      });
+      return closed.id;
+    }))!;
+    await pumpView(tester);
+    expect(find.text('1 update'), findsOneWidget);
+    expect(find.text('Closed one'), findsNothing);
+
+    await tester.tap(find.text('1 update'));
+    await tester.pump();
+    expect(find.text('Open one'), findsNothing);
+    await tester.tap(find.text('Closed one'));
+    await tester.pump();
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pump();
+    expect(store.byId(id)!.news, isNull);
+    expect(find.text('1 update'), findsNothing);
     await unmount(tester);
   });
 

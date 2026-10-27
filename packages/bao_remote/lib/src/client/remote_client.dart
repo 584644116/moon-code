@@ -509,7 +509,7 @@ class RemoteClient {
     {'root': root, 'query': textQueryToJson(query)},
   ).map((item) => searchItemFromJson(_map(item)));
 
-  /// `git` there; [limit] as `runGit`'s (a server before it reads all).
+  /// `git` there; [limit], [stdin] and [environment] as `runGit`'s.
   Future<IdeGitOutput> git(
     List<String> arguments, {
     required String cwd,
@@ -757,7 +757,7 @@ class RemoteClient {
   // --- Review ----------------------------------------------------------------
 
   /// The review store of the project at [root] there; null where there is
-  /// none (no such folder).
+  /// none (no Git there, or no such folder).
   Future<ReviewStore?> openReview(String root) async {
     final opened = await peer.request(RemoteProtocol.reviewOpen, {
       'root': root,

@@ -18,12 +18,14 @@ import 'chat/reply_scroll.dart';
 import 'chat/user_message_style.dart';
 import 'chat/widgets/chat_minimap.dart';
 import 'chat/widgets/pixel_loader.dart';
+import 'chat/resume_after_reset.dart';
 import 'chat/widgets/turn_footer.dart' show LiveTurnStatsSetting;
 import 'customize/customization_store.dart';
 import 'diagnostics/app_event_watch.dart';
 import 'diagnostics/frame_watch.dart';
 import 'diagnostics/diagnostics_upload.dart';
 import 'extensions/theme_extensions.dart';
+import 'ide/editor_word_wrap.dart';
 import 'ide/git/git_repository.dart';
 import 'ide/git/repository_scan.dart';
 import 'ide/language_mode.dart';
@@ -241,14 +243,32 @@ Future<void> main(List<String> arguments) async {
       files.settings[LiveTurnStatsSetting.settingKey],
     );
     LiveTurnStatsSetting.changes = files.settings;
-    // Settings → General → Claude Code: the build to run, read as each
-    // agent starts.
-    ClaudePathSetting.current = () =>
-        ClaudePathSetting.parse(files.settings[ClaudePathSetting.settingKey]);
+    // An agent stopped at the usage limit: whether it goes on once it
+    // resets, set in the model picker.
+    ResumeAfterResetSetting.current = () => ResumeAfterResetSetting.enabled(
+      files.settings[ResumeAfterResetSetting.settingKey],
+    );
+    ResumeAfterResetSetting.changes = files.settings;
+    ResumeAfterResetSetting.write = (on) => unawaited(
+      files.settings
+          .update(
+            ResumeAfterResetSetting.settingKey,
+            on ? ResumeAfterResetSetting.on : null,
+          )
+          .catchError((Object error) {
+            // A settings file that does not parse is left as it is; its
+            // error is shown.
+            debugPrint(
+              '${ResumeAfterResetSetting.settingKey} not kept: $error',
+            );
+          }),
+    );
     // Settings → General → Core: the engine sessions run on (MoonCode's own
-    // core, or the Claude Code CLI), read as each agent starts.
-    // Unset, the CLI. The core Claude Code runs is the engine's, for the
-    // two of that kernel.
+    // core, or the Claude Code CLI), read as each agent starts. Unset, the
+    // CLI where it is installed (looked for on the app's PATH, then the
+    // shell's), else the built-in core, which suggests the CLI.
+    ClaudeCore.cliInstalled = localClaudeInstalled;
+    unawaited(lookForLocalClaude());
     AgentEngine.current = () =>
         AgentEngine.parse(files.settings[AgentEngine.settingKey]);
     AgentEngine.changes = files.settings;
@@ -273,6 +293,10 @@ Future<void> main(List<String> arguments) async {
               : AgentEngine.claudeCli)
           .name,
     );
+    // Settings → General → Claude Code: the build to run, read as each
+    // agent starts.
+    ClaudePathSetting.current = () =>
+        ClaudePathSetting.parse(files.settings[ClaudePathSetting.settingKey]);
     // Settings → Models: the upstreams, kept in settings.json.
     ModelProviders.current = ModelProviders.settings(files.settings);
     // Claude Code's own models as it last listed them: in the picker
@@ -339,12 +363,24 @@ Future<void> main(List<String> arguments) async {
     // Settings → Appearance: the code's font, size and ligatures, and the
     // window's text size.
     CodeFont.follow(files.settings, (key) => files.settings[key]);
+    // Whether the editors wrap long lines.
+    EditorWordWrap.follow(files.settings);
   }
   // Emoji as pictures: fetched into the cache the first run, in the
   // background, through the proxy.
   EmojiSheet.start(EmojiSheetStore.cache());
   await prepareClaudeOnboarding();
   final locale = AppLocale(storage: files?.argv);
+  // The agents to go on once the usage limit resets, kept beside
+  // state.json: one due while the app was closed goes on as it opens.
+  if (!kIsWeb) {
+    ResumeAfterReset.current = ResumeAfterReset(
+      store: PreferenceStore.file(
+        p.join(DataDirectory.current.stateDir, ResumeAfterReset.fileName),
+      ),
+    );
+    unawaited(ResumeAfterReset.current.load());
+  }
   final workspace = Workspace(
     preferences: PreferenceStore.file(),
     // Beside state.json: written as the user types.

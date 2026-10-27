@@ -8,6 +8,7 @@ import '../forge/forge_ref.dart';
 import '../forge/forge_view.dart';
 import '../ide/ide_button.dart';
 import '../ide/ide_menu.dart';
+import '../ide/ide_spinning.dart';
 import '../l10n/l10n.dart';
 import '../settings/pages/model_dialogs.dart' show ModelDialogFrame;
 import '../theme/app_theme.dart';
@@ -16,137 +17,211 @@ import '../theme/workbench_theme.dart' show themeColors;
 import '../workspace/editor_launcher.dart' show openExternal;
 import 'stash_forge.dart';
 import 'stash_note.dart';
+import 'stash_thread_view.dart' show stashDateText;
 import 'stash_view.dart' show StashBanner, StashChip;
 
 // A stash and the issue it is (docs/stash.md): a stash of a project that
 // is a Git repository is one of its issues, kept in step with it, or kept
 // here alone if the user says so; one of a project that is none, here.
 
+/// What a stash can be as an issue, as [StashIssueChip] and
+/// [StashIssueButton] offer it.
+enum _Can {
+  /// Its project's repositories still being looked for.
+  checking,
+
+  /// It is one.
+  own,
+
+  /// It can be published.
+  publish,
+
+  /// Kept here, by the user.
+  local,
+
+  /// Nothing: its project no repository (or none).
+  nothing,
+}
+
+_Can _canOf(StashForge forge, StashNote note) {
+  if (note.ownIssue != null) return _Can.own;
+  final project = note.project;
+  if (project == null) return _Can.nothing;
+  final repos = forge.knownReposOf(project);
+  if (repos == null) return _Can.checking;
+  if (repos.isEmpty) return _Can.nothing;
+  return note.local ? _Can.local : _Can.publish;
+}
+
+/// Publishes [note] in its project's repository: at once where there is
+/// one, else in the one picked under [anchor].
+Future<void> _publish(
+  BuildContext context,
+  StashForge forge,
+  StashNote note,
+  Rect anchor,
+) async {
+  final l10n = context.l10n;
+  final repos = forge.knownReposOf(note.project ?? '') ?? const [];
+  if (repos.length == 1) {
+    return showStashIssueDialog(
+      context,
+      forge: forge,
+      note: note,
+      repo: repos.single,
+    );
+  }
+  await showIdeMenu(
+    context,
+    anchor: anchor,
+    entries: [
+      for (final repo in repos)
+        IdeMenuAction(
+          l10n.stashIssuePublishTo(repo.path),
+          enabled: forge.accounts.apiFor(repo.host) != null,
+          onSelected: () => unawaited(
+            showStashIssueDialog(context, forge: forge, note: note, repo: repo),
+          ),
+        ),
+    ],
+  );
+}
+
 /// In a stash's detail, beside its status and project: the issue it is
-/// (its state and number; opened, its changes sent or let go, or let go
-/// itself, from its menu), else where it can be one (published, once the
-/// user confirms what goes), else nothing (its project no repository).
-class StashIssueChip extends StatefulWidget {
+/// (its state and number; opened, asked again, its changes sent or let
+/// go, or let go itself, from its menu), else where it can be one
+/// (published, once the user confirms what goes; or kept here), else
+/// nothing (its project no repository); its project's repositories
+/// looked for meanwhile.
+class StashIssueChip extends StatelessWidget {
   const StashIssueChip({super.key, required this.forge, required this.note});
 
   final StashForge forge;
   final StashNote note;
 
-  @override
-  State<StashIssueChip> createState() => _StashIssueChipState();
-}
-
-class _StashIssueChipState extends State<StashIssueChip> {
-  /// [_project]'s repositories, as last asked.
-  List<ForgeRepo> _repos = const [];
-  String? _project;
-
-  @override
-  void initState() {
-    super.initState();
-    _askRepos();
+  /// How it stands with its issue: the same, or which side changed; when
+  /// last synced.
+  String _syncHint(AppLocalizations l10n, String tag) {
+    final here = note.changedHere;
+    final there = forge.remoteChanged(note);
+    return [
+      switch ((here, there)) {
+        (true, true) => l10n.stashIssueBothChanged,
+        (true, false) => l10n.stashIssueNotPushed,
+        (false, true) => l10n.stashIssueRemoteNewer,
+        (false, false) => l10n.stashIssueInSync(tag),
+      },
+      if (forge.lastSynced case final at?)
+        l10n.stashIssueSyncedAt(stashDateText(at)),
+    ].join(' · ');
   }
-
-  @override
-  void didUpdateWidget(StashIssueChip oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.note.project != _project) _askRepos();
-  }
-
-  void _askRepos() {
-    final project = _project = widget.note.project;
-    if (project == null) {
-      _repos = const [];
-      return;
-    }
-    unawaited(
-      widget.forge.reposOf(project).then((repos) {
-        if (mounted && _project == project) setState(() => _repos = repos);
-      }),
-    );
-  }
-
-  StashForge get _forge => widget.forge;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: _forge,
+    listenable: forge,
     builder: (context, _) => _build(context),
   );
 
   Widget _build(BuildContext context) {
     final l10n = context.l10n;
-    final note = widget.note;
-    if (note.ownIssue case final url?) {
-      final ref = _forge.refOf(url);
-      final link = note.issueOf(url);
-      final state = link == null ? null : _forge.stateOf(link);
-      return StashChip(
-        icon: Codicons.issues,
-        leading: ref == null ? null : ForgeStateIcon(ref.kind, state, size: 12),
-        label: ref?.fullTag ?? url,
-        active: true,
-        onTap: (anchor) => unawaited(
-          showIdeMenu(context, anchor: anchor, entries: _ownEntries(l10n, url)),
-        ),
-      );
-    }
-    if (_repos.isEmpty) return const SizedBox.shrink();
-    if (note.local) {
-      return StashChip(
-        icon: Codicons.lock,
-        label: l10n.stashIssueLocal,
-        onTap: (anchor) => unawaited(
-          showIdeMenu(
-            context,
-            anchor: anchor,
-            entries: [
-              IdeMenuAction(
-                l10n.stashIssueAllow,
-                onSelected: () => unawaited(_forge.allowIssue(note.id)),
-              ),
-            ],
+    switch (_canOf(forge, note)) {
+      case _Can.nothing:
+        return const SizedBox.shrink();
+      case _Can.checking:
+        return StashChip(
+          icon: Codicons.sync,
+          leading: IdeSpinning(
+            Icon(Codicons.sync, size: 12, color: AppColors.textFaint),
           ),
-        ),
-      );
-    }
-    return StashChip(
-      icon: Codicons.cloudUpload,
-      label: l10n.stashIssueNotPublished,
-      onTap: (anchor) => unawaited(
-        showIdeMenu(
-          context,
-          anchor: anchor,
-          entries: ideMenuGroups([
-            [
-              for (final repo in _repos)
+          label: l10n.stashIssueChecking,
+          onTap: (_) {},
+        );
+      case _Can.own:
+        final url = note.ownIssue!;
+        final ref = forge.refOf(url);
+        final link = note.issueOf(url);
+        final state = link == null ? null : forge.stateOf(link);
+        return StashChip(
+          icon: Codicons.issues,
+          leading: forge.asking(url)
+              ? IdeSpinning(
+                  Icon(Codicons.sync, size: 12, color: AppColors.textFaint),
+                )
+              : ref == null
+              ? null
+              : ForgeStateIcon(ref.kind, state, size: 12),
+          label: [ref?.fullTag ?? url, if (note.changedHere) '•'].join(' '),
+          tooltip: _syncHint(l10n, ref?.fullTag ?? url),
+          active: true,
+          onTap: (anchor) => unawaited(
+            showIdeMenu(
+              context,
+              anchor: anchor,
+              entries: _ownEntries(context, l10n, url),
+            ),
+          ),
+        );
+      case _Can.local:
+        return StashChip(
+          icon: Codicons.lock,
+          label: l10n.stashIssueLocal,
+          onTap: (anchor) => unawaited(
+            showIdeMenu(
+              context,
+              anchor: anchor,
+              entries: [
                 IdeMenuAction(
-                  l10n.stashIssuePublishTo(repo.path),
-                  enabled: _forge.accounts.apiFor(repo.host) != null,
-                  onSelected: () => unawaited(
-                    showStashIssueDialog(
-                      context,
-                      forge: _forge,
-                      note: note,
-                      repo: repo,
-                    ),
-                  ),
+                  l10n.stashIssueAllow,
+                  onSelected: () => unawaited(forge.allowIssue(note.id)),
                 ),
-            ],
-            [
-              IdeMenuAction(
-                l10n.stashIssueKeepLocal,
-                onSelected: () => unawaited(_forge.keepLocal(note.id)),
-              ),
-            ],
-          ]),
-        ),
-      ),
-    );
+              ],
+            ),
+          ),
+        );
+      case _Can.publish:
+        final repos = forge.knownReposOf(note.project!)!;
+        return StashChip(
+          icon: Codicons.cloudUpload,
+          label: l10n.stashIssueNotPublished,
+          onTap: (anchor) => unawaited(
+            showIdeMenu(
+              context,
+              anchor: anchor,
+              entries: ideMenuGroups([
+                [
+                  for (final repo in repos)
+                    IdeMenuAction(
+                      l10n.stashIssuePublishTo(repo.path),
+                      enabled: forge.accounts.apiFor(repo.host) != null,
+                      onSelected: () => unawaited(
+                        showStashIssueDialog(
+                          context,
+                          forge: forge,
+                          note: note,
+                          repo: repo,
+                        ),
+                      ),
+                    ),
+                ],
+                [
+                  IdeMenuAction(
+                    l10n.stashIssueKeepLocal,
+                    onSelected: () => unawaited(forge.keepLocal(note.id)),
+                  ),
+                ],
+              ]),
+            ),
+          ),
+        );
+    }
   }
 
-  List<IdeMenuEntry> _ownEntries(AppLocalizations l10n, String url) {
-    final note = widget.note;
+  List<IdeMenuEntry> _ownEntries(
+    BuildContext context,
+    AppLocalizations l10n,
+    String url,
+  ) {
+    final signedIn = forge.canAsk(url);
     return ideMenuGroups([
       [
         IdeMenuAction(
@@ -158,29 +233,84 @@ class _StashIssueChipState extends State<StashIssueChip> {
           onSelected: () =>
               unawaited(Clipboard.setData(ClipboardData(text: url))),
         ),
+        IdeMenuAction(
+          l10n.stashIssueRefresh,
+          enabled: signedIn,
+          onSelected: () => unawaited(forge.refreshNote(note.id, force: true)),
+        ),
       ],
       [
         IdeMenuAction(
           l10n.stashIssuePush,
-          enabled: note.changedHere && _forge.canAsk(url),
+          enabled: note.changedHere && signedIn,
           onSelected: () => unawaited(
-            showStashIssueDialog(context, forge: _forge, note: note),
+            showStashIssueDialog(context, forge: forge, note: note),
           ),
         ),
         IdeMenuAction(
           l10n.stashIssueTakeRemote,
-          enabled: note.changedHere && _forge.canAsk(url),
-          onSelected: () => unawaited(_forge.takeRemote(note.id)),
+          enabled: note.changedHere && signedIn,
+          onSelected: () => unawaited(forge.takeRemote(note.id)),
         ),
       ],
       [
         IdeMenuAction(
           l10n.stashIssueUnlinkOwn,
-          onSelected: () => unawaited(_forge.keepLocal(note.id)),
+          onSelected: () => unawaited(forge.keepLocal(note.id)),
         ),
       ],
     ]);
   }
+}
+
+/// Among a stash's detail's actions: Publish as Issue where it can be one,
+/// Push to Issue where it was changed here; nothing otherwise.
+class StashIssueButton extends StatelessWidget {
+  const StashIssueButton({super.key, required this.forge, required this.note});
+
+  final StashForge forge;
+  final StashNote note;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: forge,
+    builder: (context, _) {
+      final l10n = context.l10n;
+      switch (_canOf(forge, note)) {
+        case _Can.publish:
+          return Builder(
+            builder: (context) => IdeButton(
+              label: l10n.stashIssuePublishButton,
+              icon: Codicons.cloudUpload,
+              secondary: true,
+              onPressed: () {
+                final box = context.findRenderObject() as RenderBox?;
+                if (box == null) return;
+                unawaited(
+                  _publish(
+                    context,
+                    forge,
+                    note,
+                    box.localToGlobal(Offset.zero) & box.size,
+                  ),
+                );
+              },
+            ),
+          );
+        case _Can.own when note.changedHere && forge.canAsk(note.ownIssue!):
+          return IdeButton(
+            label: l10n.stashIssuePushButton,
+            icon: Codicons.cloudUpload,
+            secondary: true,
+            onPressed: () => unawaited(
+              showStashIssueDialog(context, forge: forge, note: note),
+            ),
+          );
+        default:
+          return const SizedBox.shrink();
+      }
+    },
+  );
 }
 
 /// In a stash's detail, over its text: what was changed here is not on

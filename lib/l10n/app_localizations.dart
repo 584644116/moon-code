@@ -5021,7 +5021,7 @@ abstract class AppLocalizations {
   /// No description provided for @stripChangeUntracked.
   ///
   /// In en, this message translates to:
-  /// **'What it was before is not known (the agent did not tell, it is too large, or outside the project): it can be kept, not undone.'**
+  /// **'What it was before is not known (it is ignored or too large and the agent did not tell, or it is outside the project): it can be kept, not undone.'**
   String get stripChangeUntracked;
 
   /// Label of the diff editor comparing a file before the agent changed it with the file now.
@@ -11076,7 +11076,7 @@ abstract class AppLocalizations {
   /// No description provided for @modelsRolesDescription.
   ///
   /// In en, this message translates to:
-  /// **'Which model Claude Code uses for each part of its work. Unset, the model picked stands in.'**
+  /// **'Which model Claude Code uses for each part of its work. Unset, the model picked stands in. All but the main model may be another upstream\'s: BaoCode\'s local proxy sends their requests there.'**
   String get modelsRolesDescription;
 
   /// No description provided for @modelsRoleUnset.
@@ -12666,32 +12666,32 @@ abstract class AppLocalizations {
   /// No description provided for @remoteStatus.
   ///
   /// In en, this message translates to:
-  /// **'SSH: {host}'**
-  String remoteStatus(String host);
+  /// **'{kind}: {host}'**
+  String remoteStatus(String kind, String host);
 
   /// No description provided for @remoteStatusConnecting.
   ///
   /// In en, this message translates to:
-  /// **'SSH: {host} (connecting...)'**
-  String remoteStatusConnecting(String host);
+  /// **'{kind}: {host} (connecting...)'**
+  String remoteStatusConnecting(String kind, String host);
 
   /// No description provided for @remoteStatusReconnecting.
   ///
   /// In en, this message translates to:
-  /// **'SSH: {host} (reconnecting...)'**
-  String remoteStatusReconnecting(String host);
+  /// **'{kind}: {host} (reconnecting...)'**
+  String remoteStatusReconnecting(String kind, String host);
 
   /// No description provided for @remoteStatusFailed.
   ///
   /// In en, this message translates to:
-  /// **'SSH: {host} (disconnected)'**
-  String remoteStatusFailed(String host);
+  /// **'{kind}: {host} (disconnected)'**
+  String remoteStatusFailed(String kind, String host);
 
   /// No description provided for @remoteStatusInstalling.
   ///
   /// In en, this message translates to:
-  /// **'SSH: {host} (installing Claude Code {percent}%)'**
-  String remoteStatusInstalling(String host, int percent);
+  /// **'{kind}: {host} (installing Claude Code {percent}%)'**
+  String remoteStatusInstalling(String kind, String host, int percent);
 
   /// Shown while Claude Code is put on a remote host where it was not installed, before the agent starts.
   ///
@@ -12720,8 +12720,8 @@ abstract class AppLocalizations {
   /// No description provided for @remoteStatusTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Connected to {host} over SSH'**
-  String remoteStatusTooltip(String host);
+  /// **'Connected to {host} over {kind}'**
+  String remoteStatusTooltip(String kind, String host);
 
   /// No description provided for @remoteStatusTooltipLost.
   ///
@@ -12744,8 +12744,8 @@ abstract class AppLocalizations {
   /// No description provided for @remoteProjectTooltip.
   ///
   /// In en, this message translates to:
-  /// **'On {host}, over SSH'**
-  String remoteProjectTooltip(String host);
+  /// **'On {host}, over {kind}'**
+  String remoteProjectTooltip(String kind, String host);
 
   /// No description provided for @quitConfirmRemote.
   ///

@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:bao_editor/monaco/flutter/editor_keybindings.dart';
 
+import '../ide/editor_word_wrap.dart';
 import '../ide/explorer_history.dart'
     show explorerRedoCommandId, explorerUndoCommandId;
 import 'chat_keybindings.dart';
@@ -112,6 +113,11 @@ final Map<String, CommandInfo> commandCatalog = {
       toggleAutoSaveCommandId,
       'Toggle Auto Save',
       category: 'File',
+    ),
+    const CommandInfo(
+      EditorWordWrap.commandId,
+      'Toggle Word Wrap',
+      category: 'View',
     ),
     const CommandInfo(
       'workbench.action.files.newUntitledFile',
@@ -515,6 +521,13 @@ final List<KeybindingEntry> defaultKeybindings = List.unmodifiable([
     key: 'ctrl+alt+s',
     mac: 'alt+cmd+s',
     command: 'workbench.action.files.saveAll',
+  ),
+  // VS Code's Alt+Z, in an editor only: elsewhere (the chat's input) it
+  // types what the keyboard has there.
+  const KeybindingEntry(
+    key: 'alt+z',
+    command: EditorWordWrap.commandId,
+    when: 'editorTextFocus',
   ),
   // A markdown tab's preview and source, one key toggling them: each
   // command runs only where the other shows. The terminal keeps its
