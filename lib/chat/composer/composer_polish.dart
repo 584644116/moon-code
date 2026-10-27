@@ -8,8 +8,10 @@
 
 import 'dart:async';
 
+import 'package:bao_markdown/bao_markdown.dart' show MdAtoms;
 import 'package:flutter/foundation.dart';
-import 'package:flutter_quill/quill_delta.dart';
+
+import 'composer_embeds.dart';
 
 import '../../kernel/claude_code/claude_haiku.dart';
 import '../../models/model_provider.dart' show parseModelRef;
@@ -74,9 +76,8 @@ class ComposerPolishRejected extends ComposerPolishException {
 
 /// The composer's content as the model is given it: [text], each thing
 /// kept out of its reach a marker (`⟦1⟧`, `⟦2⟧`…) standing for the one in
-/// [kept] at that number less one: an embed's operation (a tag, an image,
-/// lines of a file…) or text that must stay as it is (code, a link, a
-/// path).
+/// [kept] at that number less one: an embed (a tag, an image, lines of a
+/// file…) or text that must stay as it is (code, a link, a path).
 class ComposerPolishText {
   const ComposerPolishText(this.text, this.kept);
 
@@ -102,9 +103,8 @@ final _kept = RegExp(
   r'|⟦[^⟧\n]*⟧',
 );
 
-/// [content] (the composer's, without the document's closing newline) as
-/// the model is given it.
-ComposerPolishText composerPolishText(Delta content) {
+/// [content] (the composer's text) as the model is given it.
+ComposerPolishText composerPolishText(String content) {
   final text = StringBuffer();
   final kept = <Object>[];
   void keep(Object what) {
@@ -112,47 +112,48 @@ ComposerPolishText composerPolishText(Delta content) {
     kept.add(what);
   }
 
-  for (final op in content.toList()) {
-    final data = op.data;
-    if (data is! String) {
-      keep(op);
+  for (final piece in composerPieces(content)) {
+    if (piece is! String) {
+      keep(piece);
       continue;
     }
     var at = 0;
-    for (final match in _kept.allMatches(data)) {
-      text.write(data.substring(at, match.start));
+    for (final match in _kept.allMatches(piece)) {
+      text.write(piece.substring(at, match.start));
       keep(match.group(0)!);
       at = match.end;
     }
-    text.write(data.substring(at));
+    text.write(piece.substring(at));
   }
   return ComposerPolishText(text.toString(), kept);
 }
 
-/// [reply] (the model's, for [asked]) as composer content: the markers
+/// [reply] (the model's, for [asked]) as the composer's text: the markers
 /// put back as what they stand for; null when one is missing, doubled or
 /// made up.
-Delta? composerPolishContent(String reply, ComposerPolishText asked) {
+String? composerPolishContent(String reply, ComposerPolishText asked) {
   final seen = <int>{};
-  final content = Delta();
+  final content = StringBuffer();
   var at = 0;
   for (final match in _marker.allMatches(reply)) {
     final index = int.parse(match.group(1)!) - 1;
     if (index < 0 || index >= asked.kept.length || !seen.add(index)) {
       return null;
     }
-    if (match.start > at) content.insert(reply.substring(at, match.start));
+    if (match.start > at) {
+      content.write(MdAtoms.strip(reply.substring(at, match.start)));
+    }
     switch (asked.kept[index]) {
-      case final Operation op:
-        content.insert(op.data, op.attributes);
+      case final ComposerEmbed embed:
+        content.write(embed.atom);
       case final String text:
-        content.insert(text);
+        content.write(text);
     }
     at = match.end;
   }
   if (seen.length != asked.kept.length) return null;
-  if (at < reply.length) content.insert(reply.substring(at));
-  return content;
+  if (at < reply.length) content.write(MdAtoms.strip(reply.substring(at)));
+  return content.toString();
 }
 
 // One line, so that it passes through a shell unchanged.
@@ -412,7 +413,7 @@ void _failed(Object error, {Object? also}) {
 /// is none, or [ComposerPolishRejected] when the answer was not the
 /// message: it lost what it was to keep, ran on far longer than [longest]
 /// allows for (written on, not rewritten), or wrote something around it.
-Future<Delta> _rewrite(
+Future<String> _rewrite(
   ComposerPolishText asked, {
   required String system,
   required String prompt,
@@ -515,7 +516,7 @@ bool _hasPreamble(String text) {
 /// the composer's new content. Throws [ComposerPolishException] when there
 /// is none, or [ComposerPolishRejected] when the reply was not the message
 /// said again.
-Future<Delta> polishComposerText(
+Future<String> polishComposerText(
   ComposerPolishText asked, {
   String? model,
   String? location,
@@ -536,7 +537,7 @@ Future<Delta> polishComposerText(
 /// instruction an agent needs, the files and names it touches found in
 /// the project (see [_enhanceSystem]). Throws [ComposerPolishException] as
 /// [polishComposerText] does.
-Future<Delta> enhanceComposerText(
+Future<String> enhanceComposerText(
   ComposerPolishText asked, {
   String? model,
   String? location,
@@ -547,7 +548,7 @@ Future<Delta> enhanceComposerText(
       '<project>\n${RemoteLocation.pathOf(location)}\n</project>',
     '<message>\n${asked.text}\n</message>',
   ].join('\n');
-  Future<Delta> ask(ClaudeHaikuTools? tools) => _rewrite(
+  Future<String> ask(ClaudeHaikuTools? tools) => _rewrite(
     asked,
     system: tools == null ? _enhanceAloneSystem : _enhanceSystem,
     prompt: prompt,

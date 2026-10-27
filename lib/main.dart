@@ -4,7 +4,6 @@ import 'dart:ui' show AppExitResponse;
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_quill/flutter_quill.dart';
 import 'package:path/path.dart' as p;
 import 'package:bao_editor/textmate/textmate_syntax.dart';
 
@@ -906,7 +905,6 @@ class _BaoCodeAppState extends State<BaoCodeApp> {
       GlobalMaterialLocalizations.delegate,
       GlobalCupertinoLocalizations.delegate,
       GlobalWidgetsLocalizations.delegate,
-      FlutterQuillLocalizations.delegate,
     ],
     home: window.isStash
         ? Material(
