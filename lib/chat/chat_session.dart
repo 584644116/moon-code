@@ -661,17 +661,37 @@ class ChatSession extends ChangeNotifier implements ChatFeed {
     );
   }
 
-  /// Background commands, including completed ones for their output tabs.
+  /// Background commands, including completed ones for their output tabs
+  /// (until cleared, [clearTasks]).
   List<KernelTask> get terminalTasks => _cached(
     #terminalTasks,
     () => [
       for (final task in _transcript.tasks)
-        if (task.background && task.kind == KernelTaskKind.command) task,
+        if (task.background &&
+            task.kind == KernelTaskKind.command &&
+            !_clearedTasks.contains(task.id))
+          task,
     ],
   );
 
+  /// The background commands ended and cleared from [terminalTasks], by id.
+  final Set<String> _clearedTasks = {};
+
   void stopTask(KernelTask task) {
     if (_kernel case final RunsBackgroundTasks kernel) kernel.stopTask(task.id);
+  }
+
+  /// Takes [tasks] that have ended (done, failed, stopped) off
+  /// [terminalTasks]: those running stay.
+  void clearTasks(Iterable<KernelTask> tasks) {
+    var cleared = false;
+    for (final task in tasks) {
+      if (task.status == CommandStatus.running) continue;
+      cleared |= _clearedTasks.add(task.id);
+    }
+    if (!cleared) return;
+    _cache.remove(#terminalTasks);
+    notifyListeners();
   }
 
   /// Moves what the item at [index] runs (a command, a subagent) to the

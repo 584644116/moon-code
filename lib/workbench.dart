@@ -2974,6 +2974,8 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
             roots: multi.folders,
             gitOf: (folder) => widget.gitFor?.call(folder),
             repositoryDetection: _repositoryDetection(host),
+            openWorktree: (path) =>
+                widget.gitFor?.call(RemoteLocation.of(host.name, path)),
             paths: host.name == null ? null : host.paths,
           )
         : IdeWorkspace(
@@ -2982,6 +2984,8 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
             languages: widget.languagesFor?.call(folder),
             git: widget.gitFor?.call(folder),
             repositoryDetection: _repositoryDetection(host),
+            openWorktree: (path) =>
+                widget.gitFor?.call(RemoteLocation.of(host.name, path)),
             paths: host.name == null ? null : host.paths,
           );
     // The parts as the last run left them, before anything shows them.
@@ -4428,9 +4432,12 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
       showGeneralDialog<void>(
         context: context,
         barrierColor: Colors.transparent,
+        // Over the whole window, header included: below it, as the IDE's.
         pageBuilder: (context, _, _) => Padding(
           padding: EdgeInsets.only(
-            top: WindowControls.drawsHeader ? 0 : AppMetrics.titleBarHeight,
+            top: WindowControls.drawsHeader
+                ? WindowControls.headerInset
+                : AppMetrics.titleBarHeight,
           ),
           child: IdeQuickInput.pick(key: key, pick: pick, onClose: hide),
         ),
@@ -4690,6 +4697,9 @@ class _SessionTerminalTasks implements TerminalTasks {
 
   @override
   void stop(KernelTask task) => session.stopTask(task);
+
+  @override
+  void clear(Iterable<KernelTask> tasks) => session.clearTasks(tasks);
 
   @override
   String get root => session.root ?? '';

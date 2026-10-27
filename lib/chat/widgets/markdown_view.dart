@@ -135,7 +135,7 @@ class _MarkdownViewState extends State<MarkdownView> {
       for (final (i, text) in texts.indexed)
         i < old.length && old[i].text == text
             ? old[i]
-            : _Segment(text, MarkdownView._document.parse(text)),
+            : _Segment(text, _parse(text, keep: old.isEmpty)),
     ];
     _gallery.clear();
     final options = MarkdownOptions();
@@ -173,6 +173,24 @@ class _MarkdownViewState extends State<MarkdownView> {
       mainAxisSize: MainAxisSize.min,
       children: children,
     );
+  }
+
+  /// Segments parsed lately, by their text, the latest last: a message
+  /// scrolled out of the history and back (the minimap scrubbed through
+  /// it, back and forth) is not parsed again. Its nodes are only read.
+  static final Map<String, List<md.Node>> _parsed = {};
+  static const _parsedKept = 160;
+
+  /// [text] parsed, as lately if it was; kept for later if [keep] (not as a
+  /// reply streams in: each would be kept a moment, the others pushed out).
+  static List<md.Node> _parse(String text, {required bool keep}) {
+    if (_parsed.remove(text) case final nodes?) return _parsed[text] = nodes;
+    final nodes = MarkdownView._document.parse(text);
+    if (keep) {
+      _parsed[text] = nodes;
+      if (_parsed.length > _parsedKept) _parsed.remove(_parsed.keys.first);
+    }
+    return nodes;
   }
 
   Widget _buildBlocks(BuildContext context, _Segment segment) {

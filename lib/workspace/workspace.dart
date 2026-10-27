@@ -1099,6 +1099,18 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
     notifyListeners();
   }
 
+  /// [groups] (by key) folded, or unfolded, all at once (the sidebar's
+  /// Collapse All and Expand All).
+  void setCollapsed(Iterable<String> groups, bool collapsed) {
+    final before = _collapsedGroups.length;
+    collapsed
+        ? _collapsedGroups.addAll(groups)
+        : _collapsedGroups.removeAll(groups);
+    if (_collapsedGroups.length == before) return;
+    _save();
+    notifyListeners();
+  }
+
   /// Whether the sidebar lists archived agents.
   bool get showArchived => _showArchived;
   bool _showArchived = false;

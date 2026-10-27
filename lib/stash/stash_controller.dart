@@ -679,11 +679,12 @@ class StashController extends ChangeNotifier {
 
   // Merges, suggested as the stash's page opens (once an hour at most).
 
-  /// Groups of stashes about the same thing, to merge.
+  /// Groups of stashes about the same thing, to merge: still two or more
+  /// (merged, their numbers lead to the one they are in).
   List<List<int>> get mergeSuggestions => [
     for (final group in _merges)
       if (!_dismissedMerges.contains(group.join(',')) &&
-          group.every((id) => store.byId(id) != null))
+          group.every((id) => store.byId(id)?.id == id))
         group,
   ];
   List<List<int>> _merges = const [];

@@ -3146,6 +3146,18 @@ abstract class AppLocalizations {
   /// **'Add to Chat'**
   String get sidePanelAddToChat;
 
+  /// No description provided for @termClearTask.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get termClearTask;
+
+  /// No description provided for @termClearEndedTasks.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear All Ended Tasks'**
+  String get termClearEndedTasks;
+
   /// The side panel's terminal page: the group of the agent's background commands in its list.
   ///
   /// In en, this message translates to:
@@ -3403,6 +3415,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Agents'**
   String get sidebarAgents;
+
+  /// No description provided for @sidebarCollapseAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse All'**
+  String get sidebarCollapseAll;
+
+  /// No description provided for @sidebarExpandAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand All'**
+  String get sidebarExpandAll;
 
   /// No description provided for @sidebarNoMatchingAgents.
   ///
@@ -17492,30 +17516,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Word Wrap'**
   String get menuWordWrap;
-
-  /// No description provided for @termClearTask.
-  ///
-  /// In en, this message translates to:
-  /// **'Clear'**
-  String get termClearTask;
-
-  /// No description provided for @termClearEndedTasks.
-  ///
-  /// In en, this message translates to:
-  /// **'Clear All Ended Tasks'**
-  String get termClearEndedTasks;
-
-  /// No description provided for @sidebarCollapseAll.
-  ///
-  /// In en, this message translates to:
-  /// **'Collapse All'**
-  String get sidebarCollapseAll;
-
-  /// No description provided for @sidebarExpandAll.
-  ///
-  /// In en, this message translates to:
-  /// **'Expand All'**
-  String get sidebarExpandAll;
 
   /// Tooltip of a changed file seen while another agent worked in the same project.
   ///

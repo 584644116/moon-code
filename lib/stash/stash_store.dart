@@ -357,6 +357,24 @@ class StashStore extends ChangeNotifier {
       }
       if (body.isNotEmpty) parts.add(body);
     }
+    // Their issues and conversations kept with it: an issue that was one
+    // of them, a stash again, would be its double.
+    for (final note in merging) {
+      if (identical(note, kept)) continue;
+      for (final link in note.issues) {
+        if (kept.issueOf(link.url) == null) kept.issues.add(link);
+      }
+      for (final link in note.threads) {
+        if (kept.threadOf(link.session) == null) kept.threads.add(link);
+      }
+      // None of its own: theirs, its text changed since (to be pushed).
+      if (kept.ownIssue == null && !kept.local && note.ownIssue != null) {
+        kept
+          ..issue = note.ownIssue
+          ..synced = note.synced
+          ..syncedRemote = note.syncedRemote;
+      }
+    }
     kept
       ..body = parts.join('\n\n---\n\n')
       ..pinned = merging.any((note) => note.pinned)

@@ -1703,6 +1703,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidePanelAddToChat => 'Add to Chat';
 
   @override
+  String get termClearTask => 'Clear';
+
+  @override
+  String get termClearEndedTasks => 'Clear All Ended Tasks';
+
+  @override
   String get sidePanelBackgroundTasks => 'Background Tasks';
 
   @override
@@ -1862,6 +1868,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sidebarAgents => 'Agents';
+
+  @override
+  String get sidebarCollapseAll => 'Collapse All';
+
+  @override
+  String get sidebarExpandAll => 'Expand All';
 
   @override
   String get sidebarNoMatchingAgents => 'No matching agents';
@@ -10688,18 +10700,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get menuWordWrap => 'Word Wrap';
-
-  @override
-  String get termClearTask => 'Clear';
-
-  @override
-  String get termClearEndedTasks => 'Clear All Ended Tasks';
-
-  @override
-  String get sidebarCollapseAll => 'Collapse All';
-
-  @override
-  String get sidebarExpandAll => 'Expand All';
 
   @override
   String get stripChangeShared =>

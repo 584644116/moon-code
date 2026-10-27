@@ -836,6 +836,7 @@ class _SidebarState extends State<Sidebar>
                     child: _buildHostSwitcher(),
                   ),
           ),
+          ?_buildCollapseAll(),
           SidebarMenu(
             width: 150,
             placement: (side: FloatingSide.bottom, align: FloatingAlign.end),
@@ -883,6 +884,27 @@ class _SidebarState extends State<Sidebar>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Folds every group that folds, or, all folded, unfolds them (#300):
+  /// shown where there are several to fold.
+  Widget? _buildCollapseAll() {
+    final groups = [
+      for (final group in _groups())
+        if (_collapsible(group)) group.id,
+    ];
+    if (groups.length < 2) return null;
+    final expand = groups.every(_workspace.isCollapsed);
+    final l10n = context.l10n;
+    return Padding(
+      padding: const EdgeInsets.only(right: 2),
+      child: SidebarIconButton(
+        icon: expand ? Codicons.expandAll : Codicons.collapseAll,
+        tooltip: expand ? l10n.sidebarExpandAll : l10n.sidebarCollapseAll,
+        size: 20,
+        onTap: () => _workspace.setCollapsed(groups, !expand),
       ),
     );
   }

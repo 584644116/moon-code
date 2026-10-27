@@ -1662,6 +1662,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sidePanelAddToChat => '添加到对话';
 
   @override
+  String get termClearTask => '清除';
+
+  @override
+  String get termClearEndedTasks => '清除所有已结束的任务';
+
+  @override
   String get sidePanelBackgroundTasks => '后台任务';
 
   @override
@@ -1804,6 +1810,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get sidebarAgents => '智能体';
+
+  @override
+  String get sidebarCollapseAll => '全部折叠';
+
+  @override
+  String get sidebarExpandAll => '全部展开';
 
   @override
   String get sidebarNoMatchingAgents => '没有匹配的智能体';
@@ -10100,18 +10112,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get menuWordWrap => '自动换行';
-
-  @override
-  String get termClearTask => '清除';
-
-  @override
-  String get termClearEndedTasks => '清除所有已结束的任务';
-
-  @override
-  String get sidebarCollapseAll => '全部折叠';
-
-  @override
-  String get sidebarExpandAll => '全部展开';
 
   @override
   String get stripChangeShared => '同一时间还有别的智能体在这个项目里工作，这处改动可能有一部分是它的。';

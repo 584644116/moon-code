@@ -29,6 +29,7 @@ import '../../l10n/l10n.dart';
 import '../ide_hover.dart';
 import '../ide_menu.dart';
 import 'markdown_format_bar.dart';
+import 'markdown_front_matter.dart';
 import 'markdown_links.dart';
 import 'markdown_model_source.dart';
 import 'markdown_paste.dart';
@@ -59,6 +60,8 @@ class IdeMarkdownPreview extends StatefulWidget {
     this.onOpenFile,
     this.onOpenExternal,
     this.onReveal,
+    this.background,
+    this.padding,
   });
 
   final String path;
@@ -98,6 +101,14 @@ class IdeMarkdownPreview extends StatefulWidget {
   /// (Finder, Explorer), from the right click's menu; none for a remote
   /// project's.
   final void Function(String path)? onReveal;
+
+  /// Behind it; the editor's when null.
+  final Color? background;
+
+  /// Around its text, for a view of its own laying it out (a
+  /// customization's, under its title); as wide as a page reads, in the
+  /// middle of a wide one, when null.
+  final EdgeInsets? padding;
 
   @override
   State<IdeMarkdownPreview> createState() => IdeMarkdownPreviewState();
@@ -501,11 +512,13 @@ class IdeMarkdownPreviewState extends State<IdeMarkdownPreview> {
         CodeCitationScope.maybeOf(context)?.colorizeBlock ??
         StashEditor.colorize;
     return ColoredBox(
-      color: themeColors['editor.background'],
+      color: widget.background ?? themeColors['editor.background'],
       child: LayoutBuilder(
         builder: (context, constraints) {
           // As wide as a page reads, in the middle of a wide view.
           final side = ((constraints.maxWidth - 880) / 2).clamp(0.0, 1e6) + 32;
+          final padding =
+              widget.padding ?? EdgeInsets.fromLTRB(side, 24, side, 160);
           final editor = MarkdownEditor(
             key: _editorKey,
             controller: _controller,
@@ -514,7 +527,7 @@ class IdeMarkdownPreviewState extends State<IdeMarkdownPreview> {
             focusNode: _focus,
             scrollController: _scroll,
             // Room after the last line, to bring any to the top.
-            padding: EdgeInsets.fromLTRB(side, 24, side, 160),
+            padding: padding,
             readOnly: widget.readOnly,
             // The bar's keys on a selection only: without one, ⌘B is the
             // workbench's (its side bar).
@@ -665,6 +678,20 @@ class _PreviewEmbeds extends MarkdownEmbeds {
     final Widget shown;
     switch (embed.kind) {
       case MdLineKind.frontMatter:
+        // Its properties, each value on its line edited in a field (its
+        // source the place for the rest); YAML they do not read as.
+        if (parseFrontMatterProperties(embed.code) case final properties?) {
+          return MdEmbedRegion(
+            child: MarkdownFrontMatter(
+              properties: properties,
+              onChanged: state.widget.readOnly
+                  ? null
+                  : (key, value) => embed.replace(
+                      setFrontMatterValue(embed.source, key, value),
+                    ),
+            ),
+          );
+        }
         shown = MarkdownCodeBlock(code: embed.code, language: 'yaml');
       case MdLineKind.fenceOpen:
         shown = MermaidCodeBlock(code: embed.code);

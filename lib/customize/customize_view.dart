@@ -11,8 +11,11 @@ import '../base/smooth_scroll.dart';
 import '../chat/floating/floating_placement.dart';
 import '../chat/widgets/hover_builder.dart';
 import '../ide/ide_code_editor.dart';
+import '../ide/file_service.dart' show readFileBytes;
 import '../ide/ide_dialog.dart';
 import '../ide/ide_hover.dart';
+import '../ide/ide_tab_bar.dart' show MarkdownSwitch;
+import '../ide/markdown/markdown_preview.dart';
 import '../l10n/l10n.dart';
 import '../platform/app_platform.dart';
 import '../remote/remote_location.dart';
@@ -349,6 +352,7 @@ class CustomizeViewState extends State<CustomizeView> {
                     unawaited(_load());
                   },
                   onOpenFile: widget.store.isLocal ? widget.onOpenFile : null,
+                  menu: () => _menu(open, opened: true),
                   status: switch (_statusOf(open)) {
                     final status? => _McpStatusPanel(
                       status: status,
@@ -729,17 +733,20 @@ class CustomizeViewState extends State<CustomizeView> {
     );
   }
 
-  List<SidebarMenuItem> _menu(Customization item) {
+  /// [item]'s actions: its row's, or, [opened], its editor's (less what
+  /// opens it).
+  List<SidebarMenuItem> _menu(Customization item, {bool opened = false}) {
     final l10n = context.l10n;
     // A remote host's files are neither opened nor shown here.
     final local = widget.store.isLocal;
     return [
-      SidebarMenuItem(
-        l10n.customizeEdit,
-        icon: Icons.edit_outlined,
-        onSelected: () => setState(() => _open = item),
-      ),
-      if (_probeable(item)) ...[
+      if (!opened)
+        SidebarMenuItem(
+          l10n.customizeEdit,
+          icon: Icons.edit_outlined,
+          onSelected: () => setState(() => _open = item),
+        ),
+      if (_probeable(item) && !opened) ...[
         SidebarMenuItem(
           l10n.mcpTest,
           icon: Icons.refresh_rounded,
@@ -1012,6 +1019,7 @@ class _CustomizationEditor extends StatefulWidget {
     required this.item,
     required this.store,
     required this.onBack,
+    required this.menu,
     this.onOpenFile,
     this.status,
   });
@@ -1019,6 +1027,11 @@ class _CustomizationEditor extends StatefulWidget {
   final Customization item;
   final CustomizationStore store;
   final VoidCallback onBack;
+
+  /// Its actions, under ⋯ (opened in the IDE, shown in the file manager…).
+  final List<SidebarMenuItem> Function() menu;
+
+  /// Opens a file a markdown link goes to.
   final ValueChanged<String>? onOpenFile;
 
   /// Above its text: an MCP server's status and log.
@@ -1040,6 +1053,11 @@ class _CustomizationEditorState extends State<_CustomizationEditor> {
   /// Its file is not there yet: shown as it would start
   /// ([Customization.detail]), made when saved.
   bool _missing = false;
+
+  /// A markdown file (a skill's, a rule's…) shows as the IDE shows one:
+  /// edited as it reads, unless switched to its source.
+  late final bool _markdown = isMarkdownPath(widget.item.path);
+  bool _source = false;
 
   Customization get _item => widget.item;
   bool get _dirty => _saved != null && _text.document.text != _saved;
@@ -1136,6 +1154,30 @@ class _CustomizationEditorState extends State<_CustomizationEditor> {
     widget.onBack();
   }
 
+  /// The file as its preview, its text the editor's: what is typed in
+  /// either is the other's, saved as one.
+  Widget _preview() {
+    final local = widget.store.isLocal;
+    final open = widget.onOpenFile;
+    return IdeMarkdownPreview(
+      path: _item.path,
+      model: _text.document,
+      readOnly: !_item.editable,
+      // A remote host's pictures are not read from here.
+      readBytes: local
+          ? readFileBytes
+          : (path) => Future.error(UnsupportedError(path)),
+      pathContext: local ? p.context : p.posix,
+      // Its source's editor told, which keeps whether it is saved.
+      onEdited: _text.syncFromDocument,
+      // On the page, its text under the title's.
+      background: Colors.transparent,
+      padding: const EdgeInsets.fromLTRB(32, 20, 16, 160),
+      onOpenFile: open == null ? null : (path, _) => open(path),
+      onOpenExternal: (uri) => unawaited(openExternal(uri.toString())),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -1197,27 +1239,48 @@ class _CustomizationEditorState extends State<_CustomizationEditor> {
                       ],
                     ),
                   ),
-                  if (widget.onOpenFile case final open? when _item.editable)
-                    SidebarIconButton(
-                      icon: Codicons.goToFile,
-                      tooltip: l10n.workspaceOpenIn(
-                        Editor.fastIde.localizedPlatformLabel(l10n),
-                      ),
-                      onTap: () => open(_item.path),
-                    ),
-                  if (_item.editable) ...[
-                    const SizedBox(width: 8),
-                    _Button(
-                      label: l10n.customizeRevert,
-                      onTap: _dirty ? _revert : null,
-                    ),
-                    const SizedBox(width: 6),
+                  // What saves shows while there is something to save,
+                  // left of the switch and the menu, which stay put.
+                  if (_savable) ...[
+                    if (_dirty) ...[
+                      _Button(label: l10n.customizeRevert, onTap: _revert),
+                      const SizedBox(width: 6),
+                    ],
                     _Button(
                       label: l10n.customizeSave,
                       primary: true,
-                      onTap: _savable ? () => unawaited(_save()) : null,
+                      onTap: () => unawaited(_save()),
                     ),
+                    const SizedBox(width: 12),
                   ],
+                  if (_markdown) ...[
+                    Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.partBorder),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: MarkdownSwitch(
+                        preview: !_source,
+                        onChanged: (preview) =>
+                            setState(() => _source = !preview),
+                        padding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  SidebarMenu(
+                    items: widget.menu,
+                    placement: (
+                      side: FloatingSide.bottom,
+                      align: FloatingAlign.end,
+                    ),
+                    builder: (context, menu) => SidebarIconButton(
+                      icon: Icons.more_horiz_rounded,
+                      tooltip: l10n.sidebarMoreActions,
+                      onTap: menu.open,
+                    ),
+                  ),
                 ],
               ),
               Padding(
@@ -1253,21 +1316,30 @@ class _CustomizationEditorState extends State<_CustomizationEditor> {
                   child: status,
                 ),
               Expanded(
-                child: Container(
-                  margin: const EdgeInsets.only(left: 32),
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.partBorder),
-                  ),
-                  child: CallbackShortcuts(
-                    bindings: {command: () => unawaited(_save())},
-                    child: IdeCodeEditor(
-                      controller: _text,
-                      path: _item.path,
-                      focusNode: _focus,
-                      readOnly: !_item.editable,
+                child: CallbackShortcuts(
+                  bindings: {command: () => unawaited(_save())},
+                  // On the page, under a rule across it: markdown as it
+                  // reads, its text under the title's; other text in the
+                  // IDE's editor, its line numbers under the arrow.
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(color: AppColors.partBorder),
+                      ),
                     ),
+                    child: _markdown && !_source
+                        ? _preview()
+                        : Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: IdeCodeEditor(
+                              controller: _text,
+                              path: _item.path,
+                              focusNode: _focus,
+                              readOnly: !_item.editable,
+                              background: Colors.transparent,
+                              glyphMargin: false,
+                            ),
+                          ),
                   ),
                 ),
               ),

@@ -1371,6 +1371,32 @@ void main() {
     expect(find.text('/tmp/b'), findsOneWidget);
   });
 
+  testWidgets('Collapse All folds every project, Expand All unfolds them '
+      '(#300)', (tester) async {
+    await pumpKept(
+      tester,
+      KeptCatalog([kept('a1', '/tmp/a', 1), kept('b1', '/tmp/b', 2)]),
+    );
+    final collapse = inSidebar(
+      find.widgetWithIcon(SidebarIconButton, Codicons.collapseAll),
+    );
+    expect(collapse, findsOneWidget);
+    expect(inSidebar(find.text('Chat a1')), findsOneWidget);
+
+    await tester.tap(collapse);
+    await tester.pump();
+    expect(inSidebar(find.text('Chat a1')), findsNothing);
+    expect(inSidebar(find.text('Chat b1')), findsNothing);
+
+    final expand = inSidebar(
+      find.widgetWithIcon(SidebarIconButton, Codicons.expandAll),
+    );
+    await tester.tap(expand);
+    await tester.pump();
+    expect(inSidebar(find.text('Chat a1')), findsOneWidget);
+    expect(inSidebar(find.text('Chat b1')), findsOneWidget);
+  });
+
   testWidgets('an agent\'s hover says the model it runs on (#245)', (
     tester,
   ) async {

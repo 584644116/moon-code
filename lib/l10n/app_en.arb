@@ -777,6 +777,8 @@
   "@sidePanelAddToChat": {
     "description": "Puts the files of a row or tab of the side panel in the chat's composer."
   },
+  "termClearTask": "Clear",
+  "termClearEndedTasks": "Clear All Ended Tasks",
   "sidePanelBackgroundTasks": "Background Tasks",
   "@sidePanelBackgroundTasks": {
     "description": "The side panel's terminal page: the group of the agent's background commands in its list."
@@ -923,6 +925,8 @@
   "sidebarArchived": "Archived",
   "sidebarOpenFolder": "Open folder…",
   "sidebarAgents": "Agents",
+  "sidebarCollapseAll": "Collapse All",
+  "sidebarExpandAll": "Expand All",
   "sidebarNoMatchingAgents": "No matching agents",
   "sidebarNoAgentsYet": "No agents yet",
   "sidebarHideArchived": "Hide archived",
@@ -7367,10 +7371,6 @@
   },
   "cmdToggleWordWrap": "Toggle Word Wrap",
   "menuWordWrap": "Word Wrap",
-  "termClearTask": "Clear",
-  "termClearEndedTasks": "Clear All Ended Tasks",
-  "sidebarCollapseAll": "Collapse All",
-  "sidebarExpandAll": "Expand All",
   "stripChangeShared": "Another agent was working in this project at the same time: some of this change may be its.",
   "@stripChangeShared": {
     "description": "Tooltip of a changed file seen while another agent worked in the same project."
