@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -11,6 +13,7 @@ import '../../ide/ide_modern_ui.dart';
 import '../../keybindings/chat_keybindings.dart';
 import '../../keybindings/default_keybindings.dart'
     show openSettingsCommandId, toggleAutoSaveCommandId;
+import '../../keybindings/window_keybindings.dart' show WindowCommandIds;
 import '../../l10n/l10n.dart';
 import '../../sidebar/sidebar.dart';
 import '../../theme/codicons.dart';
@@ -660,6 +663,19 @@ class _WindowHeaderState extends State<WindowHeader> {
           command(
             l10n.cmdToggleSidePanelPosition,
             ChatCommandIds.toggleSidePanelPosition,
+          ),
+        if (WindowControls.canFullScreen)
+          HeaderMenuItem(
+            l10n.cmdToggleFullScreen,
+            shortcut: _shortcut(
+              WindowCommandIds.toggleFullScreen,
+              ide ? ChatKeys.ideLayout : ChatKeys.chatLayout,
+            ),
+            onSelected: () => unawaited(
+              WindowControls.toggleFullScreen(
+                viewId: View.maybeOf(context)?.viewId,
+              ),
+            ),
           ),
         HeaderMenuItem(
           l10n.menuKeepOnTop,

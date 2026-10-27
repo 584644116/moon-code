@@ -59,6 +59,7 @@ String localizedCommandLabel(AppLocalizations l10n, String id, String english) {
     'workbench.action.lastEditorInGroup' => l10n.cmdLastEditorInGroup,
     'workbench.action.toggleSidebarVisibility' => l10n.cmdToggleSidebar,
     'workbench.action.toggleAuxiliaryBar' => l10n.cmdToggleChat,
+    'workbench.action.toggleFullScreen' => l10n.cmdToggleFullScreen,
     'workbench.action.togglePanel' => l10n.cmdTogglePanel,
     'workbench.action.terminal.toggleTerminal' => l10n.cmdToggleTerminal,
     'workbench.action.terminal.new' => l10n.cmdNewTerminal,
@@ -109,6 +110,7 @@ String localizedCommandLabel(AppLocalizations l10n, String id, String english) {
     WindowCommandIds.showChat => l10n.cmdShowChatWindow,
     'workbench.action.openSettings' => l10n.cmdOpenSettings,
     'workbench.action.openGlobalKeybindings' => l10n.cmdOpenKeyboardShortcuts,
+    'baocode.openLspSettings' => l10n.cmdOpenLspSettings,
     // The chat's (chatExtraCommands).
     ChatCommandIds.newChat => l10n.cmdChatNewAgent,
     ChatCommandIds.closePane => l10n.cmdChatClosePane,

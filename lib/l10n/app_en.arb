@@ -456,6 +456,7 @@
   },
   "cmdToggleSidebar": "Toggle Primary Side Bar Visibility",
   "cmdToggleChat": "Toggle Chat",
+  "cmdToggleFullScreen": "Toggle Full Screen",
   "cmdTogglePanel": "Toggle Panel Visibility",
   "cmdToggleTerminal": "Toggle Terminal",
   "cmdNewTerminal": "Create New Terminal",
@@ -495,6 +496,7 @@
   "cmdBackToChat": "Back to Chat",
   "cmdOpenSettings": "Open Settings",
   "cmdOpenKeyboardShortcuts": "Open Keyboard Shortcuts",
+  "cmdOpenLspSettings": "Open Language Server Settings (JSON)",
   "cmdJumpToBracket": "Go to Bracket",
   "cmdUndo": "Undo",
   "cmdRedo": "Redo",
@@ -914,6 +916,13 @@
   "sidebarNeedsInput": "Needs input",
   "sidebarRunning": "Running",
   "sidebarUnread": "Unread",
+  "sidebarHoverModel": "Model: {model}",
+  "@sidebarHoverModel": {
+    "description": "A conversation's hover in the sidebar: the model it runs on.",
+    "placeholders": {
+      "model": {"type": "String"}
+    }
+  },
   "sidebarDone": "Done",
   "sidebarArchived": "Archived",
   "sidebarOpenFolder": "Open folder…",
@@ -7338,21 +7347,10 @@
       }
     }
   },
-  "cmdToggleFullScreen": "Toggle Full Screen",
   "cmdToggleWordWrap": "Toggle Word Wrap",
   "menuWordWrap": "Word Wrap",
-  "cmdOpenLspSettings": "Open Language Server Settings (JSON)",
   "termClearTask": "Clear",
   "termClearEndedTasks": "Clear All Ended Tasks",
-  "sidebarHoverModel": "Model: {model}",
-  "@sidebarHoverModel": {
-    "description": "A conversation's hover in the sidebar: the model it runs on.",
-    "placeholders": {
-      "model": {
-        "type": "String"
-      }
-    }
-  },
   "sidebarCollapseAll": "Collapse All",
   "sidebarExpandAll": "Expand All",
   "stripChangeShared": "Another agent was working in this project at the same time: some of this change may be its.",

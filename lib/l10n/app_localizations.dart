@@ -2126,6 +2126,12 @@ abstract class AppLocalizations {
   /// **'Toggle Chat'**
   String get cmdToggleChat;
 
+  /// No description provided for @cmdToggleFullScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Full Screen'**
+  String get cmdToggleFullScreen;
+
   /// No description provided for @cmdTogglePanel.
   ///
   /// In en, this message translates to:
@@ -2359,6 +2365,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open Keyboard Shortcuts'**
   String get cmdOpenKeyboardShortcuts;
+
+  /// No description provided for @cmdOpenLspSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Language Server Settings (JSON)'**
+  String get cmdOpenLspSettings;
 
   /// No description provided for @cmdJumpToBracket.
   ///
@@ -3367,6 +3379,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unread'**
   String get sidebarUnread;
+
+  /// A conversation's hover in the sidebar: the model it runs on.
+  ///
+  /// In en, this message translates to:
+  /// **'Model: {model}'**
+  String sidebarHoverModel(String model);
 
   /// No description provided for @sidebarDone.
   ///
@@ -17355,12 +17373,6 @@ abstract class AppLocalizations {
   /// **'It is issue {issue}: the pull request should say it fixes it.'**
   String stashImplementIssue(String issue);
 
-  /// No description provided for @cmdToggleFullScreen.
-  ///
-  /// In en, this message translates to:
-  /// **'Toggle Full Screen'**
-  String get cmdToggleFullScreen;
-
   /// No description provided for @cmdToggleWordWrap.
   ///
   /// In en, this message translates to:
@@ -17373,12 +17385,6 @@ abstract class AppLocalizations {
   /// **'Word Wrap'**
   String get menuWordWrap;
 
-  /// No description provided for @cmdOpenLspSettings.
-  ///
-  /// In en, this message translates to:
-  /// **'Open Language Server Settings (JSON)'**
-  String get cmdOpenLspSettings;
-
   /// No description provided for @termClearTask.
   ///
   /// In en, this message translates to:
@@ -17390,12 +17396,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear All Ended Tasks'**
   String get termClearEndedTasks;
-
-  /// A conversation's hover in the sidebar: the model it runs on.
-  ///
-  /// In en, this message translates to:
-  /// **'Model: {model}'**
-  String sidebarHoverModel(String model);
 
   /// No description provided for @sidebarCollapseAll.
   ///

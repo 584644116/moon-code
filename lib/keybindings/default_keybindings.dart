@@ -26,6 +26,10 @@ const openSettingsCommandId = 'workbench.action.openSettings';
 /// Open Keyboard Shortcuts: the settings dialog on its keyboard page.
 const openKeybindingsCommandId = 'workbench.action.openGlobalKeybindings';
 
+/// Open Language Server Settings (JSON): the user's `lsp.json` in the IDE,
+/// made with its examples where there is none.
+const openLspSettingsCommandId = 'baocode.openLspSettings';
+
 /// Shell Command: Install / Uninstall the `code` command in PATH.
 const installShellCommandId = 'workbench.action.installCommandLine';
 const uninstallShellCommandId = 'workbench.action.uninstallCommandLine';
@@ -399,6 +403,11 @@ final Map<String, CommandInfo> commandCatalog = {
     const CommandInfo(
       openKeybindingsCommandId,
       'Open Keyboard Shortcuts',
+      category: 'Preferences',
+    ),
+    const CommandInfo(
+      openLspSettingsCommandId,
+      'Open Language Server Settings (JSON)',
       category: 'Preferences',
     ),
     const CommandInfo(

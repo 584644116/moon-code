@@ -206,8 +206,10 @@ Future<McpProbeResult> _probeRemote(
       sse ? 'text/event-stream' : 'application/json, text/event-stream',
     );
     if (!sse) {
-      request.headers.contentType = ContentType.json;
-      request.write(_initialize);
+      // `application/json` alone, as Claude Code sends it: some servers
+      // refuse it with a charset (HTTP 415).
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      request.add(utf8.encode(_initialize));
     }
     final response = await request.close().timeout(timeout);
     final status = response.statusCode;

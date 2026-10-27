@@ -20,15 +20,19 @@ import '../ide/ide_button.dart' show IdeButtonColors;
 import '../ide/ide_commands.dart' show ideUsesMacKeys;
 import '../ide/ide_hover.dart';
 import '../ide/ide_list.dart';
-import '../l10n/l10n.dart';
+import '../ide/ide_spinning.dart';
+import '../kernel/agent_kernel.dart' show KernelChoiceKind;
 import '../keybindings/chat_keybindings.dart';
-import '../keybindings/keybinding_service.dart';
 import '../keybindings/default_keybindings.dart' show openSettingsCommandId;
+import '../keybindings/keybinding_service.dart';
+import '../l10n/l10n.dart';
+import '../models/model_provider.dart' show parseModelRef;
+import '../models/model_providers.dart';
 import '../remote/remote_location.dart';
 import '../remote/remote_status.dart' show sshErrorText;
 import '../remote/ssh_host.dart' show SshHost, SshHostState, SshHosts;
-import '../theme/codicons.dart';
 import '../theme/app_theme.dart';
+import '../theme/codicons.dart';
 import '../theme/workbench_theme.dart' show themeColors;
 import '../update/update_service.dart';
 import '../workspace/chat_drag.dart';
@@ -1397,6 +1401,7 @@ class _SidebarState extends State<Sidebar>
           ? null
           : _workspace.workspaceOf(project)?.folders,
       dragged: project != null && identical(project, _draggedProject),
+      pinned: project != null && _workspace.isPinnedProject(project),
       icon: project == null
           ? null
           : _Slot(
@@ -1430,9 +1435,30 @@ class _SidebarState extends State<Sidebar>
         null => _buildThreadRow(thread, group),
       };
 
+  /// The model [thread] runs on, by its upstream and name: its session's,
+  /// open, else the one it opens with again (#245).
+  String? _modelOf(AgentThread thread) {
+    if (thread.isOpen) {
+      if (thread.session.models?.selected case final model?) {
+        return [?model.group?.label, model.label].join(' · ');
+      }
+    }
+    final kept = _workspace.keptChoice(thread, KernelChoiceKind.model);
+    if (parseModelRef(kept) case (:final provider, :final model)) {
+      final upstream = ModelProviders.current.provider(provider);
+      final name = upstream?.models
+          .where((option) => option.id == model)
+          .firstOrNull
+          ?.displayName;
+      return [?upstream?.name, name ?? model].join(' · ');
+    }
+    return kept;
+  }
+
   Widget _buildThreadRow(AgentThread thread, _Group group) {
     return _ThreadRow(
       thread: thread,
+      model: () => _modelOf(thread),
       height: _rowHeight,
       stashes: switch ((widget.stashes, thread.id)) {
         (final stashes?, final session?) => stashes.of(session),
@@ -1500,6 +1526,7 @@ class _SidebarState extends State<Sidebar>
     final l10n = context.l10n;
     final editor = _workspace.preferredEditor;
     final multi = _workspace.workspaceOf(project);
+    final pinned = _workspace.isPinnedProject(project);
     return [
       SidebarMenuItem(
         l10n.sidebarNewAgentHere,
@@ -1526,6 +1553,11 @@ class _SidebarState extends State<Sidebar>
           icon: editor.icon,
           onSelected: () => _openInEditor(project, editor),
         ),
+      SidebarMenuItem(
+        pinned ? l10n.sidebarUnpin : l10n.sidebarPin,
+        icon: pinned ? Icons.push_pin : Icons.push_pin_outlined,
+        onSelected: () => _workspace.setPinnedProject(project, !pinned),
+      ),
       SidebarMenuItem(
         l10n.sidebarChangeIcon,
         icon: Icons.emoji_emotions_outlined,
@@ -1617,6 +1649,11 @@ class _SidebarState extends State<Sidebar>
         break;
       }
     }
+    // Pinned ones stay on top: the dragged one moves among its kind.
+    final pinned = projects.where(_workspace.isPinnedProject).length;
+    at = _workspace.isPinnedProject(_draggedProject!)
+        ? at.clamp(0, pinned)
+        : at.clamp(pinned, projects.length);
     final from = projects.indexOf(_draggedProject!);
     final spot = at == from || at == from + 1 ? null : at;
     if (spot != _projectSpot) setState(() => _projectSpot = spot);
@@ -1628,8 +1665,7 @@ class _SidebarState extends State<Sidebar>
     final (project, at) = (_draggedProject, _projectSpot);
     setState(() => _draggedProject = _projectSpot = null);
     if (project == null || at == null) return;
-    final from = projects.indexOf(project);
-    _workspace.moveProject(project, at > from ? at - 1 : at);
+    _workspace.moveProject(project, before: projects.elementAtOrNull(at));
   }
 
   // --- Dragging agents within the list ---------------------------------------
@@ -2157,6 +2193,7 @@ class _GroupHeader extends StatelessWidget {
     this.onCreate,
     this.menu,
     this.dragged = false,
+    this.pinned = false,
     this.icon,
     this.folders,
   });
@@ -2177,6 +2214,9 @@ class _GroupHeader extends StatelessWidget {
 
   /// Being dragged to another place among the projects.
   final bool dragged;
+
+  /// The project is pinned on top of the others: a pin after its name.
+  final bool pinned;
 
   /// The project's icon, before its name.
   final Widget? icon;
@@ -2240,6 +2280,14 @@ class _GroupHeader extends StatelessWidget {
                   child: Row(
                     children: [
                       Flexible(child: _label(project)),
+                      if (pinned) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.push_pin,
+                          size: 11,
+                          color: AppColors.textFaint,
+                        ),
+                      ],
                       if (_hiddenStatus(context) case final status?) ...[
                         const SizedBox(width: 6),
                         status,
@@ -2729,6 +2777,7 @@ class _MoreRow extends StatelessWidget {
 class _ThreadRow extends StatelessWidget {
   const _ThreadRow({
     required this.thread,
+    required this.model,
     required this.height,
     this.stashes = const [],
     this.onOpenStash,
@@ -2758,6 +2807,9 @@ class _ThreadRow extends StatelessWidget {
   });
 
   final AgentThread thread;
+
+  /// The model it runs on, as its hover shows it; none when unknown.
+  final String? Function() model;
   final double height;
 
   /// The stashes it carries out: a tag on it, opened by [onOpenStash].
@@ -2991,6 +3043,13 @@ class _ThreadRow extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(thread.project.path, style: faint),
+          if (model() case final model?)
+            Text(
+              l10n.sidebarHoverModel(model),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: faint,
+            ),
           for (final stash in stashes)
             Text(
               'Stash #${stash.id} · ${stash.title}',

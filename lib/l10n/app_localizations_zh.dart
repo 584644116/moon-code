@@ -1046,6 +1046,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cmdToggleChat => '切换聊天';
 
   @override
+  String get cmdToggleFullScreen => '切换全屏';
+
+  @override
   String get cmdTogglePanel => '切换面板可见性';
 
   @override
@@ -1161,6 +1164,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get cmdOpenKeyboardShortcuts => '打开键盘快捷方式';
+
+  @override
+  String get cmdOpenLspSettings => '打开语言服务器设置 (JSON)';
 
   @override
   String get cmdJumpToBracket => '转到括号';
@@ -1784,6 +1790,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get sidebarUnread => '未读';
+
+  @override
+  String sidebarHoverModel(String model) {
+    return '模型：$model';
+  }
 
   @override
   String get sidebarDone => '已完成';
@@ -10032,27 +10043,16 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get cmdToggleFullScreen => '切换全屏';
-
-  @override
   String get cmdToggleWordWrap => '切换自动换行';
 
   @override
   String get menuWordWrap => '自动换行';
 
   @override
-  String get cmdOpenLspSettings => '打开语言服务器设置 (JSON)';
-
-  @override
   String get termClearTask => '清除';
 
   @override
   String get termClearEndedTasks => '清除所有已结束的任务';
-
-  @override
-  String sidebarHoverModel(String model) {
-    return '模型：$model';
-  }
 
   @override
   String get sidebarCollapseAll => '全部折叠';

@@ -1069,6 +1069,11 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
   /// Each agent's choices, by session: those it opens with again.
   final Map<String, Map<String, String>> _agentSettings = {};
 
+  /// [thread]'s choice of [kind] as kept for when it opens again (the
+  /// model it runs on, say); null when none is.
+  String? keptChoice(AgentThread thread, KernelChoiceKind kind) =>
+      _agentSettings[thread.id]?[kind.name];
+
   /// Agents' choices kept, the most recent ones.
   static const _keptAgents = 500;
 
@@ -1267,20 +1272,51 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
   /// The order the user dragged projects in, by path.
   final List<String> _projectOrder = [];
 
-  /// The projects the sidebar lists, in its order: those not dragged yet
-  /// (e.g. new) on top, most recent first; then as the user ordered them.
+  /// The projects the user pinned, by path, in their order on top.
+  final List<String> _pinnedProjects = [];
+
+  bool isPinnedProject(Project project) =>
+      _pinnedProjects.contains(project.path);
+
+  /// Pins [project] (on top of those pinned) or unpins it (on top of the
+  /// rest, as if never dragged).
+  void setPinnedProject(Project project, bool pinned) {
+    if (isPinnedProject(project) == pinned) return;
+    if (pinned) {
+      _pinnedProjects.insert(0, project.path);
+    } else {
+      _pinnedProjects.remove(project.path);
+      _projectOrder.remove(project.path);
+    }
+    _save();
+    notifyListeners();
+  }
+
+  /// The projects the sidebar lists, in its order: those pinned first;
+  /// then those not dragged yet (e.g. new), most recent first; then as the
+  /// user ordered them.
   List<Project> get sidebarProjects {
     final shown = [
       for (final project in _projects)
         if (!isHidden(project)) project,
     ];
-    final rank = {for (final (i, path) in _projectOrder.indexed) path: i};
-    final ranked = [
+    final pinRank = {for (final (i, path) in _pinnedProjects.indexed) path: i};
+    final pinned = [
       for (final project in shown)
+        if (pinRank[project.path] != null) project,
+    ]..sort((a, b) => pinRank[a.path]!.compareTo(pinRank[b.path]!));
+    final rank = {for (final (i, path) in _projectOrder.indexed) path: i};
+    final rest = [
+      for (final project in shown)
+        if (pinRank[project.path] == null) project,
+    ];
+    final ranked = [
+      for (final project in rest)
         if (rank[project.path] != null) project,
     ]..sort((a, b) => rank[a.path]!.compareTo(rank[b.path]!));
     return [
-      for (final project in shown)
+      ...pinned,
+      for (final project in rest)
         if (rank[project.path] == null) project,
       ...ranked,
     ];
@@ -1422,17 +1458,25 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
     _save();
   }
 
-  /// Moves [project] to [index] of [sidebarProjects]: all listed are in
-  /// the user's order from then on.
-  void moveProject(Project project, int index) {
-    final order = sidebarProjects..remove(project);
-    order.insert(index.clamp(0, order.length), project);
+  /// Moves [project] in [sidebarProjects] to just before [before], or
+  /// last, among those pinned or among the rest, as it is (last there when
+  /// [before] is of the others): all listed are in the user's order from
+  /// then on.
+  void moveProject(Project project, {Project? before}) {
+    final pinned = isPinnedProject(project);
+    final order = [
+      for (final other in sidebarProjects)
+        if (isPinnedProject(other) == pinned && other != project) other,
+    ];
+    final at = before == null ? -1 : order.indexOf(before);
+    order.insert(at < 0 ? order.length : at, project);
     final paths = [for (final project in order) project.path];
+    final kept = pinned ? _pinnedProjects : _projectOrder;
     final rest = [
-      for (final path in _projectOrder)
+      for (final path in kept)
         if (!paths.contains(path)) path,
     ];
-    _projectOrder
+    kept
       ..clear()
       ..addAll([...paths, ...rest]);
     _save();
@@ -1723,6 +1767,7 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
       _collapsedGroups.length,
       _expandedGroups.length,
       _projectOrder.length,
+      _pinnedProjects.length,
       _hiddenProjects.length,
       _order.length,
       _projectIcons.length,
@@ -1732,6 +1777,7 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
     _collapsedGroups.removeWhere(gone);
     _expandedGroups.removeWhere(gone);
     _projectOrder.retainWhere(paths.contains);
+    _pinnedProjects.retainWhere(paths.contains);
     _hiddenProjects.removeWhere((path, _) => !paths.contains(path));
     _order.removeWhere((path, _) => !paths.contains(path));
     _projectIcons.removeWhere(
@@ -1966,6 +2012,7 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
       _folders.addAll(list('folders'));
       _expandedGroups.addAll(list('expanded'));
       _projectOrder.addAll(list('projectOrder'));
+      _pinnedProjects.addAll(list('pinnedProjects'));
       _sshHosts.addAll(list('sshHosts'));
       _hostNames.addAll(strings(sidebar['hostNames']));
       if (sidebar['sshServers'] case final Map<Object?, Object?> servers) {
@@ -2075,6 +2122,7 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
         'folders': [..._folders],
         'expanded': [..._expandedGroups],
         'projectOrder': [..._projectOrder],
+        'pinnedProjects': [..._pinnedProjects],
         'sshHosts': [..._sshHosts],
         'hostNames': {..._hostNames},
         'sshServers': {

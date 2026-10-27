@@ -325,6 +325,27 @@ void main() {
       },
     );
 
+    test('a folder watched while the host could not be reached: told '
+        'once it is, to be read again', () async {
+      connector.failure = const SshConnectException(
+        SshFailure.server,
+        'The BaoCode server could not be downloaded',
+      );
+      final host = hosts['dev'];
+      final files = host.files(root) as RemoteIdeFileService;
+      await expectLater(files.list(root), throwsA(isA<SshConnectException>()));
+      var changes = 0;
+      final watching = files.watchDirectory(root).listen((_) => changes++);
+      addTearDown(watching.cancel);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(changes, 0);
+
+      connector.failure = null;
+      await host.reconnect();
+      await until(() => changes > 0);
+      expect(await files.list(root), isEmpty);
+    });
+
     test('Git runs there', () async {
       Process.runSync('git', ['init', '-q'], workingDirectory: root);
       File(at('a.txt')).writeAsStringSync('x');

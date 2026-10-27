@@ -1077,6 +1077,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cmdToggleChat => 'Toggle Chat';
 
   @override
+  String get cmdToggleFullScreen => 'Toggle Full Screen';
+
+  @override
   String get cmdTogglePanel => 'Toggle Panel Visibility';
 
   @override
@@ -1196,6 +1199,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cmdOpenKeyboardShortcuts => 'Open Keyboard Shortcuts';
+
+  @override
+  String get cmdOpenLspSettings => 'Open Language Server Settings (JSON)';
 
   @override
   String get cmdJumpToBracket => 'Go to Bracket';
@@ -1842,6 +1848,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sidebarUnread => 'Unread';
+
+  @override
+  String sidebarHoverModel(String model) {
+    return 'Model: $model';
+  }
 
   @override
   String get sidebarDone => 'Done';
@@ -10620,27 +10631,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get cmdToggleFullScreen => 'Toggle Full Screen';
-
-  @override
   String get cmdToggleWordWrap => 'Toggle Word Wrap';
 
   @override
   String get menuWordWrap => 'Word Wrap';
 
   @override
-  String get cmdOpenLspSettings => 'Open Language Server Settings (JSON)';
-
-  @override
   String get termClearTask => 'Clear';
 
   @override
   String get termClearEndedTasks => 'Clear All Ended Tasks';
-
-  @override
-  String sidebarHoverModel(String model) {
-    return 'Model: $model';
-  }
 
   @override
   String get sidebarCollapseAll => 'Collapse All';
