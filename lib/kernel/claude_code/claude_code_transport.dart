@@ -202,12 +202,14 @@ class ClaudeLaunch {
     'useAutoModeDuringPlan': ?autoModeDuringPlan,
     'alwaysThinkingEnabled': ?thinking,
     'language': ?language,
-    if (models.isNotEmpty)
+    if (models.isNotEmpty) ...{
       'modelPicker': {
         'options': [
           for (final model in models) {'model': model},
         ],
       },
+      'availableModels': allowlist,
+    },
     // The app's own browser tools can read a signed-in page and change
     // what it sends or shows. They are allowed as a server, but these are
     // asked about one call at a time (an ask rule is weighed first).
@@ -226,6 +228,11 @@ class ClaudeLaunch {
       if (directories.isNotEmpty) ...additionalDirectoriesEnvironment,
     },
   };
+
+  /// A provider's session's models, let through the user's own
+  /// `availableModels`: those it is switched to and starts on, and its
+  /// roles' (see [allowedModels]).
+  List<String> get allowlist => allowedModels(env, [...models, ?model]);
 
   /// The user's own setup set empty, in the shell's environment or their
   /// settings' `env`: `CLAUDE_CODE_EFFORT_LEVEL` would hold every request

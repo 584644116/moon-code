@@ -174,7 +174,8 @@ class ClaudeTranslator {
   /// shown, it tells the model planning is over.
   static String planStartedNote(String path) =>
       '<system-reminder>$_planStarted: plan mode is over. Carry out the '
-      'plan in $path now.</system-reminder>';
+      '${path.isEmpty ? 'plan you put to them' : 'plan in $path'} now.'
+      '</system-reminder>';
 
   /// Whether [text] says the plan is started (see [planStartedNote]).
   static bool startsPlan(String text) => text.contains(_planStarted);
@@ -188,8 +189,12 @@ class ClaudeTranslator {
     'Edit' ||
     'MultiEdit' ||
     'Write' => isPlanPath(_string(input['file_path']) ?? ''),
+    // Its plan sent rather than written (no file named): the plan all the
+    // same, to start.
     'ExitPlanMode' =>
-      _planPath != null || _string(input['planFilePath']) != null,
+      _planPath != null ||
+          _string(input['planFilePath']) != null ||
+          _string(input['plan']) != null,
     _ => false,
   };
 
@@ -202,11 +207,13 @@ class ClaudeTranslator {
     var plan =
         _plans[card] ??
         PlanItem(
-          // Put to the user, the CLI names its file.
+          // Put to the user, the CLI names its file; none when it was
+          // sent rather than written.
           path:
               _string(input['file_path']) ??
               _string(input['planFilePath']) ??
-              _planPath!,
+              _planPath ??
+              '',
           round: ++_planRounds,
         );
     // An edit changes the text once; written whole, it is the text.

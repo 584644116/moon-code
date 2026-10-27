@@ -185,6 +185,9 @@ class AgentLoop {
     _repeats.reset();
     var stopHookActive = false;
     var overflowRetries = 0;
+    var compactedForLength = false;
+    var worked = false;
+    var remindedOfTodos = false;
     while (true) {
       if (cancel.isCancelled) return _interrupted(during: false);
       if (maxTurns != null && _requests >= maxTurns!) {
@@ -271,8 +274,24 @@ class AgentLoop {
           _appendUser('Stop hook feedback:\n${stop.feedback}', meta: true);
           continue;
         }
+        // Work done with items left open: the model is reminded once to
+        // bring its list up to date (#156). Appended, so what is cached
+        // stays.
+        if (worked && !remindedOfTodos && answer.stopReason != 'max_tokens') {
+          final todos = session.todos[run.agentId ?? session.sessionId];
+          final open = [
+            for (final todo in todos ?? const <Map<String, Object?>>[])
+              if (todo['status'] != 'completed') todo,
+          ];
+          if (open.isNotEmpty) {
+            remindedOfTodos = true;
+            _appendUser(openTodosReminder(open), meta: true);
+            continue;
+          }
+        }
         return _result('end_turn');
       }
+      worked = true;
       final stopped = await _runCalls(calls, cancel);
       if (cancel.isCancelled) return _interrupted(during: true, calls: calls);
       if (stopped) return _result('stopped');
@@ -318,6 +337,7 @@ class AgentLoop {
       };
     }
     if (cache) _markCache(conversation);
+    _addPlanReminder(conversation);
     if (messages == null) _nudgeIfGrown(conversation);
     final maxTokens = _maxTokens(info);
     final body = <String, Object?>{
@@ -482,6 +502,12 @@ class AgentLoop {
         ],
       };
     }
+  }
+
+  /// The reminder that keeps the model in plan mode, added after the cache
+  /// is marked: it is not cached, and the turn after reads it anew.
+  void _addPlanReminder(List<Map<String, Object?>> conversation) {
+    if (conversation.isEmpty) return;
     if (isMain && session.permissionMode == 'plan') {
       final last = conversation.last;
       if (last['role'] == 'user') {

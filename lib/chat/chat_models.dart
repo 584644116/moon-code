@@ -414,7 +414,7 @@ class PlanItem extends ChatItem {
     this.feedback,
   });
 
-  /// The plan's file.
+  /// The plan's file; empty when the plan was sent rather than written.
   final String path;
 
   /// Which round of the conversation's planning it is, from 1.

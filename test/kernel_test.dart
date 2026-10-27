@@ -1052,7 +1052,7 @@ void main() {
       expect(translator.awaitingPlan, isNull);
     });
 
-    test('a plan said, not written, is said in the conversation', () {
+    test('a plan said, not written, is its card all the same (no file)', () {
       final transcript = Transcript();
       var seq = 0;
       ClaudeTranslator(emit: transcript.apply, nextSeq: () => ++seq).translate({
@@ -1071,7 +1071,11 @@ void main() {
           ],
         },
       });
-      expect((transcript.itemAt(0) as AssistantTextItem).text, '1. Do it');
+      // Its card is all of it: put to the user, it awaits them (see the
+      // kernel), with nothing else to start it by.
+      final plan = transcript.itemAt(0) as PlanItem;
+      expect(plan.text, '1. Do it');
+      expect(plan.path, isEmpty);
       expect(transcript.plan, isNull);
     });
 
@@ -1755,6 +1759,72 @@ void main() {
         kernel.dispose();
       },
     );
+
+    test('a plan sent rather than written, in plan mode the model entered '
+        'from Agent, is put to the user all the same', () async {
+      // As the CLI tells it: the plan in the call alone, no file named,
+      // and asked about with no input.
+      final cli = FakeCli();
+      final (:kernel, :transcript, events: _) = claude(cli);
+      kernel.permission.select('bypassPermissions');
+      kernel.send(const KernelTurn(id: 'u1', text: 'go'));
+      await pumpEventQueue();
+      void said(String id, String name, Map<String, Object?> input) =>
+          cli.push({
+            'type': 'assistant',
+            'parent_tool_use_id': null,
+            'message': {
+              'id': 'msg-$id',
+              'role': 'assistant',
+              'content': [
+                {'type': 'tool_use', 'id': id, 'name': name, 'input': input},
+              ],
+            },
+          });
+      said('e1', 'EnterPlanMode', {});
+      cli.push({
+        'type': 'system',
+        'subtype': 'status',
+        'status': null,
+        'permissionMode': 'plan',
+      });
+      said('x1', 'ExitPlanMode', {'plan': '# Hello\n\n1. Add hello.txt'});
+      cli.push({
+        'type': 'control_request',
+        'request_id': 'r1',
+        'request': {
+          'subtype': 'can_use_tool',
+          'tool_name': 'ExitPlanMode',
+          'input': <String, Object?>{},
+          'requires_user_interaction': true,
+        },
+      });
+      await pumpEventQueue();
+      expect(cli.responses.last['message'], ClaudeTranslator.planPresented);
+      final plan = transcript.liveItems
+          .map((entry) => entry.$2)
+          .whereType<PlanItem>()
+          .single;
+      expect(plan.status, PlanStatus.awaiting);
+      expect(plan.title, 'Hello');
+      expect(plan.path, isEmpty);
+      expect(kernel.mode.selected, 'plan');
+
+      kernel.startBuilding();
+      expect(kernel.mode.selected, 'agent');
+      kernel.send(const KernelTurn(id: 'u2', text: 'Carry out the plan'));
+      await pumpEventQueue();
+      final content = (cli.users.last['message'] as Map)['content'] as List;
+      expect(
+        (content.last as Map)['text'],
+        ClaudeTranslator.planStartedNote(''),
+      );
+      expect(
+        ClaudeTranslator.planStartedNote(''),
+        contains('Carry out the plan you put to them now.'),
+      );
+      kernel.dispose();
+    });
 
     test('full access answers questions itself; Don\'t ask refuses what '
         'it would ask', () async {

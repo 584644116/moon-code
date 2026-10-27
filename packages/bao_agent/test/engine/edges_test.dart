@@ -23,8 +23,11 @@ void main() {
     h = await Harness.start(permissionMode: 'plan');
     h.model.script.add(Reply.text('looking'));
     await h.turn('plan');
+    // The request is JSON-encoded, so a Windows path's backslashes are
+    // doubled there: the path as written is what the file is named.
     final plan = RegExp(r'write it to ([^ ]+\.md)')
-        .firstMatch(sentIn(h.model.turns.first))![1]!;
+        .firstMatch(sentIn(h.model.turns.first))![1]!
+        .replaceAll(r'\', r'');
     h.model.script.addAll([
       Reply.tool('Write', {
         'file_path': plan,
@@ -58,6 +61,62 @@ void main() {
     );
     // Edits are accepted now: not asked about.
     expect(h.permissionRequests.map((r) => r['tool_name']), ['ExitPlanMode']);
+  });
+
+  test('a plan sent rather than written is kept in its file, which the '
+      'user is shown', () async {
+    // #298: the file named was not there, and its tab said so.
+    h = await Harness.start(permissionMode: 'plan');
+    h.model.script.add(Reply.text('looking'));
+    await h.turn('plan');
+    // The request is JSON-encoded, so a Windows path's backslashes are
+    // doubled there: the path as written is what the file is named.
+    final plan = RegExp(r'write it to ([^ ]+\.md)')
+        .firstMatch(sentIn(h.model.turns.first))![1]!
+        .replaceAll(r'\\', r'\');
+    expect(File(plan).existsSync(), isFalse);
+    h.model.script.addAll([
+      Reply.tool('ExitPlanMode', {'plan': '# Plan\n\nStep one.'}),
+      Reply.text('done'),
+    ]);
+    Map<String, Object?>? asked;
+    h.onPermission = (request) async {
+      asked = request;
+      // Shown the file: there by then.
+      expect(File(plan).readAsStringSync(), '# Plan\n\nStep one.');
+      return {'behavior': 'allow', 'updatedInput': request['input']};
+    };
+    await h.turn('go');
+    expect((asked!['input'] as Map)['planFilePath'], plan);
+    expect(File(plan).readAsStringSync(), '# Plan\n\nStep one.');
+  });
+
+  test('in plan mode, the cache ends before the reminder: the next turn '
+      'reads it', () async {
+    h = await Harness.start(permissionMode: 'plan');
+    final path = p.join(h.cwd, 'f.txt');
+    File(path).writeAsStringSync('hello');
+    h.model.script.addAll([
+      Reply.tool('Read', {'file_path': path}),
+      Reply.tool('Read', {'file_path': path}),
+      Reply.text('done'),
+    ]);
+    await h.turn('look');
+    List<Map> messagesOf(ModelRequest request) => [
+      for (final m in request.body['messages'] as List) m as Map,
+    ];
+    final first = messagesOf(h.model.turns[1]);
+    final second = messagesOf(h.model.turns[2]);
+    final last = (first.last['content'] as List).cast<Map>();
+    expect('${last.last['text']}', contains('plan mode'));
+    expect(last.last.containsKey('cache_control'), isFalse);
+    expect(last[last.length - 2]['cache_control'], isNotNull);
+    // What the first wrote to the cache, the second sends the same.
+    final i = first.length - 1;
+    expect(
+      jsonEncode(second[i]),
+      jsonEncode({...first[i], 'content': last.sublist(0, last.length - 1)}),
+    );
   });
 
   test('questions not answered; EnterPlanMode is not for subagents', () async {
@@ -274,6 +333,7 @@ void main() {
           ),
         ]),
         Reply.text('ok'),
+        Reply.text(''),
         Reply.text('<summary>Summed.</summary>'),
       ]);
       await h.turn('write');

@@ -168,6 +168,7 @@ void main() {
       h.model.script.addAll([
         Reply.tool('TodoWrite', {'todos': todos}),
         Reply.text('ok'),
+        Reply.text(''),
       ]);
       await h.turn('plan');
       final result = h.toolResults.single['tool_use_result'] as Map;
@@ -197,6 +198,57 @@ void main() {
       expect((files.first as Map)['path'], 'f0.txt');
       expect((files.first as Map)['note'], 'The summary');
       expect((files.last as Map)['path'], 'f6.txt');
+    });
+
+    test('items left open as the work ends: the model is reminded once, '
+        'after what is cached (#156)', () async {
+      h = await Harness.start();
+      List<Map<String, Object?>> list(String status) => [
+        {'content': 'One', 'status': 'completed', 'activeForm': 'Doing one'},
+        {'content': 'Two', 'status': status, 'activeForm': 'Doing two'},
+      ];
+      h.model.script.addAll([
+        Reply.tool('TodoWrite', {'todos': list('in_progress')}),
+        Reply.text('All done.'),
+        Reply.tool('TodoWrite', {'todos': list('completed')}),
+        // An empty answer is asked for again here, so the turn's last
+        // request is the one that says nothing.
+        Reply.text(''),
+        Reply.text('Done.'),
+      ]);
+      await h.turn('work');
+      final requests = h.model.turns;
+      expect(requests, hasLength(5));
+      String text(int i) => jsonEncode(requests[i].body['messages']);
+      expect(text(1), isNot(contains('to-do list still has items open')));
+      final reminded = requests[2].body['messages']! as List;
+      expect(jsonEncode(reminded.last), contains('- [in_progress] Two'));
+      // What was sent before is sent again as it was.
+      final before = requests[1].body['messages']! as List;
+      String plain(Object? m) =>
+          jsonEncode(m).replaceAll(',"cache_control":{"type":"ephemeral"}', '');
+      for (final (i, message) in before.indexed) {
+        expect(plain(reminded[i]), plain(message));
+      }
+      // The reminder goes out before the empty answer is asked again, so
+      // what the turn ends on is the retry's.
+      expect(h.lastResult['result'], 'Done.');
+      expect(h.engine.session.mainTodos, isEmpty);
+
+      // Still open, the list is not brought up again in the same turn.
+      h.model.script.addAll([
+        Reply.tool('TodoWrite', {'todos': list('pending')}),
+        Reply.text('Stopped.'),
+        Reply.text('Two is left.'),
+      ]);
+      await h.turn('again');
+      expect(h.model.turns, hasLength(8));
+      expect(h.lastResult['result'], 'Two is left.');
+
+      // A turn without work: no reminder.
+      h.model.script.add(Reply.text('Hi.'));
+      await h.turn('hello');
+      expect(h.model.turns, hasLength(9));
     });
   });
 
