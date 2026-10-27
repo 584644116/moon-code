@@ -1,6 +1,6 @@
 # 参考项目集成计划
 
-> 范围：`D:\DM\4\ZCode`、`D:\DM\4\claudecodeui`、`D:\DM\4\claude-code-best`、`D:\DM\4\billion-context` 中**已确认可以集成或借鉴**的能力。
+> 范围：`ZCode`、`claudecodeui`、`claude-code-best`、`billion-context` 中**已确认可以集成或借鉴**的能力。
 >
 > 执行方式：严格按批次逐项实施，不跳过、不中途改方向。每批完成后更新本文末尾的状态表并单独提交；发现必须偏离计划的情况，先停止、在本文件记录原因并征求确认。
 >
@@ -417,7 +417,7 @@
 
 ### 9.1 环境
 
-- Flutter SDK：`D:\DM\_sdk\flutter`。
+- Flutter SDK：`<flutter-sdk>`。
 - 跑完 Flutter 相关测试后清理生成的平台目录（`linux/`、`macos/`、`windows/` 若出现未跟踪产物；已跟踪的项目文件不要删）。
 - 只跑与改动相关的测试，不跑全量。
 
@@ -435,35 +435,35 @@
 - `test/units/utils_test.dart`：MemoryLoader、settings 分层
 - `test/kernel_test.dart`：4 条 Windows 路径/环境相关失败（fork copy path、session cache path、2 条 claude locator）
 
-> 失败清单以 `C:\Users\z1515\.claude\projects\D--DM-4-baocode\memory\bao-agent-pre-existing-test-failures.md` 为准；清单之外的失败才算回归。
+> 失败清单以 `<memory>/bao-agent-pre-existing-test-failures.md` 为准；清单之外的失败才算回归。
 
 ### 9.3 每批命令
 
 ```powershell
-$env:PATH = 'D:\DM\_sdk\flutter\bin;' + $env:PATH
-cd D:\DM\4\baocode
+$env:PATH = '<flutter-sdk>\bin;' + $env:PATH
+cd <repo>
 
 # 批次 1
-D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/api/api_error_kind_test.dart
-D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/units/dangerous_commands_test.dart
-D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/units/permissions_units_test.dart
-D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/engine/resume_read_state_test.dart
-D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/engine/permissions_test.dart --plain-name "times out"
-D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/engine/controls_test.dart
+flutter test packages/bao_agent/test/api/api_error_kind_test.dart
+flutter test packages/bao_agent/test/units/dangerous_commands_test.dart
+flutter test packages/bao_agent/test/units/permissions_units_test.dart
+flutter test packages/bao_agent/test/engine/resume_read_state_test.dart
+flutter test packages/bao_agent/test/engine/permissions_test.dart --plain-name "times out"
+flutter test packages/bao_agent/test/engine/controls_test.dart
 
 # 批次 2/3
-D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/engine/session_compression_test.dart
-D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/engine/context_compression_test.dart
-D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/engine/context_tools_test.dart
-D:\DM\_sdk\flutter\bin\flutter test test/kernel_test.dart --plain-name "context tools"
+flutter test packages/bao_agent/test/engine/session_compression_test.dart
+flutter test packages/bao_agent/test/engine/context_compression_test.dart
+flutter test packages/bao_agent/test/engine/context_tools_test.dart
+flutter test test/kernel_test.dart --plain-name "context tools"
 
 # 批次 4
-D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/engine/compaction_test.dart
-D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/engine/edges_test.dart
-D:\DM\_sdk\flutter\bin\flutter test packages/bao_agent/test/engine/tools_test.dart
+flutter test packages/bao_agent/test/engine/compaction_test.dart
+flutter test packages/bao_agent/test/engine/edges_test.dart
+flutter test packages/bao_agent/test/engine/tools_test.dart
 
 # 静态检查
-D:\DM\_sdk\flutter\bin\dart analyze packages/bao_agent lib test
+dart analyze packages/bao_agent lib test
 ```
 
 > 实际测试文件以创建时的名称为准；每批完成后把真实命令补到本节。

@@ -28,11 +28,11 @@
 
 | 项目 | 形态 | 许可 | 本方案允许的用法 | 明确禁止 |
 | --- | --- | --- | --- | --- |
-| `D:\DM\4\deepseek-harness` | Node/TypeScript，Cordis 插件树 | **MIT**（Copyright (c) 2026 DeepSeek） | 借鉴机制与参数，用 Dart 独立实现；若未来直接移植代码，必须保留 MIT 版权与许可文本 | 不把 Node 运行时或其插件体系引入 BaoCode；不整段搬运 TypeScript |
-| `D:\DM\4\ZCode` | TypeScript | Apache-2.0 | 借鉴权限守卫、风险分级、失败分类、压缩策略；独立重写 | 不整段搬运；直接引用时保留版权与 NOTICE |
-| `D:\DM\4\claudecodeui` | Web/Node | AGPL-3.0-or-later | **只提炼交互与产品思路** | 不复制任何代码到 GPL-3.0 的 BaoCode |
-| `D:\DM\4\claude-code-best` | 逆向工程快照 | 无 LICENSE | 只把协议与会话格式当事实参考 | 不复制代码；不随产品分发 |
-| `D:\DM\4\billion-context` | Node/TS | MIT + 强制署名附加条款 | 借鉴可逆范围压缩、前缀缓存友好折叠、CCR、父链只读回退 | 不作为 Dart 库嵌入；不作为 sidecar 随包分发；不复制代码 |
+| `deepseek-harness` | Node/TypeScript，Cordis 插件树 | **MIT**（Copyright (c) 2026 DeepSeek） | 借鉴机制与参数，用 Dart 独立实现；若未来直接移植代码，必须保留 MIT 版权与许可文本 | 不把 Node 运行时或其插件体系引入 BaoCode；不整段搬运 TypeScript |
+| `ZCode` | TypeScript | Apache-2.0 | 借鉴权限守卫、风险分级、失败分类、压缩策略；独立重写 | 不整段搬运；直接引用时保留版权与 NOTICE |
+| `claudecodeui` | Web/Node | AGPL-3.0-or-later | **只提炼交互与产品思路** | 不复制任何代码到 GPL-3.0 的 BaoCode |
+| `claude-code-best` | 逆向工程快照 | 无 LICENSE | 只把协议与会话格式当事实参考 | 不复制代码；不随产品分发 |
+| `billion-context` | Node/TS | MIT + 强制署名附加条款 | 借鉴可逆范围压缩、前缀缓存友好折叠、CCR、父链只读回退 | 不作为 Dart 库嵌入；不作为 sidecar 随包分发；不复制代码 |
 
 > 本文所有“借鉴 dsh”的条目都是**设计参照 + Dart 独立实现**，不产生 MIT 署名义务；如果实施时决定逐段移植其实现，必须在该文件头保留 MIT 许可文本，并在 `docs/reference-integration-plan.md` 记录来源。
 
@@ -457,10 +457,10 @@
 
 ## 9. 回归基线与测试纪律
 
-1. `packages/bao_agent` 的 `test/engine/`、`test/units/` 在**干净树**上固定有 15 条 Windows 环境失败，不能当作回归。失败清单见 `C:\Users\z1515\.claude\projects\D--DM-4-baocode\memory\bao-agent-pre-existing-test-failures.md`，核心是路径分隔符、shell 行为、plugin 加载、settings 分层、memory loader。
+1. `packages/bao_agent` 的 `test/engine/`、`test/units/` 在**干净树**上固定有 15 条 Windows 环境失败，不能当作回归。失败清单见 `<memory>/bao-agent-pre-existing-test-failures.md`，核心是路径分隔符、shell 行为、plugin 加载、settings 分层、memory loader。
 2. 判据是“失败集合与基线一致”，不是“全绿”。
 3. 只跑与改动相关的测试；不跑全量。
-4. Flutter SDK 在 `D:\DM\_sdk\flutter`；跑完测试后清理生成的平台目录。
+4. Flutter SDK 在 `<flutter-sdk>`；跑完测试后清理生成的平台目录。
 5. 触及 `lib/channel/`、权限、`control_request`/`control_response`、`LinkMethods`、会话 JSONL 的改动，必须在提交说明中标注 **需回归验证** 并列出所跑测试。
 
 ---
