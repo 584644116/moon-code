@@ -290,6 +290,16 @@ class Transcript {
 
   /// Keeps how long turn [id] took, and what it spent, on the message that
   /// began it.
+  /// The message that started turn [turnId] (its item's id); null when it
+  /// is not listed.
+  UserMessageItem? turnMessage(String turnId) => switch (_indexOf[turnId]) {
+    final index? => switch (_items[index]) {
+      final UserMessageItem message => message,
+      _ => null,
+    },
+    null => null,
+  };
+
   void _timeTurn(String id, Duration worked, TurnUsage? usage) {
     final index = _indexOf[id];
     if (index == null) return;

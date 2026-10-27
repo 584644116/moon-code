@@ -514,12 +514,16 @@ class RemoteClient {
     List<String> arguments, {
     required String cwd,
     int? limit,
+    String? stdin,
+    Map<String, String>? environment,
   }) async {
     final result = _map(
       await peer.request(RemoteProtocol.gitRun, {
         'arguments': arguments,
         'cwd': cwd,
         'limit': ?limit,
+        'stdin': ?stdin,
+        'environment': ?environment,
       }),
     );
     if (result['truncated'] == true) {

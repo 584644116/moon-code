@@ -2103,4 +2103,7 @@ class _SidePanelScmHost implements IdeScmHost {
   @override
   Future<void> appendLines(String path, String lines) =>
       ideAppendLinesToFile(files, path, lines);
+
+  @override
+  String? get activePath => null;
 }

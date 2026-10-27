@@ -1257,6 +1257,12 @@ class IdeWorkspace extends ChangeNotifier
     _edits.dispose();
     super.dispose();
   }
+
+  @override
+  String? get activePath => switch (active) {
+    final document? when document.isFile => document.path,
+    _ => null,
+  };
 }
 
 class _EditsNotifier extends ChangeNotifier {

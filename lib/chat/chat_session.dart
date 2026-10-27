@@ -889,6 +889,22 @@ class ChatSession extends ChangeNotifier implements ChatFeed {
     );
   }
 
+  /// The files changed and neither kept nor undone, each with the turn
+  /// that changed it (its id) and what that turn was asked, in the order
+  /// they were changed: what the IDE's changelists of turns are made of.
+  List<({String turn, String request, String path})> get turnEdits =>
+      _cached(#turnEdits, () {
+        return [
+          for (final (seq: _, :change, :turnId) in _pendingEdits)
+            if (turnId != null)
+              (
+                turn: turnId,
+                request: _transcript.turnMessage(turnId)?.text ?? '',
+                path: _absolute(change.path),
+              ),
+        ];
+      });
+
   Iterable<({int seq, FileChange change, String? turnId})> get _pendingEdits {
     final settled = math.max(_keptSeq, _transcript.revertedSeq);
     return _transcript.edits.where(
