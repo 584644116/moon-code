@@ -10671,6 +10671,12 @@ abstract class AppLocalizations {
   /// **'Use {name}'**
   String modelsAccountEnable(String name);
 
+  /// No description provided for @modelsAccountDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get modelsAccountDisabled;
+
   /// No description provided for @modelsAccountLimited.
   ///
   /// In en, this message translates to:
@@ -10682,6 +10688,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Quota not known yet'**
   String get modelsAccountQuotaUnknown;
+
+  /// No description provided for @modelsQuotaShortWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Short window'**
+  String get modelsQuotaShortWindow;
+
+  /// No description provided for @modelsQuotaLongWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Long window'**
+  String get modelsQuotaLongWindow;
+
+  /// No description provided for @modelsQuotaLastUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated {time}'**
+  String modelsQuotaLastUpdated(String time);
 
   /// No description provided for @modelsQuotaWeek.
   ///
@@ -10706,6 +10730,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{percent}% used'**
   String modelsQuotaUsed(int percent);
+
+  /// No description provided for @modelsQuotaRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% left'**
+  String modelsQuotaRemaining(int percent);
+
+  /// No description provided for @quotaBarWindowLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'{window} {percent}% left'**
+  String quotaBarWindowLeft(String window, int percent);
+
+  /// No description provided for @quotaBarAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}/{total} available'**
+  String quotaBarAvailable(int count, int total);
+
+  /// No description provided for @quotaBarAllOut.
+  ///
+  /// In en, this message translates to:
+  /// **'All accounts out of quota · back {time}'**
+  String quotaBarAllOut(String time);
+
+  /// No description provided for @quotaBarBackAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Out of quota · back {time}'**
+  String quotaBarBackAt(String time);
+
+  /// No description provided for @quotaBarNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No account can be used'**
+  String get quotaBarNone;
+
+  /// No description provided for @quotaBarThisChat.
+  ///
+  /// In en, this message translates to:
+  /// **'This chat'**
+  String get quotaBarThisChat;
+
+  /// No description provided for @quotaBarRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh Quota'**
+  String get quotaBarRefresh;
 
   /// No description provided for @modelsQuotaResetsIn.
   ///

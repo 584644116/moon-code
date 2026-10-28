@@ -131,6 +131,7 @@ import 'stash/stash_view.dart';
 import 'stash/stash_welcome.dart' show showStashWelcome;
 import 'workspace/agent_work_path.dart';
 import 'workspace/chat_branch_bar.dart';
+import 'workspace/chat_quota_bar.dart';
 import 'workspace/chat_drag.dart';
 import 'workspace/chat_grid_view.dart';
 import 'workspace/chat_terminal.dart';
@@ -3860,17 +3861,20 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
       final project = thread.project;
       final multi = _workspace.workspaceOf(project);
       final git = multi == null ? _shownGit(thread) : null;
-      return ChatBranchBar(
+      return ChatQuotaBar(
         session: thread.session,
-        name: multi?.name ?? project.name,
-        workspace: multi != null,
-        repositories: multi != null
-            ? _shownRepositories(thread, _sidePanelRepositories(multi))
-            : [if (git != null) (project.path, git)],
-        onSwitchWorktree: widget.gitFor == null
-            ? null
-            : (folder, path) =>
-                  _sidePanel.chooseWorktree(thread.session, folder, path),
+        branch: ChatBranchBar(
+          session: thread.session,
+          name: multi?.name ?? project.name,
+          workspace: multi != null,
+          repositories: multi != null
+              ? _shownRepositories(thread, _sidePanelRepositories(multi))
+              : [if (git != null) (project.path, git)],
+          onSwitchWorktree: widget.gitFor == null
+              ? null
+              : (folder, path) =>
+                    _sidePanel.chooseWorktree(thread.session, folder, path),
+        ),
       );
     },
   );

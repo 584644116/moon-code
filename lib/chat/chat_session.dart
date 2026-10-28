@@ -558,7 +558,8 @@ class ChatSession extends ChangeNotifier implements ChatFeed {
   };
 
   /// Whether an agent on [model] can go on by itself once the usage limit
-  /// it stopped at resets: on the account's own plan, which says when.
+  /// it stopped at resets: on the account's own plan, or ChatGPT accounts,
+  /// which say when.
   bool continuesAfterLimit(String model) => switch (_kernel) {
     final ReportsUsageLimit kernel => kernel.usageLimitAppliesTo(model),
     _ => false,

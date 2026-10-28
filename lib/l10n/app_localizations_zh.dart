@@ -6171,10 +6171,24 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get modelsAccountDisabled => '已禁用';
+
+  @override
   String get modelsAccountLimited => '额度已用尽';
 
   @override
   String get modelsAccountQuotaUnknown => '额度尚未获取';
+
+  @override
+  String get modelsQuotaShortWindow => '短周期';
+
+  @override
+  String get modelsQuotaLongWindow => '长周期';
+
+  @override
+  String modelsQuotaLastUpdated(String time) {
+    return '上次更新 $time';
+  }
 
   @override
   String get modelsQuotaWeek => '每周';
@@ -6193,6 +6207,40 @@ class AppLocalizationsZh extends AppLocalizations {
   String modelsQuotaUsed(int percent) {
     return '已用 $percent%';
   }
+
+  @override
+  String modelsQuotaRemaining(int percent) {
+    return '剩余 $percent%';
+  }
+
+  @override
+  String quotaBarWindowLeft(String window, int percent) {
+    return '$window剩 $percent%';
+  }
+
+  @override
+  String quotaBarAvailable(int count, int total) {
+    return '$count/$total 可用';
+  }
+
+  @override
+  String quotaBarAllOut(String time) {
+    return '账号额度全部用尽 · $time 恢复';
+  }
+
+  @override
+  String quotaBarBackAt(String time) {
+    return '额度已用尽 · $time 恢复';
+  }
+
+  @override
+  String get quotaBarNone => '没有可用的账号';
+
+  @override
+  String get quotaBarThisChat => '当前对话';
+
+  @override
+  String get quotaBarRefresh => '刷新额度';
 
   @override
   String modelsQuotaResetsIn(String time) {
