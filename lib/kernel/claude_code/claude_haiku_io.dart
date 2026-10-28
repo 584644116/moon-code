@@ -28,19 +28,24 @@ Future<String> askClaudeHaiku(
   Map<String, String>? env,
   List<({String name, ImageAttachment image})> images = const [],
   ClaudeHaikuTools? tools,
+  int? limit,
 }) async {
-  if (images.isNotEmpty) {
-    final timer = ClaudeAnswerTimer();
+  if (images.isNotEmpty || limit != null) {
+    // Streamed: with pictures the answer comes that way, and with a limit
+    // it has to, so that it can be stopped the moment it passes.
+    final timer = ClaudeAnswerTimer()..limit = limit;
     final clock = Stopwatch()..start();
     final (stderr, code) = await _run(
       system,
-      // One line.
-      '${claudeHaikuMessage(prompt, images)}\n',
+      images.isEmpty
+          ? prompt
+          // One line.
+          : '${claudeHaikuMessage(prompt, images)}\n',
       cancel: cancel,
       model: model,
       env: env,
       stream: true,
-      message: true,
+      message: images.isNotEmpty,
       tools: tools,
       onLine: (line) => timer.add(line, clock.elapsed),
     );
@@ -170,10 +175,20 @@ Future<(String, int)> _run(
       process.kill();
     }),
   );
+  // The line it went past in, if it did: the run is stopped there, and
+  // the rest of a document not waited for.
+  ClaudeHaikuTooLong? tooLong;
   final stdout = process.stdout
       .transform(const Utf8Decoder(allowMalformed: true))
       .transform(const LineSplitter())
-      .forEach(onLine);
+      .forEach((line) {
+        try {
+          onLine(line);
+        } on ClaudeHaikuTooLong catch (error) {
+          tooLong = error;
+          process.kill();
+        }
+      });
   final stderr = process.stderr
       .transform(const Utf8Decoder(allowMalformed: true))
       .join();
@@ -189,6 +204,7 @@ Future<(String, int)> _run(
   );
   if (cancelled) throw const ClaudeHaikuCancelled();
   await stdout;
+  if (tooLong case final tooLong?) throw tooLong;
   return (await stderr, code);
 }
 
@@ -248,10 +264,19 @@ Future<(String, int)> _runBuiltin(
   }
   onStart?.call();
   final ended = Completer<int>();
+  ClaudeHaikuTooLong? tooLong;
   final subscription = agent.messages.listen(
     (line) {
       final isResult = line['type'] == 'result';
-      if (stream || message || isResult) onLine(jsonEncode(line));
+      if (stream || message || isResult) {
+        try {
+          onLine(jsonEncode(line));
+        } on ClaudeHaikuTooLong catch (error) {
+          // Stopped where it stood: the run has nothing more to say.
+          tooLong = error;
+          if (!ended.isCompleted) ended.complete(1);
+        }
+      }
       if (isResult && !ended.isCompleted) {
         ended.complete(line['is_error'] == true ? 1 : 0);
       }
@@ -283,6 +308,7 @@ Future<(String, int)> _runBuiltin(
       ),
     );
     if (cancelled) throw const ClaudeHaikuCancelled();
+    if (tooLong case final tooLong?) throw tooLong;
     return (agent.errors.join('\n'), code);
   } finally {
     unawaited(subscription.cancel());

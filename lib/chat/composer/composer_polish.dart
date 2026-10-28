@@ -212,6 +212,7 @@ Future<String> Function(
   bool exact,
   String? location,
   ClaudeHaikuTools? tools,
+  int? limit,
 })?
 composerPolishAsker;
 
@@ -290,6 +291,18 @@ const _enhanceNoPadding =
     'step. Never put in the message a question the agent could answer by '
     'reading the code. ';
 
+// What the model writes instead of the message, when it goes on: a
+// message of a line or two comes back as several times that, with
+// headings and a plan. It was the slowest answers of all, and the only
+// ones thrown away (see `too long`).
+const _enhanceProportion =
+    'Keep it in proportion to what was asked: a message of a few lines '
+    'stays a few lines, and a longer one grows by what the agent needs to '
+    'start, at most about twice what was written — never a document. No '
+    'heading for sections of it, no numbered plan of steps, no background '
+    'and no overview of the project: the agent reads the code itself. '
+    'When in doubt, write less. ';
+
 const _enhanceClosing =
     'Write no preamble, no plan of your own, no heading for the whole, no '
     'questions and no offers to help: the person is asking, not '
@@ -303,14 +316,16 @@ const _enhanceClosing =
 
 const _enhanceSystem =
     '$_enhanceOpening$_enhanceToldReply$_enhanceWithTools'
-    '$_enhanceWithToolsWriting$_enhanceNoPadding$_enhanceClosing';
+    '$_enhanceWithToolsWriting$_enhanceNoPadding$_enhanceProportion'
+    '$_enhanceClosing';
 
 // The same, where the project is not there to be read (a host reached
 // over SSH, or none): no tools, so nothing to look in, and nothing to
 // promise of paths it never saw.
 const _enhanceAloneSystem =
     '$_enhanceOpening$_enhanceToldReply$_enhanceAlone'
-    '$_enhanceAloneWriting$_enhanceNoPadding$_enhanceClosing';
+    '$_enhanceAloneWriting$_enhanceNoPadding$_enhanceProportion'
+    '$_enhanceClosing';
 
 /// The tools a message is enhanced with: reading the project at
 /// [location], when it is on this machine — a host reached over SSH is
@@ -321,8 +336,12 @@ ClaudeHaikuTools? _enhanceTools(String? location) => switch (location) {
     directory: location,
     readable: [location],
     // A few searches and reads, then the message: the message is the
-    // point, not a tour of the code (see [_enhanceSystem]).
-    maxTurns: 8,
+    // point, not a tour of the code (see [_enhanceSystem]). The three
+    // tool calls it is told to take at most are three turns, and the
+    // answer is the fourth: a fifth leaves one to spare. More than that
+    // was turns spent re-reading what it had, each one sending all of it
+    // again, for the answers that came back too long.
+    maxTurns: 5,
   ),
   _ => null,
 };
@@ -337,6 +356,7 @@ Future<String> _askText(
   required bool exact,
   required String? location,
   required ClaudeHaikuTools? tools,
+  int? limit,
   Future<void>? cancel,
 }) {
   if (composerPolishAsker case final asker?) {
@@ -347,6 +367,7 @@ Future<String> _askText(
       exact: exact,
       location: location,
       tools: tools,
+      limit: limit,
     );
   }
   return askClaudeHaiku(
@@ -356,6 +377,7 @@ Future<String> _askText(
     exact: exact,
     location: location,
     tools: tools,
+    limit: limit,
     cancel: cancel,
   );
 }
@@ -390,6 +412,7 @@ Future<String> _reply(
   required String? model,
   required String? location,
   required ClaudeHaikuTools? tools,
+  int? limit,
   void Function(ComposerPolishStage stage)? onStage,
 }) async {
   final auxiliary = ModelProviders.current.auxiliary(model);
@@ -405,7 +428,14 @@ Future<String> _reply(
         exact: exact,
         location: location,
         tools: tools,
+        limit: limit,
       );
+    } on ClaudeHaikuTooLong catch (error) {
+      // It answered — at more length than the message could take, and was
+      // stopped there. The tier did not fail, and the model itself would
+      // write as much again: what came back is judged like any answer
+      // that was not the message, and the caller decides what to do.
+      throw ComposerPolishRejected('too long', error.written);
     } on Object catch (error) {
       _failed(error, also: after);
       throw ComposerPolishException('$error');
@@ -440,8 +470,13 @@ Future<String> _reply(
       exact: false,
       location: location,
       tools: tools,
+      limit: limit,
       cancel: stop.future,
     );
+  } on ClaudeHaikuTooLong catch (error) {
+    // Answered, and stopped: nothing of the tier's is wrong to keep it
+    // from being asked again. Asked as it is, it would write as much.
+    throw ComposerPolishRejected('too long', error.written);
   } on Object catch (error) {
     _tiersFailed.add(model_);
     // Said at once: what the tier answered, as its retry may take
@@ -471,8 +506,9 @@ void _failed(Object error, {Object? also}) {
 /// session's), through Claude Code where the session runs ([location]):
 /// the composer's new content. Throws [ComposerPolishException] when there
 /// is none, or [ComposerPolishRejected] when the answer was not the
-/// message: it lost what it was to keep, ran on far longer than [longest]
-/// allows for (written on, not rewritten), or wrote something around it.
+/// message: it lost what it was to keep, ran on past the [budget] its
+/// words were given (written on, not rewritten), or wrote something
+/// around it.
 Future<String> _rewrite(
   ComposerPolishText asked, {
   required String system,
@@ -480,7 +516,7 @@ Future<String> _rewrite(
   required String? model,
   required String? location,
   required ClaudeHaikuTools? tools,
-  required bool Function(int before, int after) longest,
+  required int Function(int before) budget,
   void Function(ComposerPolishStage stage)? onStage,
 }) async {
   appEvent(
@@ -489,6 +525,9 @@ Future<String> _rewrite(
         '(${tools?.tools.join('/') ?? '-'}), model ${model ?? 'auto'}, '
         '${prompt.length} chars',
   );
+  // What it said, its markers aside: what the answer may grow from.
+  final before = asked.text.replaceAll(_marker, '');
+  final room = budget(before.length);
   final String reply;
   try {
     reply = await _reply(
@@ -497,8 +536,22 @@ Future<String> _rewrite(
       model: model,
       location: location,
       tools: tools,
+      // Stopped as it is written, well before the budget runs out: waiting
+      // for the end of a document is the most expensive when it is the
+      // least wanted. Half again as much leaves the one that is merely
+      // long its chance to be judged on the whole of it.
+      limit: room + room ~/ 2,
       onStage: onStage,
     );
+  } on ComposerPolishRejected catch (rejected) {
+    // It answered, and was stopped at the limit: the answer it wrote is
+    // there to read (see the composer), and the caller asks again.
+    appEvent(
+      'composer',
+      'asked ${tools == null ? 'alone' : 'with tools'}: '
+          '${rejected.reason}',
+    );
+    rethrow;
   } on ComposerPolishException catch (error) {
     appEvent(
       'composer',
@@ -513,7 +566,6 @@ Future<String> _rewrite(
       .replaceFirst(RegExp(r'^<message>\s*'), '')
       .replaceFirst(RegExp(r'\s*</message>$'), '');
   final words = cleaned.replaceAll(_marker, '');
-  final before = asked.text.replaceAll(_marker, '');
   if (words.trim().isEmpty) {
     throw ComposerPolishRejected('empty', cleaned);
   }
@@ -521,7 +573,7 @@ Future<String> _rewrite(
     appEvent('composer', 'rewrite rejected: $reason');
     throw ComposerPolishRejected(reason, cleaned);
   }
-  if (!longest(before.length, words.length)) {
+  if (words.length > room) {
     appEvent('composer', 'rewrite rejected: too long');
     throw ComposerPolishRejected('too long', cleaned);
   }
@@ -593,7 +645,8 @@ Future<String> polishComposerText(
   location: location,
   tools: null,
   // Twice the words is already more than a polish would write.
-  longest: (before, after) => after <= before * 2 + 200,
+  // Twice the words is already more than a polish would write.
+  budget: (before) => before * 2 + 200,
   onStage: onStage,
 );
 
@@ -634,7 +687,7 @@ Future<String> enhanceComposerText(
     tools: tools,
     // It may say what it found and how to check it: several times the
     // words, not a whole file written out.
-    longest: (before, after) => after <= before * 6 + 1500,
+    budget: (before) => before * 6 + 1500,
     onStage: onStage,
   );
   if (tools == null) return ask(null);

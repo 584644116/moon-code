@@ -33,6 +33,11 @@ import 'claude_haiku_stub.dart'
 /// (see [claudeHaikuMessage]): the model sees them without tools. With
 /// [tools], it may look at files (see [ClaudeHaikuTools]). Both only on
 /// this machine; a remote host is asked the prompt alone.
+///
+/// With [limit], its text is counted as it comes and the run is stopped
+/// the moment it passes: [ClaudeHaikuTooLong] with what was written. An
+/// answer that long was not the answer, and waiting for the rest of it
+/// costs the most exactly when it is least wanted.
 Future<String> askClaudeHaiku(
   String system,
   String prompt, {
@@ -42,6 +47,7 @@ Future<String> askClaudeHaiku(
   String? location,
   List<({String name, ImageAttachment image})> images = const [],
   ClaudeHaikuTools? tools,
+  int? limit,
 }) async {
   final host = location == null ? null : RemoteLocation.hostOf(location);
   final providers = ModelProviders.current;
@@ -66,6 +72,7 @@ Future<String> askClaudeHaiku(
       cancel: cancel,
       images: images,
       tools: tools,
+      limit: limit,
     );
   }
   final (provider, info) = custom;
@@ -94,6 +101,7 @@ Future<String> askClaudeHaiku(
     env: env,
     images: images,
     tools: tools,
+    limit: limit,
   );
 }
 
@@ -214,6 +222,15 @@ class ClaudeAnswerTimer {
   Duration? _lastText;
   Map<String, Object?>? _result;
 
+  /// The answer's text as it came, a piece at a time: how far it has got,
+  /// before there is a whole answer to measure (see [askClaudeHaiku]'s
+  /// `limit`, [limit]).
+  final written = StringBuffer();
+
+  /// Past how many of [written]'s characters [add] gives up (see
+  /// [ClaudeHaikuTooLong]); none, when nothing is counting.
+  int? limit;
+
   /// [line], printed [at] (since Claude Code started).
   void add(String line, Duration at) {
     final Object? message;
@@ -236,6 +253,13 @@ class ClaudeAnswerTimer {
           when text.isNotEmpty:
         _firstText ??= at;
         _lastText = at;
+        written.write(text);
+        // The caller was counting: this much is already too much, and
+        // waiting for the rest of a document costs the most.
+        final cap = limit;
+        if (cap != null && written.length > cap) {
+          throw ClaudeHaikuTooLong(written.toString(), cap);
+        }
       case {'type': 'result'}:
         _result = message as Map<String, Object?>;
     }
@@ -330,6 +354,20 @@ String claudeHaikuAnswer(String output, String stderr, int code) {
 
 class ClaudeHaikuCancelled implements Exception {
   const ClaudeHaikuCancelled();
+}
+
+/// The answer went on past the [limit] it was given, so it was stopped
+/// where it stood: [written] is what it had said by then. Not a failure
+/// of the model's, and not an empty answer: what it wrote was more than
+/// the question could have meant to take (see the composer's enhance).
+class ClaudeHaikuTooLong implements Exception {
+  const ClaudeHaikuTooLong(this.written, this.limit);
+
+  final String written;
+  final int limit;
+
+  @override
+  String toString() => 'The answer went past $limit characters, stopped.';
 }
 
 class ClaudeHaikuException implements Exception {

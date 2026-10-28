@@ -11,7 +11,7 @@ import 'package:baocode/chat/composer/composer_polish.dart';
 import 'package:baocode/ide/ide_hover.dart';
 import 'package:baocode/ide/ide_notifications.dart';
 import 'package:baocode/kernel/claude_code/claude_haiku.dart'
-    show ClaudeHaikuTools;
+    show ClaudeHaikuTooLong, ClaudeHaikuTools;
 import 'package:baocode/l10n/l10n.dart';
 import 'package:baocode/models/model_provider.dart';
 import 'package:baocode/models/model_providers.dart';
@@ -110,6 +110,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) async => '## Fix it\n\nFix the typo.';
       try {
         await polishComposerText(composerPolishText('fix it'));
@@ -130,6 +131,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) async => 'Fix it.';
       final stages = <ComposerPolishStage>[];
       await polishComposerText(
@@ -150,6 +152,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) async => 'x' * 400;
       await expectLater(
         polishComposerText(asked),
@@ -162,6 +165,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) async => '  ';
       await expectLater(
         polishComposerText(asked),
@@ -177,6 +181,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) async => throw Exception('Not signed in');
       await expectLater(
         polishComposerText(composerPolishText('fix it')),
@@ -216,7 +221,7 @@ void main() {
           'then on', () async {
         final asked = <({bool exact})>[];
         composerPolishAsker =
-            (system, prompt, {model, exact = false, location, tools}) async {
+            (system, prompt, {model, exact = false, location, tools, limit}) async {
               asked.add((exact: exact));
               if (exact) return 'Fix it.';
               throw Exception("There's an issue with the selected model");
@@ -239,7 +244,7 @@ void main() {
       test('what it waits on is told as it goes, the tier and then the '
           'model itself', () async {
         composerPolishAsker =
-            (system, prompt, {model, exact = false, location, tools}) async {
+            (system, prompt, {model, exact = false, location, tools, limit}) async {
               if (exact) return 'Fix it.';
               throw Exception("There's an issue with the selected model");
             };
@@ -258,7 +263,7 @@ void main() {
       test('Enhance with the project to read: the project first, and the '
           'tier after it', () async {
         composerPolishAsker =
-            (system, prompt, {model, exact = false, location, tools}) async =>
+            (system, prompt, {model, exact = false, location, tools, limit}) async =>
                 'Fix the typo.';
         final stages = <ComposerPolishStage>[];
         await enhanceComposerText(
@@ -275,7 +280,7 @@ void main() {
         await ModelProviders.current.setAuxiliaryModel('@up/small');
         final asked = <({bool exact})>[];
         composerPolishAsker =
-            (system, prompt, {model, exact = false, location, tools}) async {
+            (system, prompt, {model, exact = false, location, tools, limit}) async {
               asked.add((exact: exact));
               throw Exception('Out of quota');
             };
@@ -347,7 +352,7 @@ void main() {
       final reply = Completer<String>();
       String? prompt;
       composerPolishAsker =
-          (system, asked, {model, exact = false, location, tools}) {
+          (system, asked, {model, exact = false, location, tools, limit}) {
             prompt = asked;
             return reply.future;
           };
@@ -387,7 +392,7 @@ void main() {
     ) async {
       final reply = Completer<String>();
       composerPolishAsker =
-          (system, asked, {model, exact = false, location, tools}) =>
+          (system, asked, {model, exact = false, location, tools, limit}) =>
               reply.future;
       final controller = await pumpComposer(tester);
       controller.replace(
@@ -417,7 +422,7 @@ void main() {
     testWidgets('typed on after the reply, no Undo button', (tester) async {
       final reply = Completer<String>();
       composerPolishAsker =
-          (system, asked, {model, exact = false, location, tools}) =>
+          (system, asked, {model, exact = false, location, tools, limit}) =>
               reply.future;
       final controller = await pumpComposer(tester);
       controller.replace(
@@ -452,6 +457,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) async => '## Fix it\n\nFix the typo.';
       final controller = await pumpComposer(
         tester,
@@ -507,6 +513,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) async {
         asked.add(prompt);
         return 'Fix it.';
@@ -549,6 +556,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) => reply.future;
       final controller = await pumpComposer(
         tester,
@@ -584,6 +592,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) => reply.future;
       final controller = await pumpComposer(tester);
       controller.replace(0, 0, 'fix it');
@@ -614,7 +623,7 @@ void main() {
       String? system;
       ClaudeHaikuTools? seen;
       composerPolishAsker =
-          (s, asked, {model, exact = false, location, tools}) {
+          (s, asked, {model, exact = false, location, tools, limit}) {
             system = s;
             seen = tools;
             return reply.future;
@@ -651,6 +660,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) {
         prompt = asked;
         return Future.value('Do the second option.');
@@ -690,7 +700,7 @@ void main() {
       ClaudeHaikuTools? seen;
       String? prompt;
       composerPolishAsker =
-          (system, asked, {model, exact = false, location, tools}) {
+          (system, asked, {model, exact = false, location, tools, limit}) {
             prompt = asked;
             seen = tools;
             return Future.value('Fix it.');
@@ -714,6 +724,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) {
         system = askedSystem;
         prompt = asked;
@@ -746,6 +757,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) {
         prompts.add(asked);
         return Future.value('Fix it.');
@@ -768,6 +780,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) {
         prompt = asked;
         return Future.value('Fix it.');
@@ -787,7 +800,7 @@ void main() {
         'the message alone', () async {
       final seen = <ClaudeHaikuTools?>[];
       composerPolishAsker =
-          (system, asked, {model, exact = false, location, tools}) async {
+          (system, asked, {model, exact = false, location, tools, limit}) async {
             seen.add(tools);
             if (tools != null) {
               throw Exception('Reached maximum number of turns');
@@ -810,7 +823,7 @@ void main() {
       // said. Asked without it, the message is all there is to go on.
       final seen = <ClaudeHaikuTools?>[];
       composerPolishAsker =
-          (system, asked, {model, exact = false, location, tools}) async {
+          (system, asked, {model, exact = false, location, tools, limit}) async {
             seen.add(tools);
             return tools == null ? 'Fix it.' : 'x' * 3000;
           };
@@ -824,11 +837,95 @@ void main() {
       expect(seen.last, isNull);
     });
 
+    test('stopped as it writes, long before the budget: asked again, the '
+        'message alone', () async {
+      // Waiting for the end of a document costs the most exactly when it
+      // is the least wanted. The run is stopped half again past the
+      // budget rather than at the end of what the model meant to write.
+      final limits = <int?>[];
+      composerPolishAsker = (system, asked, {
+        model,
+        exact = false,
+        location,
+        tools,
+        int? limit,
+      }) async {
+        limits.add(limit);
+        if (tools == null) return 'Fix it.';
+        throw ClaudeHaikuTooLong('x' * 100000, limit ?? 0);
+      };
+      final content = await enhanceComposerText(
+        composerPolishText('fix it'),
+        location: r'C:\wpp',
+      );
+      expect(content, 'Fix it.');
+      // A message of 6 characters: 6 * 6 + 1500 = 1536, stopped at 2304.
+      expect(limits.first, 2304);
+      // Asked again without the project, on the same budget as before.
+      expect(limits.last, 2304);
+    });
+
+    test("a stopped answer is the answer's, not the tier's: the tier is "
+        'asked again, not gone from', () async {
+      // A tier that fails goes unasked for the rest of the run. One that
+      // answered, and ran on, is still the tier to ask.
+      forgetFailedPolishTiers();
+      final previous = ModelProviders.current;
+      addTearDown(() {
+        ModelProviders.current = previous;
+        forgetFailedPolishTiers();
+      });
+      ModelProviders.current = ModelProviders.memory(
+        providers: [
+          ModelProvider(
+            id: 'p',
+            name: 'P',
+            baseUrl: 'https://p.example',
+            models: const [
+              ProviderModel(id: 'a-model'),
+              ProviderModel(id: 'its-haiku'),
+            ],
+            roles: const ProviderRoles(main: 'a-model', haiku: 'its-haiku'),
+          ),
+        ],
+      );
+
+      final asked = <bool>[];
+      composerPolishAsker = (system, prompt, {
+        model,
+        exact = false,
+        location,
+        tools,
+        int? limit,
+      }) async {
+        asked.add(exact);
+        throw ClaudeHaikuTooLong('x' * 100000, limit ?? 0);
+      };
+      for (var attempt = 0; attempt < 2; attempt++) {
+        await expectLater(
+          polishComposerText(
+            composerPolishText('fix it'),
+            model: '@p/a-model',
+          ),
+          throwsA(
+            isA<ComposerPolishRejected>().having(
+              (e) => e.reason,
+              'reason',
+              'too long',
+            ),
+          ),
+        );
+      }
+      // The tier both times: one that answered, and ran on, is still the
+      // tier to ask — not one gone from as though it had failed.
+      expect(asked, [false, false]);
+    });
+
     test('a project on a host: the message alone, no tools', () async {
       ClaudeHaikuTools? seen;
       String? prompt;
       composerPolishAsker =
-          (system, asked, {model, exact = false, location, tools}) {
+          (system, asked, {model, exact = false, location, tools, limit}) {
             prompt = asked;
             seen = tools;
             return Future.value('Fix it.');
@@ -845,7 +942,7 @@ void main() {
       'what it found and how to check it: several times the words taken',
       () async {
         composerPolishAsker =
-            (system, asked, {model, exact = false, location, tools}) async =>
+            (system, asked, {model, exact = false, location, tools, limit}) async =>
                 'Fix the typo in lib/main.dart, where the button is built, then run '
                 'flutter test test/chat/composer_polish_test.dart and check that the '
                 'reply is still taken as one change.';
@@ -867,6 +964,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) async => 'x' * 3000;
       await expectLater(
         enhanceComposerText(composerPolishText('fix it')),
@@ -883,6 +981,7 @@ void main() {
           exact = false,
           location,
           tools,
+          limit,
         }) async => reply;
         await expectLater(
           polishComposerText(composerPolishText('fix it')),
@@ -905,6 +1004,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) async => '## Fix the typo\n\nFix the typo in the label.';
       await polishComposerText(
         composerPolishText('## Fix the typo\n\nIt is wrong.'),
@@ -917,6 +1017,7 @@ void main() {
         exact = false,
         location,
         tools,
+        limit,
       }) async => '好的，修复这个错字，并运行测试。';
       await polishComposerText(
         composerPolishText('好的，修复这个错字。'),
@@ -927,7 +1028,7 @@ void main() {
         'project', () async {
       final seen = <ClaudeHaikuTools?>[];
       composerPolishAsker =
-          (system, asked, {model, exact = false, location, tools}) async {
+          (system, asked, {model, exact = false, location, tools, limit}) async {
             seen.add(tools);
             return '## Fix it\n\nFix the typo.';
           };
@@ -946,7 +1047,7 @@ void main() {
     test('the prompts ask for no padding, and show what that means', () async {
       final systems = <String>[];
       composerPolishAsker =
-          (system, asked, {model, exact = false, location, tools}) async {
+          (system, asked, {model, exact = false, location, tools, limit}) async {
             systems.add(system);
             return 'Fix it.';
           };
@@ -970,6 +1071,53 @@ void main() {
       expect(withTools, contains('the page\'s build path'));
       expect(alone, contains('You cannot look at the project here'));
       expect(alone, contains('what to measure'));
+    });
+
+    test('the prompts keep it in proportion, and say what is not', () async {
+      // The answers that came back far too long were the slowest of all,
+      // and the only ones thrown away: said in words the model may follow,
+      // in both prompts, not only left to the length check after them.
+      final systems = <String>[];
+      composerPolishAsker =
+          (system, asked, {model, exact = false, location, tools, limit}) async {
+            systems.add(system);
+            return 'Fix it.';
+          };
+
+      await enhanceComposerText(
+        composerPolishText('fix it'),
+        location: r'C:\w\app',
+      );
+      await enhanceComposerText(composerPolishText('fix it'));
+
+      for (final system in systems) {
+        expect(system, contains('Keep it in proportion to what was asked'));
+        expect(system, contains('no numbered plan of steps'));
+        expect(system, contains('never a document'));
+        expect(system, contains('When in doubt, write less'));
+      }
+    });
+
+    test('enhance is given five turns, a polish none', () async {
+      final given = <ClaudeHaikuTools?>[];
+      composerPolishAsker =
+          (system, asked, {model, exact = false, location, tools, limit}) async {
+            given.add(tools);
+            return 'Fix it.';
+          };
+
+      await enhanceComposerText(
+        composerPolishText('fix it'),
+        location: r'C:\w\app',
+      );
+      await polishComposerText(
+        composerPolishText('fix it'),
+        location: r'C:\w\app',
+      );
+
+      // Three tool calls it is told to take at most, the answer fourth.
+      expect(given.first?.maxTurns, 5);
+      expect(given.last, isNull);
     });
   });
 }

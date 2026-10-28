@@ -10,6 +10,7 @@ Future<String> askClaudeHaiku(
   Map<String, String>? env,
   List<({String name, ImageAttachment image})> images = const [],
   ClaudeHaikuTools? tools,
+  int? limit,
 }) async => throw const ClaudeHaikuException(
   'This needs Claude Code, which the web cannot run.',
 );

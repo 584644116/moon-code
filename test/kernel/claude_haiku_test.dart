@@ -176,4 +176,40 @@ void main() {
       expect(api.headers.map((h) => h['x-api-key']).toSet(), {'sk-up'});
     }, timeout: const Timeout(Duration(minutes: 1)));
   });
+
+  group('an answer stopped when it goes past its limit', () {
+    // What Claude Code prints as an answer streams, one line each.
+    String delta(String text) => jsonEncode({
+      'type': 'stream_event',
+      'event': {
+        'type': 'content_block_delta',
+        'delta': {'type': 'text_delta', 'text': text},
+      },
+    });
+
+    test('written up to the limit is kept, and nothing thrown', () {
+      final timer = ClaudeAnswerTimer();
+      timer.add(delta('a short answer'), Duration.zero);
+      // No limit set: nothing counted, nothing thrown.
+      expect(timer.written.toString(), 'a short answer');
+    });
+
+    test('past it: stopped where it stood, what it wrote kept', () {
+      final timer = ClaudeAnswerTimer()..limit = 10;
+      expect(
+        () => timer.add(delta('x' * 11), Duration.zero),
+        throwsA(
+          isA<ClaudeHaikuTooLong>()
+              .having((e) => e.written, 'written', 'x' * 11)
+              .having((e) => e.limit, 'limit', 10),
+        ),
+      );
+    });
+
+    test('exactly at it is not past it', () {
+      final timer = ClaudeAnswerTimer()..limit = 4;
+      timer.add(delta('abcd'), Duration.zero);
+      expect(timer.written.length, 4);
+    });
+  });
 }
