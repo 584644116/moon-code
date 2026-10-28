@@ -93,6 +93,75 @@ void main() {
     test('none without the folder', () {
       expect(listDiagnosticsLogs(p.join(logs.path, 'gone')), isEmpty);
     });
+
+    test('the crash reports between the logs and the hang reports', () {
+      write('errors.log', 'a');
+      write('hangs/hang-20261011-090000-2.txt', 't');
+      write('reports/BaoCode-2026-10-28-120616.ips', '{}');
+      final listed = listDiagnosticsLogs(
+        logs.path,
+        crashFolders: [p.join(logs.path, 'reports')],
+      );
+      expect([for (final log in listed) log.name], [
+        'errors.log',
+        'crashes/BaoCode-2026-10-28-120616.ips',
+        'hangs/hang-20261011-090000-2.txt',
+      ]);
+      expect([for (final log in listed) log.isCrash], [false, true, false]);
+    });
+  });
+
+  group('listCrashReports', () {
+    void report(String path, DateTime modified) {
+      write(path, '{"app_name":"BaoCode"}');
+      File(p.join(logs.path, path)).setLastModifiedSync(modified);
+    }
+
+    test("the app's, the newest first, a name in two folders once", () {
+      final day = DateTime(2026, 10, 28);
+      report('reports/BaoCode-2026-10-26-100000.ips', day);
+      report('reports/BaoCode-2026-10-28-120616.ips', day.add(_hour * 3));
+      report('reports/Retired/BaoCode-2026-10-27-100000.ips', day.add(_hour));
+      report('reports/Retired/BaoCode-2026-10-28-120616.ips', day);
+      report('reports/BaoCodeHelper-2026-10-28-130000.ips', day);
+      report('reports/Safari-2026-10-28-130000.ips', day);
+      report('reports/BaoCode-2026-10-28-130000.txt', day);
+      final reports = p.join(logs.path, 'reports');
+      final listed = listCrashReports([
+        reports,
+        p.join(reports, 'Retired'),
+        p.join(logs.path, 'gone'),
+      ]);
+      expect([for (final log in listed) log.name], [
+        'crashes/BaoCode-2026-10-28-120616.ips',
+        'crashes/BaoCode-2026-10-27-100000.ips',
+        'crashes/BaoCode-2026-10-26-100000.ips',
+      ]);
+      expect(
+        listed.first.source,
+        p.join(reports, 'BaoCode-2026-10-28-120616.ips'),
+      );
+      expect(listed.first.size, '{"app_name":"BaoCode"}'.length);
+    });
+
+    test('no more than the newest few', () {
+      for (var i = 0; i < maxCrashReports + 2; i++) {
+        report(
+          'reports/BaoCode-2026-10-${10 + i}-000000.ips',
+          DateTime(2026, 10, 10 + i),
+        );
+      }
+      final listed = listCrashReports([p.join(logs.path, 'reports')]);
+      expect(listed, hasLength(maxCrashReports));
+      expect(listed.first.name, 'crashes/BaoCode-2026-10-16-000000.ips');
+    });
+
+    test("macOS' folders", () {
+      expect(macCrashReportFolders('/Users/ann'), [
+        '/Users/ann/Library/Logs/DiagnosticReports',
+        '/Users/ann/Library/Logs/DiagnosticReports/Retired',
+      ]);
+    }, skip: Platform.isWindows);
   });
 
   group('redactHome', () {
@@ -118,9 +187,31 @@ void main() {
       );
     });
 
+    test("in JSON's escaped slashes, as macOS' crash reports have them", () {
+      expect(
+        redactHome(r'"procPath" : "\/Users\/ann\/a\/BaoCode"', '/Users/ann'),
+        r'"procPath" : "~\/a\/BaoCode"',
+      );
+    });
+
     test('not a root, nor nothing', () {
       expect(redactHome('/etc/hosts', '/'), '/etc/hosts');
       expect(redactHome('/etc/hosts', ''), '/etc/hosts');
+    });
+  });
+
+  group('redactCrashReport', () {
+    test("the machine's key goes, the rest stays", () {
+      expect(
+        redactCrashReport(
+          '{\n  "pid" : 1980,\n'
+          '  "crashReporterKey" : "742F288F-5181-E91C-D926-856AE707E206",\n'
+          '  "procName" : "BaoCode"\n}',
+        ),
+        '{\n  "pid" : 1980,\n'
+        '  "crashReporterKey" : "",\n'
+        '  "procName" : "BaoCode"\n}',
+      );
     });
   });
 
@@ -199,6 +290,34 @@ void main() {
       expect(bundle.omittedDumps, 1);
     });
 
+    test('the crash reports, without the home folder and the key', () {
+      write('errors.log', 'boom\n');
+      write(
+        'reports/BaoCode-2026-10-28-120616.ips',
+        '{"procPath" : "\\/Users\\/ann\\/BaoCode.app",'
+            ' "crashReporterKey" : "742F288F"}',
+      );
+      final bundle = packDiagnosticsSync(
+        logs.path,
+        dumps: false,
+        crashFolders: [p.join(logs.path, 'reports')],
+        home: '/Users/ann',
+      );
+      final files = untar(gzip.decode(bundle.bytes));
+      expect(files.keys, [
+        'errors.log',
+        'crashes/BaoCode-2026-10-28-120616.ips',
+      ]);
+      expect(
+        utf8.decode(files['crashes/BaoCode-2026-10-28-120616.ips']!),
+        '{"procPath" : "~\\/BaoCode.app", "crashReporterKey" : ""}',
+      );
+      expect(
+        bundle.files.last.size,
+        files['crashes/BaoCode-2026-10-28-120616.ips']!.length,
+      );
+    });
+
     test('nothing to send: an empty tar', () {
       final bundle = packDiagnosticsSync(logs.path, dumps: true);
       expect(untar(gzip.decode(bundle.bytes)), isEmpty);
@@ -206,3 +325,5 @@ void main() {
     });
   });
 }
+
+const _hour = Duration(hours: 1);

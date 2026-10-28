@@ -1974,7 +1974,7 @@
   "updateModeManual": "仅手动检查",
   "updateModeNone": "关闭",
   "diagnosticsTitle": "诊断日志",
-  "diagnosticsDescription": "把 MoonCode 的错误日志发给开发者，帮助排查问题。只有点击上传时才会发送。",
+  "diagnosticsDescription": "把 BaoCode 的错误日志和系统记录的崩溃报告发给开发者，帮助排查问题。只有点击上传时才会发送。",
   "diagnosticsUpload": "上传…",
   "diagnosticsDialogTitle": "上传诊断日志",
   "diagnosticsNotePlaceholder": "备注（选填）：遇到了什么问题，怎样复现",

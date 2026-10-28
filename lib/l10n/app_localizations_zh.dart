@@ -6894,7 +6894,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get diagnosticsDescription =>
-      '把 MoonCode 的错误日志发给开发者，帮助排查问题。只有点击上传时才会发送。';
+      '把 BaoCode 的错误日志和系统记录的崩溃报告发给开发者，帮助排查问题。只有点击上传时才会发送。';
 
   @override
   String get diagnosticsUpload => '上传…';

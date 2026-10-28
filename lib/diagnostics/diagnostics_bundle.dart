@@ -5,14 +5,23 @@ import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 
-/// A file of the logs folder (`DataDirectory.logsDir`) that a diagnostics
-/// upload sends: its [name] under the folder, `/`-separated, and its size.
+/// A file that a diagnostics upload sends: its [name] in the bundle,
+/// `/`-separated, and its size. One of the logs folder
+/// (`DataDirectory.logsDir`), its name under it; or a crash report of the
+/// system's, read from [source].
 class DiagnosticsLog {
-  const DiagnosticsLog(this.name, this.size);
+  const DiagnosticsLog(this.name, this.size, {this.source});
 
-  /// `errors.log`, `hangs/hang-20261011-013600-1234.dmp`.
+  /// `errors.log`, `hangs/hang-20261011-013600-1234.dmp`,
+  /// `crashes/BaoCode-2026-10-28-120616.ips`.
   final String name;
   final int size;
+
+  /// Where a file from outside the logs folder is read: a crash report.
+  final String? source;
+
+  /// A crash report of the system's ([listCrashReports]).
+  bool get isCrash => source != null;
 
   /// A minidump of a hang (Windows: windows/runner/hang_watchdog.h): sent
   /// only when asked, as it may hold what the app had in memory.
@@ -35,10 +44,17 @@ class DiagnosticsBundle {
 /// `/v1/diagnostics`).
 const maxDiagnosticsBytes = 10 * 1024 * 1024;
 
+/// The most crash reports a bundle takes: the newest.
+const maxCrashReports = 5;
+
 /// The logs of [folder]: its own `*.log` (errors.log and the run before's,
-/// Windows' window.log), by name, then the hang reports of `hangs/`, the
-/// newest first. None where there is no folder.
-List<DiagnosticsLog> listDiagnosticsLogs(String folder) {
+/// Windows' window.log), by name, then the system's crash reports of the
+/// app in [crashFolders] ([listCrashReports]), then the hang reports of
+/// `hangs/`, the newest first. None where there is no folder.
+List<DiagnosticsLog> listDiagnosticsLogs(
+  String folder, {
+  List<String> crashFolders = const [],
+}) {
   List<DiagnosticsLog> filesOf(String directory, bool Function(String) take) {
     final dir = Directory(directory);
     if (!dir.existsSync()) return [];
@@ -59,7 +75,58 @@ List<DiagnosticsLog> listDiagnosticsLogs(String folder) {
     p.join(folder, 'hangs'),
     (name) => name.endsWith('.txt') || name.endsWith('.dmp'),
   )..sort((a, b) => b.name.compareTo(a.name));
-  return [...logs, ...hangs];
+  return [...logs, ...listCrashReports(crashFolders), ...hangs];
+}
+
+/// Where macOS keeps the app's crash reports (`BaoCode-<time>.ips`): the
+/// user's DiagnosticReports, and its `Retired` the reports already sent to
+/// Apple are moved to.
+List<String> macCrashReportFolders(String home) {
+  final reports = p.join(home, 'Library', 'Logs', 'DiagnosticReports');
+  return [reports, p.join(reports, 'Retired')];
+}
+
+/// The app's crash reports in [folders] (`BaoCode-2026-10-28-120616.ips`;
+/// a crash, a hang the system caught, a kill for memory), the [max]
+/// newest, as `crashes/<name>`; a name in two folders once.
+List<DiagnosticsLog> listCrashReports(
+  List<String> folders, {
+  int max = maxCrashReports,
+}) {
+  final found = <String, (File, DateTime)>{};
+  for (final folder in folders) {
+    final dir = Directory(folder);
+    try {
+      if (!dir.existsSync()) continue;
+      for (final entity in dir.listSync(followLinks: false)) {
+        final name = p.basename(entity.path);
+        if (entity is! File || !crashReportName.hasMatch(name)) continue;
+        if (found.containsKey(name)) continue;
+        found[name] = (entity, entity.lastModifiedSync());
+      }
+    } on FileSystemException {
+      // Not to be read: none from there.
+    }
+  }
+  final newest = found.entries.toList()
+    ..sort((a, b) => b.value.$2.compareTo(a.value.$2));
+  return [
+    for (final MapEntry(key: name, value: (file, _)) in newest.take(max))
+      if (_lengthOf(file) case final size?)
+        DiagnosticsLog('crashes/$name', size, source: file.path),
+  ];
+}
+
+/// The names the system gives the app's reports: its process's name
+/// first. Not `BaoCodeHelper` and the like.
+final crashReportName = RegExp(r'^BaoCode[-_.].*\.ips$');
+
+int? _lengthOf(File file) {
+  try {
+    return file.lengthSync();
+  } on FileSystemException {
+    return null;
+  }
 }
 
 /// [listDiagnosticsLogs]'s files of [folder] packed, in another isolate:
@@ -67,6 +134,7 @@ List<DiagnosticsLog> listDiagnosticsLogs(String folder) {
 Future<DiagnosticsBundle> packDiagnostics(
   String folder, {
   required bool dumps,
+  List<String> crashFolders = const [],
   String? home,
   bool windows = false,
   int maxBytes = maxDiagnosticsBytes,
@@ -74,28 +142,31 @@ Future<DiagnosticsBundle> packDiagnostics(
   () => packDiagnosticsSync(
     folder,
     dumps: dumps,
+    crashFolders: crashFolders,
     home: home,
     windows: windows,
     maxBytes: maxBytes,
   ),
 );
 
-/// The logs of [folder] as a `tar.gz` of at most [maxBytes]: the text ones
-/// with [home] written `~` ([redactHome]); then, with [dumps], the
-/// minidumps as they are, the newest first, those that would make it too
-/// large left out. A file gone or unreadable since it was listed is left
-/// out too.
+/// The logs of [folder] and the crash reports of [crashFolders] as a
+/// `tar.gz` of at most [maxBytes]: the text ones with [home] written `~`
+/// ([redactHome]), the crash reports without the machine's key
+/// ([redactCrashReport]); then, with [dumps], the minidumps as they are,
+/// the newest first. What would make it too large is left out, and a file
+/// gone or unreadable since it was listed.
 ///
 /// Each file is a gzip member of its own, so that what it adds is known
 /// as it is added; gzip and tar read the members as one stream.
 DiagnosticsBundle packDiagnosticsSync(
   String folder, {
   required bool dumps,
+  List<String> crashFolders = const [],
   String? home,
   bool windows = false,
   int maxBytes = maxDiagnosticsBytes,
 }) {
-  final listed = listDiagnosticsLogs(folder);
+  final listed = listDiagnosticsLogs(folder, crashFolders: crashFolders);
   final ordered = [
     ...listed.where((log) => !log.isDump),
     if (dumps) ...listed.where((log) => log.isDump),
@@ -106,7 +177,7 @@ DiagnosticsBundle packDiagnosticsSync(
   final files = <DiagnosticsLog>[];
   var omitted = 0;
   for (final log in ordered) {
-    final file = File(p.join(folder, log.name));
+    final file = File(log.source ?? p.join(folder, log.name));
     Uint8List bytes;
     DateTime modified;
     try {
@@ -120,6 +191,9 @@ DiagnosticsBundle packDiagnosticsSync(
       if (home != null) {
         text = redactHome(text, home, windows: windows);
       }
+      // A crash report keeps the machine's key, which says nothing of the
+      // crash and would tell one user's reports from another's.
+      if (log.isCrash) text = redactCrashReport(text);
       bytes = utf8.encode(scrubSecrets(text));
     }
     final member = codec.encode(tarEntry(log.name, bytes, modified));
@@ -135,9 +209,9 @@ DiagnosticsBundle packDiagnosticsSync(
 }
 
 /// [text] with the user's [home] folder written `~`: in paths and in
-/// JSON's escaped ones. On Windows, also with `/` between its parts, and
-/// in any case. Not where it begins a longer name (`/Users/ann` in
-/// `/Users/anna`).
+/// JSON's escaped ones (`\/Users\/ann`, as macOS' crash reports have
+/// them). On Windows, also with `/` between its parts, and in any case.
+/// Not where it begins a longer name (`/Users/ann` in `/Users/anna`).
 String redactHome(String text, String home, {bool windows = false}) {
   final trimmed = home.replaceFirst(RegExp(r'[\\/]+$'), '');
   // A root, or nothing: every path would go.
@@ -145,6 +219,7 @@ String redactHome(String text, String home, {bool windows = false}) {
   final parts = trimmed.split(RegExp(r'[\\/]'));
   final variants = {
     trimmed,
+    parts.join(r'\/'),
     if (windows) ...[parts.join('/'), parts.join(r'\'), parts.join(r'\\')],
   }.toList()..sort((a, b) => b.length.compareTo(a.length));
   final pattern = RegExp(
@@ -204,6 +279,13 @@ String scrubSecrets(String text) {
   );
   return out;
 }
+
+/// A crash report of macOS' without its `crashReporterKey`, the same for
+/// every report of the machine: what would tell the reports of one user.
+String redactCrashReport(String text) => text.replaceAllMapped(
+  RegExp(r'("crashReporterKey"\s*:\s*")[^"]*"'),
+  (match) => '${match[1]}"',
+);
 
 /// [bytes] as a file of a tar (`ustar`): its header, then its content to
 /// a whole number of blocks.
