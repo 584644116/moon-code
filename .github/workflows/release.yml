@@ -246,6 +246,14 @@ jobs:
           path: |
             build/installers/BaoCode-*.dmg
             build/installers/BaoCode-*-mac-*.zip
+      # The Dart code's symbols, for a jank sample's `??? (in App)` frames
+      # (tool/build_macos.dart). Not released: kept with the run.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: symbols-macos${{ env.SUFFIX }}
+          if-no-files-found: error
+          retention-days: 90
+          path: build/symbols/App.macos.symbols
       - name: Forget the certificate and the key
         if: always()
         run: |
