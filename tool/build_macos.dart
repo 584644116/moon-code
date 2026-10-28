@@ -31,7 +31,7 @@
 // The Dart code's symbols are saved as it is built, to build/symbols/
 // App.macos.symbols (universal: the App framework's executable before it is
 // stripped): a jank sample (lib/diagnostics/jank_sample.dart) names its
-// frames by their offsets in App, which tool/symbolize_mac_sample.dart
+// frames by their offsets in App, which tool/symbolize_jank_sample.dart
 // turns into functions with that file. The app ships stripped, as before.
 //
 // Signed with a Developer ID and notarised when the environment says how

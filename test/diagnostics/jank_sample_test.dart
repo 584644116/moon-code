@@ -16,14 +16,17 @@ void main() {
   });
   tearDown(() => folder.deleteSync(recursive: true));
 
-  JankSampler sampler({bool mac = true, int kept = 5}) => JankSampler(
+  JankSampler sampler({String os = 'macos', int kept = 5}) => JankSampler(
     folder.path,
     pid: 4242,
-    mac: mac,
     kept: kept,
     clock: () => now,
-    start: (executable, arguments) async =>
-        started.add([executable, ...arguments]),
+    take: () => platformSample(
+      os: os,
+      pid: 4242,
+      start: (executable, arguments) async =>
+          started.add([executable, ...arguments]),
+    ),
   );
 
   test(
@@ -57,9 +60,23 @@ void main() {
     expect(started, hasLength(3));
   });
 
-  test('none where there is no sample (not a Mac)', () async {
-    expect(await sampler(mac: false).sample(), isNull);
+  test('none where the platform samples not', () async {
+    expect(await sampler(os: 'android').sample(), isNull);
+    // Windows and Linux sample from within, the app built ahead of time:
+    // not under flutter test.
+    expect(await sampler(os: 'linux').sample(), isNull);
     expect(started, isEmpty);
+  });
+
+  test('none named when the sample did not start', () async {
+    final watch = JankSampler(
+      folder.path,
+      pid: 1,
+      clock: () => now,
+      take: () =>
+          (path, seconds) async => false,
+    );
+    expect(await watch.sample(), isNull);
   });
 
   test('the oldest samples go, the hang reports stay', () async {

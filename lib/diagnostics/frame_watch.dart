@@ -22,9 +22,9 @@ import 'jank_sample.dart';
 ///
 /// And, under `jank`, a stretch of frames each too short for a line of its
 /// own but slow one after another (scrolling that stutters for minutes, the
-/// CPU busy): what they took, as [JankWindow] sums them up; on a Mac,
-/// with a sample of the app's threads then ([JankSampler]), which names the
-/// code they were in.
+/// CPU busy): what they took, as [JankWindow] sums them up; on the
+/// desktops, with a sample of the app's stacks then ([JankSampler]), which
+/// names the code they were in.
 class FrameWatch {
   FrameWatch._(this.slow);
 
@@ -155,7 +155,8 @@ class FrameWatch {
     _jankWritten++;
     _lastJankWritten = now;
     final state = _state();
-    // Which code it is, a Mac's `sample` says: taken as it goes on.
+    // Which code it is, a sample of the app's stacks says: taken as it
+    // goes on.
     final sampler = _sampler ??= switch (EventLog.current?.directory) {
       final folder? => JankSampler(folder),
       null => null,
