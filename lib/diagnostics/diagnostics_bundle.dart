@@ -5,6 +5,8 @@ import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 
+import 'crash_reports.dart';
+
 /// A file that a diagnostics upload sends: its [name] in the bundle,
 /// `/`-separated, and its size. One of the logs folder
 /// (`DataDirectory.logsDir`), its name under it; or a crash report of the
@@ -23,7 +25,8 @@ class DiagnosticsLog {
   /// A crash report of the system's ([listCrashReports]).
   bool get isCrash => source != null;
 
-  /// A minidump of a hang (Windows: windows/runner/hang_watchdog.h): sent
+  /// A minidump of a hang or a crash (Windows: windows/runner/
+  /// hang_watchdog.h): sent
   /// only when asked, as it may hold what the app had in memory.
   bool get isDump => name.endsWith('.dmp');
 
@@ -44,13 +47,10 @@ class DiagnosticsBundle {
 /// `/v1/diagnostics`).
 const maxDiagnosticsBytes = 10 * 1024 * 1024;
 
-/// The most crash reports a bundle takes: the newest.
-const maxCrashReports = 5;
-
 /// The logs of [folder]: its own `*.log` (errors.log and the run before's,
 /// Windows' window.log), by name, then the system's crash reports of the
-/// app in [crashFolders] ([listCrashReports]), then the hang reports of
-/// `hangs/`, the newest first. None where there is no folder.
+/// app in [crashFolders] ([listCrashReports]), then the hang and crash
+/// reports of `hangs/`, the newest first. None where there is no folder.
 List<DiagnosticsLog> listDiagnosticsLogs(
   String folder, {
   List<String> crashFolders = const [],
@@ -70,63 +70,28 @@ List<DiagnosticsLog> listDiagnosticsLogs(
 
   final logs = filesOf(folder, (name) => name.endsWith('.log'))
     ..sort((a, b) => a.name.compareTo(b.name));
-  // hang-YYYYMMDD-HHMMSS-pid: the names sort as the times.
+  // hang-YYYYMMDD-HHMMSS-pid, crash-…, jank-…: sorted as the times, the
+  // kind after.
+  String time(DiagnosticsLog log) {
+    final name = p.posix.basename(log.name);
+    final dash = name.indexOf('-');
+    return '${name.substring(dash + 1)} ${name.substring(0, dash + 1)}';
+  }
+
   final hangs = filesOf(
     p.join(folder, 'hangs'),
     (name) => name.endsWith('.txt') || name.endsWith('.dmp'),
-  )..sort((a, b) => b.name.compareTo(a.name));
-  return [...logs, ...listCrashReports(crashFolders), ...hangs];
-}
-
-/// Where macOS keeps the app's crash reports (`BaoCode-<time>.ips`): the
-/// user's DiagnosticReports, and its `Retired` the reports already sent to
-/// Apple are moved to.
-List<String> macCrashReportFolders(String home) {
-  final reports = p.join(home, 'Library', 'Logs', 'DiagnosticReports');
-  return [reports, p.join(reports, 'Retired')];
-}
-
-/// The app's crash reports in [folders] (`BaoCode-2026-10-28-120616.ips`;
-/// a crash, a hang the system caught, a kill for memory), the [max]
-/// newest, as `crashes/<name>`; a name in two folders once.
-List<DiagnosticsLog> listCrashReports(
-  List<String> folders, {
-  int max = maxCrashReports,
-}) {
-  final found = <String, (File, DateTime)>{};
-  for (final folder in folders) {
-    final dir = Directory(folder);
-    try {
-      if (!dir.existsSync()) continue;
-      for (final entity in dir.listSync(followLinks: false)) {
-        final name = p.basename(entity.path);
-        if (entity is! File || !crashReportName.hasMatch(name)) continue;
-        if (found.containsKey(name)) continue;
-        found[name] = (entity, entity.lastModifiedSync());
-      }
-    } on FileSystemException {
-      // Not to be read: none from there.
-    }
-  }
-  final newest = found.entries.toList()
-    ..sort((a, b) => b.value.$2.compareTo(a.value.$2));
+  )..sort((a, b) => time(b).compareTo(time(a)));
   return [
-    for (final MapEntry(key: name, value: (file, _)) in newest.take(max))
-      if (_lengthOf(file) case final size?)
-        DiagnosticsLog('crashes/$name', size, source: file.path),
+    ...logs,
+    for (final report in listCrashReports(crashFolders))
+      DiagnosticsLog(
+        'crashes/${report.name}',
+        report.size,
+        source: report.path,
+      ),
+    ...hangs,
   ];
-}
-
-/// The names the system gives the app's reports: its process's name
-/// first. Not `BaoCodeHelper` and the like.
-final crashReportName = RegExp(r'^BaoCode[-_.].*\.ips$');
-
-int? _lengthOf(File file) {
-  try {
-    return file.lengthSync();
-  } on FileSystemException {
-    return null;
-  }
 }
 
 /// [listDiagnosticsLogs]'s files of [folder] packed, in another isolate:
@@ -151,8 +116,8 @@ Future<DiagnosticsBundle> packDiagnostics(
 
 /// The logs of [folder] and the crash reports of [crashFolders] as a
 /// `tar.gz` of at most [maxBytes]: the text ones with [home] written `~`
-/// ([redactHome]), the crash reports without the machine's key
-/// ([redactCrashReport]); then, with [dumps], the minidumps as they are,
+/// ([redactHome]), the crash reports in UTF-8 ([reportText]) without the
+/// machine's key ([redactCrashReport]); then, with [dumps], the minidumps as they are,
 /// the newest first. What would make it too large is left out, and a file
 /// gone or unreadable since it was listed.
 ///
@@ -187,10 +152,11 @@ DiagnosticsBundle packDiagnosticsSync(
       continue;
     }
     if (!log.isDump) {
-      var text = utf8.decode(bytes, allowMalformed: true);
-      if (home != null) {
-        text = redactHome(text, home, windows: windows);
-      }
+      // A crash report the system wrote may be UTF-16.
+      var text = log.isCrash
+          ? reportText(bytes)
+          : utf8.decode(bytes, allowMalformed: true);
+      if (home != null) text = redactHome(text, home, windows: windows);
       // A crash report keeps the machine's key, which says nothing of the
       // crash and would tell one user's reports from another's.
       if (log.isCrash) text = redactCrashReport(text);

@@ -144,6 +144,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // A hang (closing a window, quitting) written down where it is: see
   // hang_watchdog.h.
   hang_watchdog::Start(window.GetHandle());
+  // And a crash: see hang_watchdog.h.
+  hang_watchdog::InstallCrashHandler();
 
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0)) {

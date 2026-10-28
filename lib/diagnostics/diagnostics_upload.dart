@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import '../platform/data_dir.dart';
 import '../telemetry/telemetry_io.dart' show abiArch;
 import '../update/version.dart';
+import 'crash_reports.dart';
 import 'diagnostics_bundle.dart';
 
 /// Where to upload instead, to try a server.
@@ -84,8 +85,9 @@ class DiagnosticsUploader {
        arch = arch ?? abiArch(Abi.current()),
        _client = client ?? HttpClient.new;
 
-  /// The app's: the data folder's `logs`, macOS' crash reports, [url] the
-  /// one [diagnosticsUrlVariable] names, if any.
+  /// The app's: the data folder's `logs`, the system's crash reports
+  /// ([crashReportFolders]), [url] the one [diagnosticsUrlVariable] names,
+  /// if any.
   factory DiagnosticsUploader.platform() {
     final environment = Platform.environment;
     final override = environment[diagnosticsUrlVariable]?.trim() ?? '';
@@ -95,9 +97,7 @@ class DiagnosticsUploader {
     return DiagnosticsUploader(
       folder: DataDirectory.current.logsDir,
       url: override.isEmpty ? null : Uri.tryParse(override),
-      crashFolders: Platform.isMacOS && home != null
-          ? macCrashReportFolders(home)
-          : const [],
+      crashFolders: platformCrashReportFolders(),
       home: home,
       windows: Platform.isWindows,
     );

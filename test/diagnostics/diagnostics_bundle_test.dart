@@ -102,66 +102,32 @@ void main() {
         logs.path,
         crashFolders: [p.join(logs.path, 'reports')],
       );
-      expect([for (final log in listed) log.name], [
-        'errors.log',
-        'crashes/BaoCode-2026-10-28-120616.ips',
-        'hangs/hang-20261011-090000-2.txt',
-      ]);
+      expect(
+        [for (final log in listed) log.name],
+        [
+          'errors.log',
+          'crashes/BaoCode-2026-10-28-120616.ips',
+          'hangs/hang-20261011-090000-2.txt',
+        ],
+      );
       expect([for (final log in listed) log.isCrash], [false, true, false]);
     });
   });
 
-  group('listCrashReports', () {
-    void report(String path, DateTime modified) {
-      write(path, '{"app_name":"BaoCode"}');
-      File(p.join(logs.path, path)).setLastModifiedSync(modified);
-    }
-
-    test("the app's, the newest first, a name in two folders once", () {
-      final day = DateTime(2026, 10, 28);
-      report('reports/BaoCode-2026-10-26-100000.ips', day);
-      report('reports/BaoCode-2026-10-28-120616.ips', day.add(_hour * 3));
-      report('reports/Retired/BaoCode-2026-10-27-100000.ips', day.add(_hour));
-      report('reports/Retired/BaoCode-2026-10-28-120616.ips', day);
-      report('reports/BaoCodeHelper-2026-10-28-130000.ips', day);
-      report('reports/Safari-2026-10-28-130000.ips', day);
-      report('reports/BaoCode-2026-10-28-130000.txt', day);
-      final reports = p.join(logs.path, 'reports');
-      final listed = listCrashReports([
-        reports,
-        p.join(reports, 'Retired'),
-        p.join(logs.path, 'gone'),
-      ]);
-      expect([for (final log in listed) log.name], [
-        'crashes/BaoCode-2026-10-28-120616.ips',
-        'crashes/BaoCode-2026-10-27-100000.ips',
-        'crashes/BaoCode-2026-10-26-100000.ips',
-      ]);
-      expect(
-        listed.first.source,
-        p.join(reports, 'BaoCode-2026-10-28-120616.ips'),
-      );
-      expect(listed.first.size, '{"app_name":"BaoCode"}'.length);
-    });
-
-    test('no more than the newest few', () {
-      for (var i = 0; i < maxCrashReports + 2; i++) {
-        report(
-          'reports/BaoCode-2026-10-${10 + i}-000000.ips',
-          DateTime(2026, 10, 10 + i),
-        );
-      }
-      final listed = listCrashReports([p.join(logs.path, 'reports')]);
-      expect(listed, hasLength(maxCrashReports));
-      expect(listed.first.name, 'crashes/BaoCode-2026-10-16-000000.ips');
-    });
-
-    test("macOS' folders", () {
-      expect(macCrashReportFolders('/Users/ann'), [
-        '/Users/ann/Library/Logs/DiagnosticReports',
-        '/Users/ann/Library/Logs/DiagnosticReports/Retired',
-      ]);
-    }, skip: Platform.isWindows);
+  test('the hang and crash reports of hangs/ sorted as their times', () {
+    write('hangs/hang-20261010-120000-1.txt', 'h');
+    write('hangs/crash-20261011-090000-2.txt', 'c');
+    write('hangs/crash-20261011-090000-2.dmp', 'd');
+    write('hangs/jank-20261009-000000-3.txt', 'j');
+    expect(
+      [for (final log in listDiagnosticsLogs(logs.path)) log.name],
+      [
+        'hangs/crash-20261011-090000-2.txt',
+        'hangs/crash-20261011-090000-2.dmp',
+        'hangs/hang-20261010-120000-1.txt',
+        'hangs/jank-20261009-000000-3.txt',
+      ],
+    );
   });
 
   group('redactHome', () {
@@ -197,21 +163,6 @@ void main() {
     test('not a root, nor nothing', () {
       expect(redactHome('/etc/hosts', '/'), '/etc/hosts');
       expect(redactHome('/etc/hosts', ''), '/etc/hosts');
-    });
-  });
-
-  group('redactCrashReport', () {
-    test("the machine's key goes, the rest stays", () {
-      expect(
-        redactCrashReport(
-          '{\n  "pid" : 1980,\n'
-          '  "crashReporterKey" : "742F288F-5181-E91C-D926-856AE707E206",\n'
-          '  "procName" : "BaoCode"\n}',
-        ),
-        '{\n  "pid" : 1980,\n'
-        '  "crashReporterKey" : "",\n'
-        '  "procName" : "BaoCode"\n}',
-      );
     });
   });
 
@@ -318,6 +269,30 @@ void main() {
       );
     });
 
+    test("Windows' reports, in UTF-8, the home folder written ~", () {
+      final wer = 'EventType=APPCRASH\r\nAppPath=C:\\Users\\Ann\\b.exe\r\n';
+      write('wer/AppCrash_baocode.exe_1a_2b/Report.wer', [
+        0xff,
+        0xfe,
+        for (final unit in wer.codeUnits) ...[unit & 0xff, unit >> 8],
+      ]);
+      final bundle = packDiagnosticsSync(
+        logs.path,
+        dumps: false,
+        crashFolders: [p.join(logs.path, 'wer')],
+        home: r'C:\Users\Ann',
+        windows: true,
+      );
+      expect(
+        utf8.decode(
+          untar(
+            gzip.decode(bundle.bytes),
+          )['crashes/AppCrash_baocode.exe_1a_2b.wer']!,
+        ),
+        'EventType=APPCRASH\r\nAppPath=~\\b.exe\r\n',
+      );
+    });
+
     test('nothing to send: an empty tar', () {
       final bundle = packDiagnosticsSync(logs.path, dumps: true);
       expect(untar(gzip.decode(bundle.bytes)), isEmpty);
@@ -325,5 +300,3 @@ void main() {
     });
   });
 }
-
-const _hour = Duration(hours: 1);

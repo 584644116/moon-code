@@ -23,6 +23,8 @@ import 'chat/resume_after_reset.dart';
 import 'chat/widgets/turn_footer.dart' show LiveTurnStatsSetting;
 import 'customize/customization_store.dart';
 import 'diagnostics/app_event_watch.dart';
+import 'diagnostics/crash_reports.dart';
+import 'diagnostics/exit_watch.dart';
 import 'diagnostics/frame_watch.dart';
 import 'diagnostics/diagnostics_upload.dart';
 import 'extensions/theme_extensions.dart';
@@ -163,8 +165,14 @@ Future<void> main(List<String> arguments) async {
     }
     // What goes wrong unseen from here on, kept for the user to send.
     errors = ErrorLog(DataDirectory.current.logsDir)..install();
-    // And what the app went through, to read what led to it.
-    EventLog.current = EventLog(DataDirectory.current.logsDir);
+    // And what the app went through, to read what led to it; how the run
+    // before ended, if it did not say.
+    final crashFolders = platformCrashReportFolders();
+    EventLog.current = EventLog(
+      DataDirectory.current.logsDir,
+      crashSince: (since) => crashReportSince(crashFolders, since),
+    );
+    watchExit(DataDirectory.current.logsDir);
   }
   unawaited(reapClaudeProcesses());
   unawaited(reapLspProcesses());
@@ -786,16 +794,20 @@ class _BaoCodeAppState extends State<BaoCodeApp> {
   /// terminals' shells are hung up, as closing their window would.
   late final AppLifecycleListener _lifecycle = AppLifecycleListener(
     onExitRequested: () async {
+      appEvent('app', 'quit requested');
       // The unsaved files of all windows asked about at once, then the
       // agents at work; in the window in front.
       final updates = _settings.updates?.service;
       if (!await _windows.confirmQuit()) {
+        appEvent('app', 'quit cancelled');
         updates?.disarm();
         return AppExitResponse.cancel;
       }
       // Restart to Update: the installer waits for the app to go. One that
       // will not start keeps the app (and says why).
+      final updating = updates?.armed ?? false;
       if (updates != null && !await updates.launchArmed()) {
+        appEvent('app', 'quit cancelled: the update would not start');
         return AppExitResponse.cancel;
       }
       await Future.wait([
@@ -808,6 +820,7 @@ class _BaoCodeAppState extends State<BaoCodeApp> {
       ]);
       // The remote hosts' servers end, and all they run with them.
       await SshHosts.instance.closeAll();
+      appExit(updating ? 'quit to update' : 'quit');
       return AppExitResponse.exit;
     },
   );
