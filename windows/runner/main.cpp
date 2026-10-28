@@ -84,8 +84,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // tool would fail with "The log reader stopped unexpectedly, or never
   // started". Only a release build, the one installed, claims the name.
 #else
+  // Nor does the perf suite's app (tool/perf/run.dart starts it with its
+  // scenarios in the environment): it runs beside the user's own copy, on
+  // a data folder of its own.
+  const bool perf_run =
+      ::GetEnvironmentVariableW(L"BAOCODE_PERF_SCENARIOS", nullptr, 0) > 0;
   const HANDLE single_instance =
-      ::CreateMutexW(nullptr, FALSE, app_identity::SingleInstanceMutex());
+      perf_run ? nullptr
+               : ::CreateMutexW(nullptr, FALSE,
+                                app_identity::SingleInstanceMutex());
   if (single_instance != nullptr && ::GetLastError() == ERROR_ALREADY_EXISTS) {
     // Not taken (or no window to take them): the copy running is written
     // down, as it may hang (see hang_watchdog.h).

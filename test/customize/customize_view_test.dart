@@ -214,11 +214,14 @@ void main() {
     final preview = _inView(find.byType(IdeMarkdownPreview));
     expect(preview, findsOneWidget);
     expect(_inView(find.byType(IdeCodeEditor)), findsNothing);
-    // Its actions flush right, over the editor's right edge (#149); Save
-    // only once there is something to save.
+    // Its actions flush right, not halfway (#149); the preview on the
+    // page's edge, its scroll bar there; Save only once there is something
+    // to save.
+    final edge = tester.getTopRight(find.byType(CustomizeView)).dx;
+    expect(tester.getTopRight(preview).dx, edge);
     expect(
       tester.getTopRight(_inView(find.byIcon(Icons.more_horiz_rounded))).dx,
-      moreOrLessEquals(tester.getTopRight(preview).dx, epsilon: 16),
+      moreOrLessEquals(edge - 24, epsilon: 8),
     );
     expect(_inView(find.text('Save')), findsNothing);
     expect(_markdown(tester).controller.text, contains('Body'));

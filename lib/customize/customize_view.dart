@@ -1164,9 +1164,10 @@ class _CustomizationEditorState extends State<_CustomizationEditor> {
       pathContext: local ? p.context : p.posix,
       // Its source's editor told, which keeps whether it is saved.
       onEdited: _text.syncFromDocument,
-      // On the page, its text under the title's.
+      // On the page, its text under the title's and off its right edge
+      // as the actions are.
       background: Colors.transparent,
-      padding: const EdgeInsets.fromLTRB(32, 20, 16, 160),
+      padding: const EdgeInsets.fromLTRB(32, 20, 40, 160),
       onOpenFile: open == null ? null : (path, _) => open(path),
       onOpenExternal: (uri) => unawaited(openExternal(uri.toString())),
     );

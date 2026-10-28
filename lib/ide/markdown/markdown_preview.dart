@@ -513,12 +513,11 @@ class IdeMarkdownPreviewState extends State<IdeMarkdownPreview> {
         StashEditor.colorize;
     return ColoredBox(
       color: widget.background ?? themeColors['editor.background'],
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // As wide as a page reads, in the middle of a wide view.
-          final side = ((constraints.maxWidth - 880) / 2).clamp(0.0, 1e6) + 32;
+      child: Builder(
+        builder: (context) {
+          // As wide as the view: a wide table fits.
           final padding =
-              widget.padding ?? EdgeInsets.fromLTRB(side, 24, side, 160);
+              widget.padding ?? const EdgeInsets.fromLTRB(32, 24, 32, 160);
           final editor = MarkdownEditor(
             key: _editorKey,
             controller: _controller,
