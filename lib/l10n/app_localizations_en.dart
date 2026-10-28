@@ -1080,6 +1080,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cmdToggleFullScreen => 'Toggle Full Screen';
 
   @override
+  String get cmdZoomIn => 'Zoom In';
+
+  @override
+  String get cmdZoomOut => 'Zoom Out';
+
+  @override
+  String get cmdZoomReset => 'Reset Zoom';
+
+  @override
   String get cmdTogglePanel => 'Toggle Panel Visibility';
 
   @override
@@ -7592,6 +7601,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'A minimap of the whole conversation at the left of its column, where you are in it shown as you scroll; click or drag it to get somewhere. It stands in for the scrollbar, and is not shown in a window too narrow for it. Off: the scrollbar.';
 
   @override
+  String get appearanceSettingsWindowBlur => 'Native Window Blur';
+
+  @override
+  String get appearanceSettingsWindowBlurDescription =>
+      'The system\'s blur under the windows (macOS\'s sidebar material, Windows 11\'s acrylic): what is behind them shows through the sidebar and the conversation. Off: the windows are opaque.';
+
+  @override
   String get appearanceSettingsSidebarTimes => 'Times in the Sidebar';
 
   @override
@@ -7657,7 +7673,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appearanceSettingsCodeSizeDescription =>
-      'The size of code in the IDE editor and the side panel\'s file and changes views. Code in the chat follows the interface size; the terminal has its own size.';
+      'The size of code in the IDE editor and the side panel\'s file and changes views at 100% interface size; zooming the interface scales it in proportion. Code in the chat follows the interface size; the terminal has its own size.';
 
   @override
   String appearanceSettingsCodeSizeLabel(String size) {
@@ -7676,7 +7692,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appearanceSettingsUiScaleDescription =>
-      'Zooms the whole interface (its text, icons and spacing), code in the chat, and terminal text while the terminal size follows it. Code in the IDE editor and side panel files and changes keeps its own size.';
+      'Zooms the whole interface (its text, icons and spacing) and the code in it, and terminal text while the terminal size follows it. Code in the editor zooms from its code size.';
 
   @override
   String appearanceSettingsUiScaleLabel(String percent) {

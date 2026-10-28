@@ -1049,6 +1049,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cmdToggleFullScreen => '切换全屏';
 
   @override
+  String get cmdZoomIn => '放大';
+
+  @override
+  String get cmdZoomOut => '缩小';
+
+  @override
+  String get cmdZoomReset => '重置缩放';
+
+  @override
   String get cmdTogglePanel => '切换面板可见性';
 
   @override
@@ -7137,6 +7146,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '在对话左侧显示整段对话的缩略图，滚动时显示当前所在位置，点击或拖动即可跳转。开启时代替右侧滚动条；窗口太窄时不显示。关闭后恢复右侧滚动条。';
 
   @override
+  String get appearanceSettingsWindowBlur => '原生高斯模糊';
+
+  @override
+  String get appearanceSettingsWindowBlurDescription =>
+      '窗口底部使用系统的模糊效果（macOS 的侧边栏材质、Windows 11 的亚克力），侧边栏和对话区会透出窗口后面的内容。关闭后窗口不透明。';
+
+  @override
   String get appearanceSettingsSidebarTimes => '侧边栏显示时间';
 
   @override
@@ -7202,7 +7218,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get appearanceSettingsCodeSizeDescription =>
-      'Fast IDE 编辑器及侧边栏文件、变更视图中源码的字号。对话中的代码跟随界面大小，终端使用终端字号。';
+      'Fast IDE 编辑器及侧边栏文件、变更视图中源码的字号，按 100% 界面大小算，界面缩放时随之等比放大缩小。对话中的代码跟随界面大小，终端使用终端字号。';
 
   @override
   String appearanceSettingsCodeSizeLabel(String size) {
@@ -7221,7 +7237,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get appearanceSettingsUiScaleDescription =>
-      '缩放整个界面（文字、图标与间距）、对话中的代码，以及终端字号为“跟随界面大小”时的终端文字。Fast IDE 编辑器及侧边栏文件、变更中的源码使用代码字号。';
+      '缩放整个界面（文字、图标与间距）和其中的代码，以及终端字号为“跟随界面大小”时的终端文字。编辑器中的源码按代码字号等比缩放。';
 
   @override
   String appearanceSettingsUiScaleLabel(String percent) {

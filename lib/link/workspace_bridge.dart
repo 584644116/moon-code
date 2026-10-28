@@ -225,13 +225,8 @@ class WorkspaceBridge {
         }
         return null;
       case LinkMethods.send:
-        var text = (params['text'] as String? ?? '').trim();
-        final images = _images(params['images']);
-        final named = [
-          for (final mention in (params['mentions'] as List?) ?? const [])
-            if (mention is String && mention.isNotEmpty) mention,
-        ];
-        if (text.isEmpty && images.isEmpty) return null;
+        final text = (params['text'] as String? ?? '').trim();
+        if (text.isEmpty && _images(params['images']).isEmpty) return null;
         final AgentThread thread;
         if (params['session'] case final Object id) {
           thread = _thread(id);
@@ -243,41 +238,37 @@ class WorkspaceBridge {
             'No agent nor project',
           );
         }
-        // A workspace's files named from its folders' names: by their
-        // paths, as its agent finds them.
-        final mentions = <String>[];
-        final multiRoot = _rootsOf(thread.project).first.$1.isNotEmpty;
-        for (final mention in named) {
-          final full = _fullPath(thread.project, mention);
-          if (full == null || !multiRoot) {
-            mentions.add(mention);
-            continue;
-          }
-          text = text.replaceAll(
-            fileReferenceText(mention),
-            fileReferenceText(full),
-          );
-          mentions.add(full);
-        }
         final session = thread.session;
         if (!session.canSend) {
           throw const LinkRemoteException('busy', 'The agent is at work');
         }
-        // Numbered on from the conversation's, as the composer numbers
-        // what is pasted, and named in the text as it names them.
-        var next = session.lastImageNumber + 1;
-        final numbered = [for (final image in images) image.withNumber(next++)];
-        if (numbered.isNotEmpty) {
-          final references = [
-            for (final image in numbered) '[Image #${image.number}]',
-          ].join(' ');
-          text = text.isEmpty ? references : '$text\n$references';
-        }
-        session.send(
-          ComposerMessage(text: text, mentions: mentions, images: numbered),
-          now: params['now'] == true,
-        );
+        session.send(_message(thread, params), now: params['now'] == true);
         return {'session': idOf(thread)};
+      case LinkMethods.edit:
+        final thread = _thread(params['session']);
+        final session = thread.session;
+        if (!session.canEditMessages) {
+          throw const LinkRemoteException(
+            LinkErrors.unsupported,
+            'This agent cannot go back',
+          );
+        }
+        // Counted from the phone's first item, as its updates are.
+        final index =
+            (_follows[idOf(thread)]?.from ?? 0) +
+            (params['index'] as int? ?? -1);
+        if (index < 0 ||
+            index >= session.itemCount ||
+            session.itemAt(index) is! UserMessageItem) {
+          throw const LinkRemoteException(
+            LinkErrors.notFound,
+            'No message there',
+          );
+        }
+        final message = _message(thread, params);
+        if (message.isEmpty) return null;
+        session.editMessage(index, message);
+        return null;
       case LinkMethods.stop:
         _thread(params['session']).session.stop();
         return null;
@@ -386,6 +377,11 @@ class WorkspaceBridge {
           _project(params['project']),
           params['path'] as String? ?? '',
         );
+      case LinkMethods.image:
+        return _readImage(
+          _project(params['project']),
+          params['path'] as String? ?? '',
+        );
       case LinkMethods.extensions:
         return {
           'items': [for (final item in await _extensions()) item.toJson()],
@@ -413,6 +409,78 @@ class WorkspaceBridge {
       if (task.id == id) return task;
     }
     return null;
+  }
+
+  /// What the phone sent ([LinkMethods.send], [LinkMethods.edit]) as the
+  /// composer would send it to [thread]: its files named by their paths as
+  /// the agent finds them, its pictures numbered on from the
+  /// conversation's and named in the text.
+  ComposerMessage _message(AgentThread thread, Map<String, Object?> params) {
+    var text = (params['text'] as String? ?? '').trim();
+    final images = _images(params['images']);
+    final named = [
+      for (final mention in (params['mentions'] as List?) ?? const [])
+        if (mention is String && mention.isNotEmpty) mention,
+    ];
+    // A workspace's files named from its folders' names: by their
+    // paths, as its agent finds them.
+    final mentions = <String>[];
+    final multiRoot = _rootsOf(thread.project).first.$1.isNotEmpty;
+    for (final mention in named) {
+      final full = _fullPath(thread.project, mention);
+      if (full == null || !multiRoot) {
+        mentions.add(mention);
+        continue;
+      }
+      text = text.replaceAll(
+        fileReferenceText(mention),
+        fileReferenceText(full),
+      );
+      mentions.add(full);
+    }
+    // Numbered on from the conversation's, as the composer numbers what
+    // is pasted, and named in the text as it names them.
+    var next = thread.session.lastImageNumber + 1;
+    final numbered = [for (final image in images) image.withNumber(next++)];
+    if (numbered.isNotEmpty) {
+      final references = [
+        for (final image in numbered) '[Image #${image.number}]',
+      ].join(' ');
+      text = text.isEmpty ? references : '$text\n$references';
+    }
+    return ComposerMessage(text: text, mentions: mentions, images: numbered);
+  }
+
+  /// A picture of [project] the phone shows, as a reply names it.
+  Future<Map<String, Object?>> _readImage(Project project, String path) async {
+    final (:files, :paths) = _filesOf(project);
+    final full =
+        _fullPath(project, path) ??
+        _changesIn(project).keys
+            .where((c) => paths.equals(c, path))
+            .firstOrNull;
+    final type = switch (paths.extension(path).toLowerCase()) {
+      '.png' => 'image/png',
+      '.jpg' || '.jpeg' => 'image/jpeg',
+      '.gif' => 'image/gif',
+      '.webp' => 'image/webp',
+      _ => null,
+    };
+    if (full == null) {
+      throw LinkRemoteException(LinkErrors.notFound, 'No file $path');
+    }
+    if (type == null) {
+      throw LinkRemoteException('bad', 'Not a picture: $path');
+    }
+    try {
+      final bytes = await readBytesThrough(files, full);
+      if (bytes.length > LinkLimits.image) {
+        return {'tooLarge': true, 'size': bytes.length};
+      }
+      return {'type': type, 'data': base64Encode(bytes)};
+    } on Object {
+      throw LinkRemoteException(LinkErrors.notFound, 'No file $path');
+    }
   }
 
   static const _imageTypes = {
@@ -698,6 +766,12 @@ class _Follow {
   /// The session's index of the phone's first item: 0 unless it has a
   /// [window].
   int _from = 0;
+
+  /// [_from], as it is now (items put before the first move it).
+  int get from {
+    _syncFrom();
+    return _from;
+  }
 
   /// The session's [ChatSession.prependedCount] as last seen, to move
   /// [_from] along with items put before the first.

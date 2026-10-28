@@ -15,6 +15,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -1563,8 +1564,10 @@ class IdeGitCommitPanelState extends State<IdeGitCommitPanel>
                           : _tree(context, rows),
                     ),
                     _Divider(
-                      onDrag: (delta) =>
-                          setState(() => _treeHeight = treeHeight + delta),
+                      size: treeHeight,
+                      onResize: (height) =>
+                          setState(() => _treeHeight = height),
+                      onReset: () => setState(() => _treeHeight = null),
                     ),
                     Expanded(child: _commitArea(context)),
                   ],
@@ -2555,52 +2558,120 @@ class IdeGitCommitPanelState extends State<IdeGitCommitPanel>
                     size: 20,
                     onPressed: () => unawaited(_messageHistory()),
                   ),
-                  if (widget.commitMessage != null)
-                    IdeActionButton(
-                      icon: _session.generating == null
-                          ? Codicons.sparkle
-                          : Codicons.debugStop,
-                      tooltip: _session.generating == null
-                          ? l10n.scmGenerateCommitMessage
-                          : l10n.scmCancelGenerateCommitMessage,
-                      size: 20,
-                      onPressed: () => unawaited(_generateMessage()),
-                    ),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              IdeButton(
-                label: l10n.gitCommitButton,
-                onPressed: busy ? null : () => unawaited(_commit()),
-              ),
-              const SizedBox(width: 6),
-              IdeButton(
-                label: l10n.gitCommitAndPush,
-                secondary: true,
-                onPressed: busy ? null : () => unawaited(_commit(push: true)),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  total == 0 ? '' : l10n.gitCommitSelected(checked, total),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.end,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: IdeListColors.description,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Row(
+                children: [
+                  if (widget.commitMessage != null) ...[
+                    // Too narrow for its label beside the others: its icon.
+                    _generateButton(
+                      context,
+                      labeled: _labelsFit(context, constraints.maxWidth),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  // Their labels give way where the row is short of room,
+                  // as the count after them does.
+                  Flexible(
+                    child: IdeButton(
+                      label: l10n.gitCommitButton,
+                      onPressed: busy ? null : () => unawaited(_commit()),
+                    ),
                   ),
-                ),
-              ),
-            ],
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: IdeButton(
+                      label: l10n.gitCommitAndPush,
+                      secondary: true,
+                      onPressed: busy
+                          ? null
+                          : () => unawaited(_commit(push: true)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      total == 0 ? '' : l10n.gitCommitSelected(checked, total),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: IdeListColors.description,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
     );
+  }
+
+  /// Generate Commit Message, or while it runs, its cancel: the first of
+  /// the buttons under the message; unless [labeled], its icon alone, the
+  /// label in its hover.
+  /// Whether the row's labels fit in [width], measured as this window
+  /// draws them: the three buttons' text, their padding and borders, and
+  /// the gaps between them. Short of room, Generate Commit Message is its
+  /// icon alone (its label in its hover), as JetBrains' is.
+  bool _labelsFit(BuildContext context, double width) {
+    final style = TextStyle(
+      fontSize: 12,
+      height: 16 / 12,
+      color: IdeButtonColors.secondaryForeground,
+    );
+    final scaler = MediaQuery.textScalerOf(context);
+    double text(String label) {
+      final painter = TextPainter(
+        text: TextSpan(text: label, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      final width = painter.width;
+      painter.dispose();
+      return width;
+    }
+
+    final l10n = context.l10n;
+    final generate = _session.generating != null
+        ? l10n.scmCancelGenerateCommitMessage
+        : l10n.scmGenerateCommitMessage;
+    // A label's 8 each side and its 1px border; an icon 16, 4 beside it.
+    final needed =
+        text(generate) +
+        16 +
+        4 +
+        18 +
+        (text(l10n.gitCommitButton) + 18) +
+        (text(l10n.gitCommitAndPush) + 18) +
+        6 +
+        6 +
+        8;
+    return needed <= width;
+  }
+
+  Widget _generateButton(BuildContext context, {required bool labeled}) {
+    final l10n = context.l10n;
+    final generating = _session.generating != null;
+    final label = generating
+        ? l10n.scmCancelGenerateCommitMessage
+        : l10n.scmGenerateCommitMessage;
+    final button = IdeButton(
+      icon: generating ? Codicons.debugStop : Codicons.sparkle,
+      label: labeled ? label : '',
+      secondary: true,
+      onPressed: () => unawaited(_generateMessage()),
+    );
+    return IdeHover(message: label, child: button);
   }
 }
 
@@ -2703,11 +2774,22 @@ class _Welcome extends StatelessWidget {
   );
 }
 
-/// The line between the tree and the message, dragged to size them.
+/// The line between the tree and the message, dragged to size them. The
+/// tree's height goes by how far the pointer is from where the drag began,
+/// so that the line stays under it, back from past where the height stops
+/// too; while dragged, the cursor is its own over the whole window (VS
+/// Code's drag shield). A double click resets the height.
 class _Divider extends StatefulWidget {
-  const _Divider({required this.onDrag});
+  const _Divider({
+    required this.size,
+    required this.onResize,
+    required this.onReset,
+  });
 
-  final ValueChanged<double> onDrag;
+  /// The tree's height, now.
+  final double size;
+  final ValueChanged<double> onResize;
+  final VoidCallback onReset;
 
   @override
   State<_Divider> createState() => _DividerState();
@@ -2715,28 +2797,78 @@ class _Divider extends StatefulWidget {
 
 class _DividerState extends State<_Divider> {
   bool _hover = false;
+  bool _dragging = false;
+
+  /// Where the drag began, and the height then.
+  double _start = 0;
+  double _startSize = 0;
+
+  OverlayEntry? _shield;
+
+  void _begin(DragStartDetails details) {
+    _start = details.globalPosition.dy;
+    _startSize = widget.size;
+    setState(() => _dragging = true);
+    if (Overlay.maybeOf(context) case final overlay?) {
+      _shield = OverlayEntry(
+        builder: (context) => const MouseRegion(
+          cursor: SystemMouseCursors.resizeRow,
+          opaque: true,
+        ),
+      );
+      overlay.insert(_shield!);
+    }
+  }
+
+  void _end() {
+    _removeShield();
+    if (mounted) setState(() => _dragging = false);
+  }
+
+  void _removeShield() {
+    _shield
+      ?..remove()
+      ..dispose();
+    _shield = null;
+  }
 
   @override
-  Widget build(BuildContext context) => MouseRegion(
-    cursor: SystemMouseCursors.resizeRow,
-    onEnter: (_) => setState(() => _hover = true),
-    onExit: (_) => setState(() => _hover = false),
-    child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onVerticalDragUpdate: (details) => widget.onDrag(details.delta.dy),
-      child: SizedBox(
-        height: 5,
-        child: Center(
-          child: Container(
-            height: _hover ? 3 : 1,
-            color: _hover
-                ? themeColors['sash.hoverBorder']
-                : themeColors.get('panel.border') ?? IdeListColors.description,
+  void dispose() {
+    _removeShield();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = _hover || _dragging;
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeRow,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        dragStartBehavior: DragStartBehavior.down,
+        onVerticalDragStart: _begin,
+        onVerticalDragUpdate: (details) =>
+            widget.onResize(_startSize + details.globalPosition.dy - _start),
+        onVerticalDragEnd: (_) => _end(),
+        onVerticalDragCancel: _end,
+        onDoubleTap: widget.onReset,
+        child: SizedBox(
+          height: 5,
+          child: Center(
+            child: Container(
+              height: active ? 3 : 1,
+              color: active
+                  ? themeColors['sash.hoverBorder']
+                  : themeColors.get('panel.border') ??
+                        IdeListColors.description,
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// A tab of the panel's: Commit, Stash.

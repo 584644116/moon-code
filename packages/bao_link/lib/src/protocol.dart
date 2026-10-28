@@ -45,6 +45,14 @@ abstract final class LinkMethods {
   /// behind it. Answered with `{"session"}`.
   static const send = 'send';
 
+  /// `{"session", "index", "text", "images"?, "mentions"?}`: the user's
+  /// message at `index` (counted from the phone's first item, as an
+  /// update's `start` is) sent again as this, as the desktop's edit of a
+  /// message: everything after it is discarded, and the turn runs again
+  /// from there. `notFound` where there is no message of the user's;
+  /// `unsupported` where the agent cannot go back.
+  static const edit = 'edit';
+
   /// `{"session"}`: stops the turn under way.
   static const stop = 'stop';
 
@@ -110,6 +118,12 @@ abstract final class LinkMethods {
   /// `{"type": "image", "id"}`): `{"kind": "png"|"gif"|"svg", "data"}`
   /// (base64). The id is of its content: the same id, the same picture.
   static const icon = 'icon';
+
+  /// `{"project", "path"}`: a picture of the project (PNG, JPEG, GIF,
+  /// WebP), as a reply names it: `{"type", "data"}` (its media type, and
+  /// base64), or `{"tooLarge": true, "size"}` past [LinkLimits.image].
+  /// `bad` for a file that is not a picture.
+  static const image = 'image';
 }
 
 /// How much of what a phone asks for it gets, at most.
@@ -122,6 +136,9 @@ abstract final class LinkLimits {
 
   /// A project's files listed.
   static const files = 20000;
+
+  /// A picture's bytes.
+  static const image = 8 * 1024 * 1024;
 }
 
 /// A task an agent left running beside the conversation: a command, a
@@ -259,6 +276,12 @@ abstract final class LinkErrors {
 
   /// The desktop's user turned the pairing down.
   static const rejected = 'rejected';
+
+  /// The desktop cannot do that here (an agent that cannot go back).
+  static const unsupported = 'unsupported';
+
+  /// The request was not one the desktop knows: one from before it could.
+  static const unknown = 'unknown';
 }
 
 /// The desktop, as the phone lists it.

@@ -105,6 +105,7 @@ import 'settings/pages/upstream_import_dialog.dart';
 import 'settings/settings_dialog.dart';
 import 'settings/shell_command_actions.dart';
 import 'sidebar/sidebar.dart';
+import 'theme/code_font.dart';
 import 'theme/codicons.dart';
 import 'icons/project_icon_view.dart';
 import 'theme/app_theme.dart';
@@ -1064,20 +1065,24 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
 
   /// New Window, Close Window, Switch Window… and Show Chat Window, where
   /// the app has windows (the IDE in the main one: New Window shows its
-  /// empty window there, Show Chat Window the chat).
+  /// empty window there, Show Chat Window the chat); full screen and zoom
+  /// in any.
   Map<String, VoidCallback> _windowCommands() {
     final windows = _windows;
     final window = widget.window;
-    final fullScreen = {
+    final anyWindow = {
       if (WindowControls.canFullScreen)
         WindowCommandIds.toggleFullScreen: () =>
             unawaited(WindowControls.toggleFullScreen(viewId: _viewId)),
+      WindowCommandIds.zoomIn: () => _zoom(1),
+      WindowCommandIds.zoomOut: () => _zoom(-1),
+      WindowCommandIds.zoomReset: () => _zoom(null),
     };
     if (windows == null || window == null || !windows.started) {
-      return fullScreen;
+      return anyWindow;
     }
     return {
-      ...fullScreen,
+      ...anyWindow,
       WindowCommandIds.newWindow: () => unawaited(windows.newWindow()),
       WindowCommandIds.closeWindow: () => unawaited(
         windows.requestClose(
@@ -1093,6 +1098,28 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
         _workspace.layout = WorkspaceLayout.chat;
       },
     };
+  }
+
+  /// The window's scale [steps] of [CodeFont.uiScaleStep] on (null: back
+  /// to the system's), kept in settings.json as Interface Size has it.
+  void _zoom(int? steps) {
+    final now = CodeFont.uiScale.value;
+    final percent = steps == null
+        ? CodeFont.defaultUiScale
+        : CodeFont.zoomedUiScale(now, steps);
+    if (percent == now) return;
+    CodeFont.uiScale.value = percent;
+    final settings = widget.settings?.files?.settings;
+    if (settings == null) return;
+    unawaited(
+      settings
+          .update(CodeFont.uiScaleSettingKey, CodeFont.uiScaleSetting(percent))
+          .catchError((Object error) {
+            // A settings file that does not parse is left as it is; its
+            // error is shown.
+            debugPrint('${CodeFont.uiScaleSettingKey} not kept: $error');
+          }),
+    );
   }
 
   /// Reaches the sidebar, for the agents it lists and its search.

@@ -295,4 +295,66 @@ void main() {
       ),
     );
   });
+
+  group('edit', () {
+    test('an answer is not a message to edit', () async {
+      await open();
+      expect(
+        bridge.handle(LinkMethods.edit, {
+          'session': id,
+          'index': 1,
+          'text': 'again',
+        }),
+        throwsA(
+          isA<LinkRemoteException>().having(
+            (e) => e.code,
+            'code',
+            LinkErrors.notFound,
+          ),
+        ),
+      );
+    });
+
+    test('the index is counted from the phone\'s first item', () async {
+      // a5, u6, a6: the phone's 1 is the session's u6.
+      final first = await open(3);
+      expect(texts(first.items), ['-', 'u6', '-']);
+      await bridge.handle(LinkMethods.edit, {
+        'session': id,
+        'index': 1,
+        'text': 'u6 again',
+      });
+      // Counted from the session's first, its 1 would be an answer.
+      expect(
+        bridge.handle(LinkMethods.edit, {
+          'session': id,
+          'index': 0,
+          'text': 'a5 is no message',
+        }),
+        throwsA(isA<LinkRemoteException>()),
+      );
+    });
+  });
+
+  group('image', () {
+    test('a file that is not a picture is refused', () async {
+      expect(
+        bridge.handle(LinkMethods.image, {'project': '/p', 'path': 'a.txt'}),
+        throwsA(isA<LinkRemoteException>()),
+      );
+    });
+
+    test('a picture not there is not found', () async {
+      expect(
+        bridge.handle(LinkMethods.image, {'project': '/p', 'path': 'x.png'}),
+        throwsA(
+          isA<LinkRemoteException>().having(
+            (e) => e.code,
+            'code',
+            LinkErrors.notFound,
+          ),
+        ),
+      );
+    });
+  });
 }
