@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 
@@ -41,7 +42,13 @@ class NetworkProxy {
   int _generation = 0;
 
   /// How long a connection's proxy is taken from what was read last.
-  static const connectionMaxAge = Duration(seconds: 10);
+  ///
+  /// A minute rather than seconds: an app that asks often would otherwise
+  /// run `reg.exe` every few connections, and the system's settings do not
+  /// change that often. Changing them in the app fixes it at once
+  /// ([_changed]), and turning Clash on or off is still followed within
+  /// the minute.
+  static const connectionMaxAge = Duration(seconds: 60);
 
   ProxyRoute get current => _route;
 
@@ -227,22 +234,36 @@ class NetworkProxyOverrides extends HttpOverrides {
 /// elsewhere, and when it cannot be read.
 Future<ProxyRoute> readSystemProxy() async {
   if (Platform.isMacOS) {
-    final result = await Process.run('/usr/sbin/scutil', const [
+    final output = await _runSystemCommand('/usr/sbin/scutil', const [
       '--proxy',
-    ]).timeout(const Duration(seconds: 3));
-    if (result.exitCode != 0) return const ProxyRoute.direct();
-    return parseScutilProxy('${result.stdout}');
+    ]);
+    if (output == null) return const ProxyRoute.direct();
+    return parseScutilProxy(output);
   }
   if (Platform.isWindows) {
-    final result = await Process.run('reg.exe', const [
+    final output = await _runSystemCommand('reg.exe', const [
       'query',
       r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings',
-    ]).timeout(const Duration(seconds: 3));
-    if (result.exitCode != 0) return const ProxyRoute.direct();
-    return parseWindowsInternetSettings('${result.stdout}');
+    ]);
+    if (output == null) return const ProxyRoute.direct();
+    return parseWindowsInternetSettings(output);
   }
   return const ProxyRoute.direct();
 }
+
+/// [command]'s output, or null when it failed: run in an isolate of its
+/// own, as starting a process is what the caller's isolate does meanwhile
+/// -- and that isolate is the one drawing the window (with something like
+/// Windhawk loaded, `CreateProcessW` alone has been seen to hold it for
+/// seconds).
+Future<String?> _runSystemCommand(String command, List<String> arguments) =>
+    Isolate.run(() async {
+      final result = await Process.run(
+        command,
+        arguments,
+      ).timeout(const Duration(seconds: 3));
+      return result.exitCode == 0 ? '${result.stdout}' : null;
+    });
 
 Future<void> startNetworkProxy(
   Listenable changes,
