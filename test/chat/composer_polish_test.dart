@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:bao_markdown/bao_markdown.dart';
+import 'package:baocode/chat/chat_models.dart';
 import 'package:baocode/chat/chat_session.dart';
+import 'package:baocode/chat/mock_conversation.dart';
 import 'package:baocode/chat/composer/composer.dart';
 import 'package:baocode/chat/composer/composer_controller.dart';
 import 'package:baocode/chat/composer/composer_embeds.dart';
@@ -70,14 +72,30 @@ void main() {
       );
     });
 
-    test('a marker lost, doubled or made up: not taken', () {
+    test('a marker lost or made up: not taken', () {
       final asked = composerPolishText(content());
       expect(
         composerPolishContent('Fix the bug ⟦1⟧ ⟦2⟧ ⟦3⟧ ⟦4⟧', asked),
         isNull,
       );
-      expect(composerPolishContent('⟦1⟧ ⟦1⟧ ⟦2⟧ ⟦3⟧ ⟦4⟧ ⟦5⟧', asked), isNull);
       expect(composerPolishContent('⟦1⟧ ⟦2⟧ ⟦3⟧ ⟦4⟧ ⟦5⟧ ⟦6⟧', asked), isNull);
+    });
+
+    test('a marker written again is the embed\'s plain text the second '
+        'time, so a picture goes once', () {
+      final asked = composerPolishText(content());
+      // The file goes in as its atom; said again, as the path it is.
+      final back = composerPolishContent(
+        'Fix ⟦1⟧, then ⟦1⟧ again, and ⟦2⟧ ⟦3⟧ ⟦4⟧ ⟦5⟧.',
+        asked,
+      )!;
+      expect(back, contains(file.atom));
+      expect(back, contains(file.plainText));
+      expect(
+        file.atom == file.plainText,
+        isFalse,
+        reason: 'the embed needs an atom unlike its plain text to test this',
+      );
     });
   });
 
@@ -283,8 +301,9 @@ void main() {
     Future<ComposerController> pumpComposer(
       WidgetTester tester, {
       IdeNotifications? notifications,
+      int historyCount = 0,
     }) async {
-      final session = ChatSession(historyCount: 0);
+      final session = ChatSession(historyCount: historyCount);
       addTearDown(session.dispose);
       final composer = ChatComposer(session: session, draft: session.draft);
       await tester.pumpWidget(
@@ -624,6 +643,36 @@ void main() {
       expect(controller.embeds.single.embed, file);
     });
 
+    testWidgets('Enhance is told what the agent said last, the composer '
+        'sending it the conversation\'s own last turn', (tester) async {
+      String? prompt;
+      composerPolishAsker = (system, asked, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) {
+        prompt = asked;
+        return Future.value('Do the second option.');
+      };
+      final controller = await pumpComposer(tester, historyCount: 16);
+      controller.replace(
+        0,
+        0,
+        'do option 2',
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+      await tester.pump();
+      await tester.tap(enhanceButton());
+      await tester.pumpAndSettle();
+      // The mock conversation's last turn: the agent's texts at 12 and 15.
+      final lastTurn = [
+        (MockConversation.itemAt(12) as AssistantTextItem).text.trim(),
+        (MockConversation.itemAt(15) as AssistantTextItem).text.trim(),
+      ].join('\n\n');
+      expect(prompt, contains('<agent_reply>\n$lastTurn\n</agent_reply>'));
+    });
+
     testWidgets('Enhance turned off in the settings, no button', (
       tester,
     ) async {
@@ -654,6 +703,84 @@ void main() {
       expect(seen?.directory, r'C:\w\app');
       expect(prompt, contains('<project>\nC:\\w\\app\n</project>'));
       expect(prompt, contains('<message>\nfix it\n</message>'));
+    });
+
+    test('what the agent said last goes before the message, that a "do '
+        'option 2" can be made specific', () async {
+      String? prompt;
+      String? system;
+      composerPolishAsker = (askedSystem, asked, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) {
+        system = askedSystem;
+        prompt = asked;
+        return Future.value('Do the second option.');
+      };
+      await enhanceComposerText(
+        composerPolishText('do option 2'),
+        reply: '1. Rename the file.\n2. Move the class.',
+        location: r'C:\w\app',
+      );
+      expect(
+        prompt,
+        contains(
+          '<agent_reply>\n1. Rename the file.\n2. Move the class.\n'
+          '</agent_reply>',
+        ),
+      );
+      // It is before the message, and the message is still last.
+      expect(
+        prompt!.indexOf('<agent_reply>'),
+        lessThan(prompt!.indexOf('<message>')),
+      );
+      expect(system, contains('<agent_reply>'));
+    });
+
+    test('no reply, or one of whitespace alone: nothing said', () async {
+      final prompts = <String>[];
+      composerPolishAsker = (system, asked, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) {
+        prompts.add(asked);
+        return Future.value('Fix it.');
+      };
+      await enhanceComposerText(composerPolishText('fix it'));
+      await enhanceComposerText(
+        composerPolishText('fix it'),
+        reply: '   \n\n ',
+      );
+      expect(prompts, hasLength(2));
+      for (final prompt in prompts) {
+        expect(prompt, isNot(contains('<agent_reply>')));
+      }
+    });
+
+    test('a long reply is cut to its end, where the message answers it', () async {
+      String? prompt;
+      composerPolishAsker = (system, asked, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) {
+        prompt = asked;
+        return Future.value('Fix it.');
+      };
+      final long = 'a' * (composerPolishReplyLimit + 5000) + 'THE END';
+      await enhanceComposerText(composerPolishText('fix it'), reply: long);
+      final said = RegExp(
+        r'<agent_reply>\n([\s\S]*)\n</agent_reply>',
+      ).firstMatch(prompt!)!.group(1)!;
+      expect(said, endsWith('THE END'));
+      expect(said, startsWith('…'));
+      // The ellipsis is not counted: what is given is the limit at most.
+      expect(said.length, lessThanOrEqualTo(composerPolishReplyLimit + 1));
     });
 
     test('it went looking and came back without the message: asked again, '

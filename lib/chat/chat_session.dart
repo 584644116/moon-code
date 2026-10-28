@@ -705,6 +705,20 @@ class ChatSession extends ChangeNotifier implements ChatFeed {
     return null;
   }
 
+  /// All the agent said in its last turn, its texts in order, as the next
+  /// message answers it; null for nothing said since the last message sent.
+  String? get lastTurnReply {
+    final texts = <String>[];
+    for (var i = _transcript.length - 1; i >= 0; i--) {
+      final item = _transcript.itemAt(i);
+      if (item is UserMessageItem) break;
+      if (item is AssistantTextItem && item.text.trim().isNotEmpty) {
+        texts.add(item.text.trim());
+      }
+    }
+    return texts.isEmpty ? null : texts.reversed.join('\n\n');
+  }
+
   /// Whether the last turn to end was stopped rather than done.
   bool get lastTurnInterrupted => _transcript.lastTurnInterrupted;
 

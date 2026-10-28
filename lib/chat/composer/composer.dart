@@ -1421,13 +1421,26 @@ class ChatComposerState extends State<ChatComposer>
     try {
       final String polished;
       try {
-        final ask = enhance ? enhanceComposerText : polishComposerText;
-        polished = await ask(
-          asked,
-          model: widget.session.selected(KernelChoiceKind.model),
-          location: widget.session.kernelContext.cwd,
-          onStage: (stage) => _setPolishStage(stage),
-        );
+        final model = widget.session.selected(KernelChoiceKind.model);
+        final location = widget.session.kernelContext.cwd;
+        void onStage(ComposerPolishStage stage) => _setPolishStage(stage);
+        polished = enhance
+            // What the agent said last, so that "do option 2" or "that
+            // bug" is made specific. Enhance only: a polish told the
+            // reply tends to answer it.
+            ? await enhanceComposerText(
+                asked,
+                reply: widget.session.lastTurnReply,
+                model: model,
+                location: location,
+                onStage: onStage,
+              )
+            : await polishComposerText(
+                asked,
+                model: model,
+                location: location,
+                onStage: onStage,
+              );
       } on ComposerPolishException catch (error) {
         // The answer is not lost: it is theirs to read, even though it is
         // not the message (see [_showPolishResult]).
