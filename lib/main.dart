@@ -26,6 +26,7 @@ import 'diagnostics/app_event_watch.dart';
 import 'diagnostics/crash_reports.dart';
 import 'diagnostics/exit_watch.dart';
 import 'diagnostics/frame_watch.dart';
+import 'diagnostics/hang_watch.dart';
 import 'diagnostics/diagnostics_upload.dart';
 import 'extensions/theme_extensions.dart';
 import 'ide/editor_word_wrap.dart';
@@ -196,8 +197,9 @@ Future<void> main(List<String> arguments) async {
     AppEventWatch.start();
     FrameWatch.start();
   }
-  // The Windows app's own logs go beside it.
-  if (errors != null) unawaited(errors.shareWithHost());
+  // The Windows app's own logs and the macOS app's hang reports go beside
+  // them.
+  if (errors != null) unawaited(shareLogsFolder(errors.directory));
   // The editor's language packs are the language servers' (README.md in
   // lib/ide/lsp/packs).
   MonacoLanguageAssets.defaultPacks = () => LanguagePackRegistry.instance;

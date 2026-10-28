@@ -143,7 +143,7 @@ class FrameWatch {
     }
     _written++;
     _lastWritten = now;
-    appEvent('slow', '$what; ${_state()}');
+    appEvent('slow', '$what; ${describeState()}');
   }
 
   void _writeJank(String summary) {
@@ -154,7 +154,7 @@ class FrameWatch {
     }
     _jankWritten++;
     _lastJankWritten = now;
-    final state = _state();
+    final state = describeState();
     // Which code it is, a sample of the app's stacks says: taken as it
     // goes on.
     final sampler = _sampler ??= switch (EventLog.current?.directory) {
@@ -177,8 +177,9 @@ class FrameWatch {
     appEvent('semantics', on ? 'on' : 'off');
   }
 
-  /// The trees' sizes, the conversations shown, memory, the app's state.
-  String _state() {
+  /// The trees' sizes, the conversations shown, memory, the app's state:
+  /// a slow frame's, and a hang's as it ends (hang_watch.dart).
+  static String describeState() {
     final binding = WidgetsBinding.instance;
     var objects = 0, nodes = 0;
     void visit(RenderObject object) {

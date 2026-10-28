@@ -5215,7 +5215,7 @@
     "description": "Update mode: never checks."
   },
   "diagnosticsTitle": "Diagnostic Logs",
-  "diagnosticsDescription": "Send BaoCode's error logs and the crash reports the system kept of it to its developers to help track down a problem. Nothing is sent until you upload.",
+  "diagnosticsDescription": "Send BaoCode's error logs and the crash and hang reports the system kept of it to its developers to help track down a problem. Nothing is sent until you upload.",
   "diagnosticsUpload": "Upload…",
   "diagnosticsDialogTitle": "Upload Diagnostic Logs",
   "diagnosticsNotePlaceholder": "Note (optional): what went wrong, and how to make it happen again",

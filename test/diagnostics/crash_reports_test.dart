@@ -89,6 +89,38 @@ void main() {
       expect(listed.first.size, 2);
     });
 
+    test("spindump's reports, the computer's name left out", () {
+      final day = DateTime(2026, 10, 28);
+      write(
+        'machine/BaoCode_2026-10-28-141700_anns-MacBook.hang',
+        'Event: hang',
+        day.add(_hour * 2),
+      );
+      write(
+        'machine/BaoCode_2026-10-26-214759_anns-MacBook.cpu_resource.diag',
+        'Event: cpu usage',
+        day.add(_hour),
+      );
+      write('machine/BaoCode_2026-10-28-100000_anns-MacBook.spin', '', day);
+      write('machine/BaoCodeHelper_2026-10-28-100000_a.hang', '', day);
+      write('machine/Safari_2026-10-28-100000_a.hang', '', day);
+      expect(
+        [
+          for (final report in listCrashReports([p.join(root.path, 'machine')]))
+            report.name,
+        ],
+        [
+          'BaoCode_2026-10-28-141700.hang',
+          'BaoCode_2026-10-26-214759.cpu_resource.diag',
+          'BaoCode_2026-10-28-100000.spin',
+        ],
+      );
+      expect(
+        macReportBundleName('BaoCode-2026-10-28-120616.ips'),
+        'BaoCode-2026-10-28-120616.ips',
+      );
+    });
+
     test('no more than the newest few', () {
       for (var i = 0; i < maxCrashReports + 2; i++) {
         write(
@@ -99,7 +131,10 @@ void main() {
       }
       final listed = listCrashReports([p.join(root.path, 'reports')]);
       expect(listed, hasLength(maxCrashReports));
-      expect(listed.first.name, 'BaoCode-2026-10-16-000000.ips');
+      expect(
+        listed.first.name,
+        'BaoCode-2026-10-${10 + maxCrashReports + 1}-000000.ips',
+      );
     });
   });
 
@@ -112,6 +147,8 @@ void main() {
       [
         p.join('/Users/ann', 'Library', 'Logs', 'DiagnosticReports'),
         p.join('/Users/ann', 'Library', 'Logs', 'DiagnosticReports', 'Retired'),
+        '/Library/Logs/DiagnosticReports',
+        p.join('/Library/Logs/DiagnosticReports', 'Retired'),
       ],
     );
     expect(
@@ -176,6 +213,26 @@ void main() {
       );
     });
 
+    test("spindump's: the event, and how long", () {
+      expect(
+        describeCrashReport(
+          'Date/Time:        2026-10-28 14:17:00.000 +0800\n'
+          'Command:          BaoCode\n'
+          'Event:            hang\n'
+          'Duration:         12.34s\n',
+        ),
+        'hang, 12.34s',
+      );
+      expect(
+        describeCrashReport(
+          'Event:            cpu usage\n'
+          'CPU:              90 seconds cpu time over 173 seconds\n'
+          'Duration:         173.36s\n',
+        ),
+        'cpu usage, 90 seconds cpu time over 173 seconds',
+      );
+    });
+
     test('nothing it knows', () {
       expect(describeCrashReport('hello'), isNull);
     });
@@ -195,4 +252,32 @@ void main() {
     );
     expect(crashReportSince(folders, crash.add(_hour)), isNull);
   });
+
+  test(
+    'of the app ending only: not its CPU use, nor a hang it came out of',
+    () {
+      final quit = DateTime(2026, 10, 28, 14, 17);
+      write(
+        'reports/BaoCode_2026-10-28-141700_ann.hang',
+        'Event: hang\nDuration: 21.50s\n',
+        quit,
+      );
+      write(
+        'reports/BaoCode_2026-10-28-141800_ann.cpu_resource.diag',
+        'Event: cpu usage\n',
+        quit.add(const Duration(minutes: 1)),
+      );
+      write(
+        'reports/BaoCode_2026-10-28-141900_ann.spin',
+        'Event: hang\n',
+        quit.add(const Duration(minutes: 2)),
+      );
+      expect(
+        crashReportSince([
+          p.join(root.path, 'reports'),
+        ], quit.subtract(const Duration(minutes: 1))),
+        'BaoCode_2026-10-28-141700.hang: hang, 21.50s',
+      );
+    },
+  );
 }

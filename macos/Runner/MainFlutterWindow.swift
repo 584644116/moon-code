@@ -549,6 +549,9 @@ class MainFlutterWindow: BaoWindow {
 
     let messenger = flutterViewController.engine.binaryMessenger
 
+    // The main thread watched, its hangs written down (see HangWatchdog.swift).
+    HangWatchdog.shared.start(messenger: messenger)
+
     // Notifications, the Dock's badge and the menu bar icon (see
     // lib/notifications/).
     attention = Attention(messenger: messenger, window: self)

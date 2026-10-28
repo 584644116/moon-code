@@ -6,7 +6,9 @@ import 'package:path/path.dart' as p;
 
 /// A crash report the system kept of the app, outside the logs folder:
 /// macOS' `BaoCode-<time>.ips` (a crash, a hang it caught, a kill for
-/// memory), Windows Error Reporting's `Report.wer` of an
+/// memory), and its spindump's `BaoCode_<time>_<host>.hang` (the app
+/// quit by force while it hung), `.spin` (a hang it came out of) and
+/// `.cpu_resource.diag` (the CPU kept busy for minutes); Windows Error Reporting's `Report.wer` of an
 /// `AppCrash_baocode.exe_…` or `AppHang_…` folder. Linux keeps none the
 /// app can read: its own (see packages/bao_sampler's crash handler) are
 /// in the logs folder's `hangs/`.
@@ -14,6 +16,7 @@ class CrashReport {
   const CrashReport(this.name, this.path, this.modified, this.size);
 
   /// Its name in a diagnostics bundle: `BaoCode-2026-10-28-120616.ips`,
+  /// `BaoCode_2026-10-28-141700.hang` (the computer's name left out),
   /// `AppCrash_baocode.exe_1a2b_3c4d.wer`.
   final String name;
 
@@ -24,7 +27,7 @@ class CrashReport {
 }
 
 /// The most crash reports a bundle takes: the newest.
-const maxCrashReports = 5;
+const maxCrashReports = 8;
 
 /// Where the system keeps the app's crash reports, on this platform: see
 /// [CrashReport]. [environment] the process', where the folders are
@@ -35,11 +38,17 @@ List<String> crashReportFolders({
 }) {
   switch (operatingSystem) {
     case 'macos':
+      // The user's (crashes), then the machine's (spindump's hangs, the
+      // CPU kept busy), which an administrator can read; Retired: those
+      // already sent to Apple.
       final home = environment['HOME'];
-      if (home == null || home.isEmpty) return const [];
-      final reports = p.join(home, 'Library', 'Logs', 'DiagnosticReports');
-      // Retired: those already sent to Apple.
-      return [reports, p.join(reports, 'Retired')];
+      return [
+        for (final reports in [
+          if (home != null && home.isNotEmpty)
+            p.join(home, 'Library', 'Logs', 'DiagnosticReports'),
+          '/Library/Logs/DiagnosticReports',
+        ]) ...[reports, p.join(reports, 'Retired')],
+      ];
     case 'windows':
       // The user's own, and the machine's (where an app's crash may go).
       return [
@@ -64,7 +73,20 @@ List<String> platformCrashReportFolders() => crashReportFolders(
 
 /// The names macOS gives the app's reports: its process's name first. Not
 /// `BaoCodeHelper` and the like.
-final macReportName = RegExp(r'^BaoCode[-_.].*\.ips$');
+final macReportName = RegExp(r'^BaoCode[-_.].*\.(?:ips|hang|spin|diag)$');
+
+/// A report's [name] without the computer's, which spindump's have after
+/// the time: `BaoCode_2026-10-28-141700_anns-MacBook.hang` is
+/// `BaoCode_2026-10-28-141700.hang`.
+String macReportBundleName(String name) => name.replaceFirstMapped(
+  RegExp(r'^(BaoCode_\d{4}-\d\d-\d\d-\d{6})_[^.]+(\..+)$'),
+  (match) => '${match[1]}${match[2]}',
+);
+
+/// Whether a macOS report of [name] tells of the app ending: a crash, a
+/// kill, a hang it was quit at; not a hang it came out of nor its CPU use.
+bool macReportEnds(String name) =>
+    name.endsWith('.ips') || name.endsWith('.hang');
 
 /// The folders Windows Error Reporting keeps a report of the app in, its
 /// `Report.wer` inside: `AppCrash_baocode.exe_<hash>_<id>`.
@@ -98,7 +120,7 @@ List<CrashReport> listCrashReports(
       for (final entity in dir.listSync(followLinks: false)) {
         final name = p.basename(entity.path);
         if (entity is File && macReportName.hasMatch(name)) {
-          add(name, entity);
+          add(macReportBundleName(name), entity);
         } else if (entity is Directory && werFolderName.hasMatch(name)) {
           add('$name.wer', File(p.join(entity.path, 'Report.wer')));
         }
@@ -146,7 +168,19 @@ String? describeCrashReport(String text) {
   final trimmed = text.trimLeft();
   if (trimmed.startsWith('{')) return _describeIps(trimmed);
   if (trimmed.contains('EventType=')) return _describeWer(trimmed);
-  return null;
+  return _describeSpindump(trimmed);
+}
+
+/// A spindump's `.hang`, `.spin` or `.diag`: lines of `Name: value` first,
+/// its event (`hang`, `cpu usage`) and how long among them.
+String? _describeSpindump(String text) {
+  String? field(String name) => RegExp(
+    '^$name:[ \\t]+(.+)\$',
+    multiLine: true,
+  ).firstMatch(text)?.group(1)?.trim();
+  final event = field('Event');
+  if (event == null) return null;
+  return [event, ?(field('CPU') ?? field('Duration'))].join(', ');
 }
 
 /// An `.ips`: a line of JSON (what the report is), then the report's.
@@ -218,6 +252,9 @@ String? crashReportSince(List<String> folders, DateTime since) {
   final after = since.subtract(const Duration(seconds: 5));
   for (final report in listCrashReports(folders)) {
     if (report.modified.isBefore(after)) return null;
+    if (report.name.startsWith('BaoCode') && !macReportEnds(report.name)) {
+      continue;
+    }
     try {
       final text = reportText(File(report.path).readAsBytesSync());
       final what = describeCrashReport(text);
