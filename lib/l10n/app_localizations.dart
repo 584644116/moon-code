@@ -14589,6 +14589,108 @@ abstract class AppLocalizations {
   /// **'Could not polish: {error}'**
   String composerPolishFailed(String error);
 
+  /// No description provided for @composerPolishUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo Polish'**
+  String get composerPolishUndo;
+
+  /// No description provided for @composerEnhanceUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo Enhance'**
+  String get composerEnhanceUndo;
+
+  /// No description provided for @composerPolishUndoGone.
+  ///
+  /// In en, this message translates to:
+  /// **'That can no longer be undone here: the message has changed since.'**
+  String get composerPolishUndoGone;
+
+  /// No description provided for @composerPolishShowResult.
+  ///
+  /// In en, this message translates to:
+  /// **'See the answer'**
+  String get composerPolishShowResult;
+
+  /// No description provided for @composerPolishResultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What the model wrote'**
+  String get composerPolishResultTitle;
+
+  /// No description provided for @composerPolishResultDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'It was not used: {reason}'**
+  String composerPolishResultDetail(String reason);
+
+  /// No description provided for @composerPolishRejectedEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'it wrote nothing'**
+  String get composerPolishRejectedEmpty;
+
+  /// No description provided for @composerPolishRejectedHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'it added a heading'**
+  String get composerPolishRejectedHeading;
+
+  /// No description provided for @composerPolishRejectedPreamble.
+  ///
+  /// In en, this message translates to:
+  /// **'it wrote a preamble around the message'**
+  String get composerPolishRejectedPreamble;
+
+  /// No description provided for @composerPolishRejectedFenced.
+  ///
+  /// In en, this message translates to:
+  /// **'it put the whole message in a code fence'**
+  String get composerPolishRejectedFenced;
+
+  /// No description provided for @composerPolishRejectedTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'it ran on far longer than the message'**
+  String get composerPolishRejectedTooLong;
+
+  /// No description provided for @composerPolishRejectedMarkers.
+  ///
+  /// In en, this message translates to:
+  /// **'it lost or changed a picture, file, code or link'**
+  String get composerPolishRejectedMarkers;
+
+  /// No description provided for @composerPolishStageProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the project…'**
+  String get composerPolishStageProject;
+
+  /// No description provided for @composerPolishStageTier.
+  ///
+  /// In en, this message translates to:
+  /// **'Asking the auxiliary model…'**
+  String get composerPolishStageTier;
+
+  /// No description provided for @composerPolishStageModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Asking the model…'**
+  String get composerPolishStageModel;
+
+  /// No description provided for @composerPolishStageFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'The auxiliary model did not answer; asking the model itself…'**
+  String get composerPolishStageFallback;
+
+  /// No description provided for @composerPolishWorking.
+  ///
+  /// In en, this message translates to:
+  /// **'Working on it…'**
+  String get composerPolishWorking;
+
   /// No description provided for @composerEnhance.
   ///
   /// In en, this message translates to:

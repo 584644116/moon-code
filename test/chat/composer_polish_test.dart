@@ -7,6 +7,7 @@ import 'package:baocode/chat/composer/composer_controller.dart';
 import 'package:baocode/chat/composer/composer_embeds.dart';
 import 'package:baocode/chat/composer/composer_polish.dart';
 import 'package:baocode/ide/ide_hover.dart';
+import 'package:baocode/ide/ide_notifications.dart';
 import 'package:baocode/kernel/claude_code/claude_haiku.dart'
     show ClaudeHaikuTools;
 import 'package:baocode/l10n/l10n.dart';
@@ -82,6 +83,45 @@ void main() {
 
   group('polishComposerText', () {
     tearDown(() => composerPolishAsker = null);
+
+    test('the answer thrown away is kept, and why', () async {
+      composerPolishAsker = (
+        system,
+        prompt, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) async => '## Fix it\n\nFix the typo.';
+      try {
+        await polishComposerText(composerPolishText('fix it'));
+        fail('no exception');
+      } on ComposerPolishRejected catch (rejected) {
+        expect(rejected.reason, 'heading');
+        // Kept, not lost: it is the person's to read, even though it is
+        // not the message (see the composer's Show the answer).
+        expect(rejected.raw, '## Fix it\n\nFix the typo.');
+      }
+    });
+
+    test('what it waits on is told as it goes', () async {
+      composerPolishAsker = (
+        system,
+        prompt, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) async => 'Fix it.';
+      final stages = <ComposerPolishStage>[];
+      await polishComposerText(
+        composerPolishText('fix it'),
+        onStage: stages.add,
+      );
+      // Claude Code's own Haiku, asked as it is: no tier of an upstream's
+      // to wait on first.
+      expect(stages, [ComposerPolishStage.model]);
+    });
 
     test('a reply far longer (written on), or empty, is not taken', () async {
       final asked = composerPolishText('fix it');
@@ -178,6 +218,40 @@ void main() {
         expect(asked.map((ask) => ask.exact), [false, true, true]);
       });
 
+      test('what it waits on is told as it goes, the tier and then the '
+          'model itself', () async {
+        composerPolishAsker =
+            (system, prompt, {model, exact = false, location, tools}) async {
+              if (exact) return 'Fix it.';
+              throw Exception("There's an issue with the selected model");
+            };
+        final stages = <ComposerPolishStage>[];
+        await polishComposerText(
+          composerPolishText('fix it'),
+          model: '@up/big',
+          onStage: stages.add,
+        );
+        expect(stages, [
+          ComposerPolishStage.tier,
+          ComposerPolishStage.fallback,
+        ]);
+      });
+
+      test('Enhance with the project to read: the project first, and the '
+          'tier after it', () async {
+        composerPolishAsker =
+            (system, prompt, {model, exact = false, location, tools}) async =>
+                'Fix the typo.';
+        final stages = <ComposerPolishStage>[];
+        await enhanceComposerText(
+          composerPolishText('fix it'),
+          model: '@up/big',
+          location: r'C:\w\app',
+          onStage: stages.add,
+        );
+        expect(stages, [ComposerPolishStage.project]);
+      });
+
       test('a model picked for the app\'s own jobs is asked as it is, and '
           'not asked again', () async {
         await ModelProviders.current.setAuxiliaryModel('@up/small');
@@ -206,9 +280,13 @@ void main() {
       ComposerEnhanceSetting.current = () => true;
     });
 
-    Future<ComposerController> pumpComposer(WidgetTester tester) async {
+    Future<ComposerController> pumpComposer(
+      WidgetTester tester, {
+      IdeNotifications? notifications,
+    }) async {
       final session = ChatSession(historyCount: 0);
       addTearDown(session.dispose);
+      final composer = ChatComposer(session: session, draft: session.draft);
       await tester.pumpWidget(
         MaterialApp(
           theme: buildAppTheme(),
@@ -216,7 +294,12 @@ void main() {
             AppLocalizations.delegate,
           ],
           home: Scaffold(
-            body: ChatComposer(session: session, draft: session.draft),
+            body: notifications == null
+                ? composer
+                : IdeNotificationsScope(
+                    notifications: notifications,
+                    child: composer,
+                  ),
           ),
         ),
       );
@@ -231,6 +314,13 @@ void main() {
           widget is IdeHover &&
           (widget.message == englishLocalizations.composerPolishHint ||
               widget.message == englishLocalizations.composerPolishing),
+    );
+
+    Finder undoButton() => find.byWidgetPredicate(
+      (widget) =>
+          widget is IdeHover &&
+          (widget.message == englishLocalizations.composerPolishUndo ||
+              widget.message == englishLocalizations.composerEnhanceUndo),
     );
 
     testWidgets('Polish puts the reply in, its tag as it was; Undo takes '
@@ -271,6 +361,199 @@ void main() {
       controller.undo();
       await tester.pump();
       expect(controller.text, before);
+    });
+
+    testWidgets('the Undo button puts back what was written, and goes', (
+      tester,
+    ) async {
+      final reply = Completer<String>();
+      composerPolishAsker =
+          (system, asked, {model, exact = false, location, tools}) =>
+              reply.future;
+      final controller = await pumpComposer(tester);
+      controller.replace(
+        0,
+        0,
+        'fix teh bug',
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+      await tester.pump();
+      await tester.tap(polishButton());
+      await tester.pump();
+      reply.complete('Fix the bug.');
+      await tester.pumpAndSettle();
+      expect(controller.text, 'Fix the bug.');
+
+      // Its own button, for the change the rewrite made alone: the
+      // editor's own undo would take back whatever was typed since as
+      // well.
+      expect(undoButton(), findsOneWidget);
+      await tester.tap(undoButton());
+      await tester.pumpAndSettle();
+      expect(controller.text, 'fix teh bug');
+      // Nothing left to take back: no button.
+      expect(undoButton(), findsNothing);
+    });
+
+    testWidgets('typed on after the reply, no Undo button', (tester) async {
+      final reply = Completer<String>();
+      composerPolishAsker =
+          (system, asked, {model, exact = false, location, tools}) =>
+              reply.future;
+      final controller = await pumpComposer(tester);
+      controller.replace(
+        0,
+        0,
+        'fix teh bug',
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+      await tester.pump();
+      await tester.tap(polishButton());
+      await tester.pump();
+      reply.complete('Fix the bug.');
+      await tester.pumpAndSettle();
+      expect(undoButton(), findsOneWidget);
+
+      controller.replace(12, 12, ' now');
+      await tester.pumpAndSettle();
+      // Edited by hand: what the rewrite left is no longer the message,
+      // so taking it back would throw that away too.
+      expect(undoButton(), findsNothing);
+    });
+
+    testWidgets('a reply thrown away: said why, and the answer kept to read', (
+      tester,
+    ) async {
+      final notifications = IdeNotifications();
+      addTearDown(notifications.dispose);
+      composerPolishAsker = (
+        system,
+        asked, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) async => '## Fix it\n\nFix the typo.';
+      final controller = await pumpComposer(
+        tester,
+        notifications: notifications,
+      );
+      controller.replace(
+        0,
+        0,
+        'fix teh bug',
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+      await tester.pump();
+      await tester.tap(polishButton());
+      await tester.pumpAndSettle();
+
+      // The text is left as it was, and the notification says why.
+      expect(controller.text, 'fix teh bug');
+      final shown = notifications.notifications.single;
+      expect(
+        shown.message,
+        englishLocalizations.composerPolishFailed(
+          englishLocalizations.stashAiNoAnswer,
+        ),
+      );
+      // The answer is theirs to read, not lost.
+      expect(
+        shown.primary.map((action) => action.label),
+        [englishLocalizations.composerPolishShowResult],
+      );
+      shown.primary.single.run();
+      await tester.pumpAndSettle();
+      // The reason, and what the model wrote under it.
+      expect(
+        find.textContaining(
+          englishLocalizations.composerPolishRejectedHeading,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Fix the typo.'),
+        findsOneWidget,
+        reason: 'what the model wrote, shown to be read',
+      );
+    });
+
+    testWidgets('an input method still composing: not asked, and the '
+        'letters kept', (tester) async {
+      final asked = <String>[];
+      composerPolishAsker = (
+        system,
+        prompt, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) async {
+        asked.add(prompt);
+        return 'Fix it.';
+      };
+      final controller = await pumpComposer(tester);
+      controller.replace(
+        0,
+        0,
+        'fix teh bug',
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+      // The person is still choosing the letters (pinyin, kana…): what is
+      // in the text is not yet what they mean.
+      controller.composing = const TextRange(start: 0, end: 3);
+      await tester.pump();
+      await tester.tap(polishButton());
+      await tester.pumpAndSettle();
+      expect(asked, isEmpty);
+      expect(controller.text, 'fix teh bug');
+
+      // Done composing: it is asked as it is.
+      controller.composing = TextRange.empty;
+      await tester.pump();
+      await tester.tap(polishButton());
+      await tester.pumpAndSettle();
+      expect(asked, hasLength(1));
+      expect(controller.text, 'Fix it.');
+    });
+
+    testWidgets('while it waits, a notification says what it waits on', (
+      tester,
+    ) async {
+      final notifications = IdeNotifications();
+      addTearDown(notifications.dispose);
+      final reply = Completer<String>();
+      composerPolishAsker = (
+        system,
+        asked, {
+        model,
+        exact = false,
+        location,
+        tools,
+      }) => reply.future;
+      final controller = await pumpComposer(
+        tester,
+        notifications: notifications,
+      );
+      controller.replace(
+        0,
+        0,
+        'fix teh bug',
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+      await tester.pump();
+      await tester.tap(polishButton());
+      await tester.pump();
+
+      final shown = notifications.notifications.single;
+      expect(shown.message, startsWith('Asking the model'));
+      expect(shown.progress?.infinite, isTrue);
+
+      reply.complete('Fix the bug.');
+      await tester.pumpAndSettle();
+      // Gone once answered, and the text is the reply.
+      expect(notifications.notifications, isEmpty);
+      expect(controller.text, 'Fix the bug.');
     });
 
     testWidgets('typed on meanwhile, the reply is not taken', (tester) async {

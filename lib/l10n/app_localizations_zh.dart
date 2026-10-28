@@ -8460,6 +8460,59 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get composerPolishUndo => '撤销润色';
+
+  @override
+  String get composerEnhanceUndo => '撤销增强';
+
+  @override
+  String get composerPolishUndoGone => '已经不能在这里撤销了：这之后消息改动过。';
+
+  @override
+  String get composerPolishShowResult => '看看结果';
+
+  @override
+  String get composerPolishResultTitle => '模型写的内容';
+
+  @override
+  String composerPolishResultDetail(String reason) {
+    return '没有采用：$reason';
+  }
+
+  @override
+  String get composerPolishRejectedEmpty => '它什么也没写';
+
+  @override
+  String get composerPolishRejectedHeading => '它加了标题';
+
+  @override
+  String get composerPolishRejectedPreamble => '它在消息外面写了开场白';
+
+  @override
+  String get composerPolishRejectedFenced => '它把整条消息放进了代码块';
+
+  @override
+  String get composerPolishRejectedTooLong => '它写得比原消息长得多';
+
+  @override
+  String get composerPolishRejectedMarkers => '它弄丢或改动了图片、文件、代码或链接';
+
+  @override
+  String get composerPolishStageProject => '正在读项目…';
+
+  @override
+  String get composerPolishStageTier => '正在问辅助模型…';
+
+  @override
+  String get composerPolishStageModel => '正在问模型…';
+
+  @override
+  String get composerPolishStageFallback => '辅助模型没应答，正在问模型本身…';
+
+  @override
+  String get composerPolishWorking => '正在处理…';
+
+  @override
   String get composerEnhance => '增强';
 
   @override

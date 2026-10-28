@@ -8956,6 +8956,65 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get composerPolishUndo => 'Undo Polish';
+
+  @override
+  String get composerEnhanceUndo => 'Undo Enhance';
+
+  @override
+  String get composerPolishUndoGone =>
+      'That can no longer be undone here: the message has changed since.';
+
+  @override
+  String get composerPolishShowResult => 'See the answer';
+
+  @override
+  String get composerPolishResultTitle => 'What the model wrote';
+
+  @override
+  String composerPolishResultDetail(String reason) {
+    return 'It was not used: $reason';
+  }
+
+  @override
+  String get composerPolishRejectedEmpty => 'it wrote nothing';
+
+  @override
+  String get composerPolishRejectedHeading => 'it added a heading';
+
+  @override
+  String get composerPolishRejectedPreamble =>
+      'it wrote a preamble around the message';
+
+  @override
+  String get composerPolishRejectedFenced =>
+      'it put the whole message in a code fence';
+
+  @override
+  String get composerPolishRejectedTooLong =>
+      'it ran on far longer than the message';
+
+  @override
+  String get composerPolishRejectedMarkers =>
+      'it lost or changed a picture, file, code or link';
+
+  @override
+  String get composerPolishStageProject => 'Reading the project…';
+
+  @override
+  String get composerPolishStageTier => 'Asking the auxiliary model…';
+
+  @override
+  String get composerPolishStageModel => 'Asking the model…';
+
+  @override
+  String get composerPolishStageFallback =>
+      'The auxiliary model did not answer; asking the model itself…';
+
+  @override
+  String get composerPolishWorking => 'Working on it…';
+
+  @override
   String get composerEnhance => 'Enhance';
 
   @override

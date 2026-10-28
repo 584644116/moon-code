@@ -23,6 +23,7 @@ import '../floating/floating_layer.dart';
 import '../floating/floating_placement.dart';
 import '../floating/floating_registry.dart';
 import '../../workspace/window_controls.dart';
+import '../widgets/agent_step.dart' show AgentStep;
 import '../widgets/hover_builder.dart';
 import 'composer_caret.dart';
 import 'composer_controller.dart';
@@ -42,6 +43,7 @@ import '../../ide/ide_hover.dart';
 import '../../ide/ide_spinning.dart';
 import '../../theme/codicons.dart';
 import '../../ide/file_service.dart' show IdeFileService;
+import '../../ide/ide_dialog.dart';
 import '../../ide/ide_notifications.dart';
 import 'remote_drops.dart';
 
@@ -160,6 +162,33 @@ class ChatComposerState extends State<ChatComposer>
 
   /// Which was asked (see [_polish]): Enhance's, or Polish's.
   bool _enhancing = false;
+
+  /// What the rewrite being waited on is doing (see [_polish]); null until
+  /// it says, and while there is none.
+  ComposerPolishStage? _polishStage;
+
+  /// When the rewrite being waited on was asked, for its elapsed time.
+  DateTime? _polishStartedAt;
+
+  /// Ticks the elapsed time of the rewrite being waited on (see
+  /// [_polishNotification]).
+  Timer? _polishTicker;
+
+  /// The notification showing the rewrite being waited on, and where it
+  /// shows: kept as they were when it was shown, so that it can be taken
+  /// away after the widget is gone.
+  IdeNotification? _polishNotification;
+  IdeNotifications? _polishNotifications;
+
+  /// The rewrite last put in the text, and what the text was before it:
+  /// kept so that it can be taken back on its own (see [_undoPolish]),
+  /// where the editor's own undo may have merged it with other typing or
+  /// run out of room. Dropped as soon as the text is edited by hand.
+  ({String before, String after, bool enhance})? _lastPolish;
+
+  /// The answer last thrown away, and why: kept so that it can be shown
+  /// rather than lost (see [_showPolishResult]).
+  ({String text, String reason})? _lastRejected;
 
   /// Every image put in, by number, kept until sent: the text's references
   /// pick which go (see [_images]), so one taken out and brought back by
@@ -371,6 +400,7 @@ class ChatComposerState extends State<ChatComposer>
     ComposerPolishSetting.changes?.removeListener(_handleSettingsChanged);
     FloatingRegistry.closePopover(_menuOwner);
     _clickWindow?.cancel();
+    _endPolishProgress();
     _controller.dispose();
     _focusNode.dispose();
     _scrollController.dispose();
@@ -797,14 +827,16 @@ class ChatComposerState extends State<ChatComposer>
 
   /// What the box shows that follows the text, besides the text (which
   /// the editor shows itself): the menu, the images, whether the message
-  /// can be sent and polished. A key typed that changes none of it since
-  /// the box was built ([_shownBuilt]) does not build it again (its
-  /// pickers, its buttons).
+  /// can be sent and polished, and whether the last rewrite can still be
+  /// taken back. A key typed that changes none of it since the box was
+  /// built ([_shownBuilt]) does not build it again (its pickers, its
+  /// buttons).
   _ShownOfText _shownOfText() => (
     menu: (_trigger != null, _menuX, _menuKind, _matches, _highlighted),
     pool: _pool,
     canSend: _canSend,
     polishable: ComposerPolishSetting.current() && _hasWords(),
+    undoable: _canUndoPolish,
   );
 
   /// Whether the text has words to polish: read again only once it
@@ -828,6 +860,12 @@ class ChatComposerState extends State<ChatComposer>
     _images = _referredImages();
     _saveDraft();
     final text = _controller.text;
+    // Edited by hand, the last rewrite is no longer the text it left: it
+    // cannot be taken back on its own any more (see [_undoPolish]), and
+    // the button that would goes.
+    if (_lastPolish case final last? when text != last.after) {
+      _lastPolish = null;
+    }
     // Edited, a message recalled from the history is the one typed.
     if (_historyAt != null && !_recalling && text != _historyShown) {
       _leaveHistory();
@@ -1359,10 +1397,15 @@ class ChatComposerState extends State<ChatComposer>
   /// its own words), or with [enhance] enhanced (the project read for what
   /// it touches, said as the whole instruction an agent needs) — its tags,
   /// images, code and links kept as they are; put in its place as one
-  /// change (⌘Z takes it back), unless the text changed meanwhile. Why not,
-  /// in a notification.
+  /// change, unless the text changed meanwhile. While it waits, a
+  /// notification says what it waits on and for how long; after, the change
+  /// can be taken back on its own (see [_undoPolish]); when the answer is
+  /// thrown away, it can be read (see [_showPolishResult]).
   Future<void> _polish({bool enhance = false}) async {
     if (_polishing) return;
+    // An input method still composing would put its half-typed letters in
+    // what is sent: the letters the person means are not there yet.
+    if (_isComposing) return;
     final asked = _polishText();
     if (!asked.hasWords) return;
     final before = _controller.text;
@@ -1371,7 +1414,10 @@ class ChatComposerState extends State<ChatComposer>
     setState(() {
       _polishing = true;
       _enhancing = enhance;
+      _polishStage = null;
+      _polishStartedAt = DateTime.now();
     });
+    _showPolishProgress(notifications, enhance: enhance);
     try {
       final String polished;
       try {
@@ -1380,37 +1426,212 @@ class ChatComposerState extends State<ChatComposer>
           asked,
           model: widget.session.selected(KernelChoiceKind.model),
           location: widget.session.kernelContext.cwd,
+          onStage: (stage) => _setPolishStage(stage),
         );
       } on ComposerPolishException catch (error) {
+        // The answer is not lost: it is theirs to read, even though it is
+        // not the message (see [_showPolishResult]).
+        final raw = switch (error) {
+          ComposerPolishRejected(:final raw?) => raw,
+          _ => null,
+        };
+        if (raw != null) {
+          _lastRejected = (
+            text: raw,
+            reason: switch (error) {
+              ComposerPolishRejected(:final reason) => reason,
+              _ => 'empty',
+            },
+          );
+        }
         notifications?.notify(
           IdeSeverity.error,
           enhance
               ? l10n.composerEnhanceFailed(error.message ?? l10n.stashAiNoAnswer)
               : l10n.composerPolishFailed(error.message ?? l10n.stashAiNoAnswer),
+          primary: [
+            if (raw != null)
+              IdeNotificationAction(
+                l10n.composerPolishShowResult,
+                () => unawaited(_showPolishResult()),
+              ),
+          ],
         );
         return;
       }
       if (!mounted || _controller.text != before) return;
-      // One change of its own to undo: not merged with what was typed just
-      // before it, nor with what is typed next.
-      _controller
-        ..breakUndo()
-        ..replace(
-          0,
-          _controller.length,
-          polished,
-          selection: TextSelection.collapsed(offset: polished.length),
-        )
-        ..breakUndo();
-      _focusNode.requestFocus();
+      _putPolish(polished, before: before, enhance: enhance);
     } finally {
+      _endPolishProgress();
       if (mounted) {
         setState(() {
           _polishing = false;
           _enhancing = false;
+          _polishStage = null;
+          _polishStartedAt = null;
         });
       }
     }
+  }
+
+  /// [polished] in the text in place of [before], as one change of its own
+  /// to undo — not merged with what was typed just before it, nor with what
+  /// is typed next — and kept so that it can be taken back alone (see
+  /// [_undoPolish]).
+  void _putPolish(
+    String polished, {
+    required String before,
+    required bool enhance,
+  }) {
+    _controller
+      ..breakUndo()
+      ..replace(
+        0,
+        _controller.length,
+        polished,
+        selection: TextSelection.collapsed(offset: polished.length),
+      )
+      ..breakUndo();
+    _lastPolish = (before: before, after: polished, enhance: enhance);
+    _lastRejected = null;
+    _focusNode.requestFocus();
+  }
+
+  /// Puts back what was there before the last Polish or Enhance, when the
+  /// text is still what it left (see [_canUndoPolish]): a change of its
+  /// own, so that ⌘Z takes it back in turn. Otherwise says why not, and
+  /// nothing changes — never overwrites what the person wrote since.
+  void _undoPolish() {
+    final last = _lastPolish;
+    if (last == null) return;
+    final l10n = context.l10n;
+    final notifications = IdeNotificationsScope.maybeOf(context);
+    if (_controller.text != last.after) {
+      notifications?.notify(
+        IdeSeverity.warning,
+        l10n.composerPolishUndoGone,
+        source: l10n.composerPolish,
+      );
+      _lastPolish = null;
+      setState(() {});
+      return;
+    }
+    _controller
+      ..breakUndo()
+      ..replace(
+        0,
+        _controller.length,
+        last.before,
+        selection: TextSelection.collapsed(offset: last.before.length),
+      )
+      ..breakUndo();
+    _lastPolish = null;
+    _focusNode.requestFocus();
+    setState(() {});
+  }
+
+  /// Whether the last rewrite is still the text, so that it can be taken
+  /// back on its own (see [_undoPolish]).
+  bool get _canUndoPolish {
+    final last = _lastPolish;
+    return last != null && _controller.text == last.after;
+  }
+
+  /// Shows [ComposerPolishRejected]'s answer, which was not put in the
+  /// text: it is the model's, not the person's, so it is shown, not put
+  /// where they would send it by accident.
+  Future<void> _showPolishResult() async {
+    final rejected = _lastRejected;
+    if (rejected == null) return;
+    final l10n = context.l10n;
+    final detail = l10n.composerPolishResultDetail(
+      switch (rejected.reason) {
+        'empty' => l10n.composerPolishRejectedEmpty,
+        'heading' => l10n.composerPolishRejectedHeading,
+        'preamble' => l10n.composerPolishRejectedPreamble,
+        'fenced' => l10n.composerPolishRejectedFenced,
+        'too long' => l10n.composerPolishRejectedTooLong,
+        'markers' => l10n.composerPolishRejectedMarkers,
+        final reason => reason,
+      },
+    );
+    await showIdeDialog(
+      context,
+      message: l10n.composerPolishResultTitle,
+      detail: '$detail\n\n${rejected.text}',
+      buttons: [l10n.commonCopy],
+      cancel: l10n.commonClose,
+      type: IdeDialogType.info,
+    ).then((button) {
+      if (button == 0) {
+        unawaited(Clipboard.setData(ClipboardData(text: rejected.text)));
+      }
+    });
+  }
+
+  /// A notification saying what the rewrite waits on and for how long,
+  /// changing as it goes (see [_polish]).
+  void _showPolishProgress(
+    IdeNotifications? notifications, {
+    required bool enhance,
+  }) {
+    if (notifications == null) return;
+    final l10n = context.l10n;
+    _polishNotifications = notifications;
+    _polishNotification = notifications.notify(
+      IdeSeverity.info,
+      _polishProgressText(l10n, enhance: enhance),
+      source: enhance ? l10n.composerEnhance : l10n.composerPolish,
+      progress: const IdeNotificationProgress.infinite(),
+    );
+    _polishTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      final notification = _polishNotification;
+      if (notification == null || !mounted) return;
+      notifications.update(
+        notification,
+        message: _polishProgressText(l10n, enhance: enhance),
+      );
+    });
+  }
+
+  /// What the rewrite being waited on is doing, and for how long.
+  String _polishProgressText(AppLocalizations l10n, {required bool enhance}) {
+    final stage = switch (_polishStage) {
+      ComposerPolishStage.project => l10n.composerPolishStageProject,
+      ComposerPolishStage.tier => l10n.composerPolishStageTier,
+      ComposerPolishStage.model => l10n.composerPolishStageModel,
+      ComposerPolishStage.fallback => l10n.composerPolishStageFallback,
+      null => l10n.composerPolishWorking,
+    };
+    final started = _polishStartedAt;
+    if (started == null) return stage;
+    final seconds = DateTime.now().difference(started).inSeconds;
+    return '$stage  ${AgentStep.formatDuration(Duration(seconds: seconds))}';
+  }
+
+  /// [stage], the rewrite being waited on now doing it (see [_polish]).
+  void _setPolishStage(ComposerPolishStage stage) {
+    if (!mounted || !_polishing) return;
+    setState(() => _polishStage = stage);
+    final notification = _polishNotification;
+    if (notification != null) {
+      _polishNotifications?.update(
+        notification,
+        message: _polishProgressText(context.l10n, enhance: _enhancing),
+      );
+    }
+  }
+
+  /// Takes the rewrite's notification away, and stops its clock (see
+  /// [_polish]).
+  void _endPolishProgress() {
+    _polishTicker?.cancel();
+    _polishTicker = null;
+    final notification = _polishNotification;
+    final notifications = _polishNotifications;
+    _polishNotification = null;
+    _polishNotifications = null;
+    if (notification != null) notifications?.close(notification);
   }
 
   // --- Submit --------------------------------------------------------------
@@ -1987,6 +2208,17 @@ class ChatComposerState extends State<ChatComposer>
             ),
             const SizedBox(width: 2),
           ],
+          // Takes back the last rewrite alone, where the editor's own undo
+          // would take back the typing since as well (see [_undoPolish]).
+          if (_canUndoPolish) ...[
+            _PolishButton(
+              undo: true,
+              busy: false,
+              enabled: true,
+              onTap: _undoPolish,
+            ),
+            const SizedBox(width: 2),
+          ],
           if ((widget.onToggleContextPanel, context) case (
             final onToggle?,
             final usage?,
@@ -2019,6 +2251,7 @@ class ChatComposerState extends State<ChatComposer>
 class _PolishButton extends StatelessWidget {
   const _PolishButton({
     this.enhance = false,
+    this.undo = false,
     required this.busy,
     required this.enabled,
     required this.onTap,
@@ -2026,6 +2259,10 @@ class _PolishButton extends StatelessWidget {
 
   /// Whether this is Enhance's, not Polish's.
   final bool enhance;
+
+  /// Whether this takes the last rewrite back (see [_undoPolish]) rather
+  /// than asking for one.
+  final bool undo;
   final bool busy;
   final bool enabled;
   final VoidCallback onTap;
@@ -2036,17 +2273,25 @@ class _PolishButton extends StatelessWidget {
     final colors = themeColors;
     final active = enabled && !busy;
     final icon = Icon(
-      busy ? Codicons.loading : (enhance ? Codicons.wand : Codicons.sparkle),
+      busy
+          ? Codicons.loading
+          : switch ((undo, enhance)) {
+              (true, _) => Codicons.discard,
+              (false, true) => Codicons.wand,
+              (false, false) => Codicons.sparkle,
+            },
       size: 14,
       color: enabled ? colors['icon.foreground'] : AppColors.textFaint,
     );
     return IdeHover(
-      message: switch ((enhance, busy)) {
-        (true, true) => l10n.composerEnhancing,
-        (true, false) => l10n.composerEnhanceHint,
-        (false, true) => l10n.composerPolishing,
-        (false, false) => l10n.composerPolishHint,
-      },
+      message: undo
+          ? (enhance ? l10n.composerEnhanceUndo : l10n.composerPolishUndo)
+          : switch ((enhance, busy)) {
+              (true, true) => l10n.composerEnhancing,
+              (true, false) => l10n.composerEnhanceHint,
+              (false, true) => l10n.composerPolishing,
+              (false, false) => l10n.composerPolishHint,
+            },
       child: HoverBuilder(
         cursor: active ? SystemMouseCursors.click : SystemMouseCursors.basic,
         builder: (context, hovered) => GestureDetector(
@@ -2251,4 +2496,5 @@ typedef _ShownOfText = ({
   Map<int, ImageAttachment> pool,
   bool canSend,
   bool polishable,
+  bool undoable,
 });

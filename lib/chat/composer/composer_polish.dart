@@ -67,11 +67,14 @@ class ComposerPolishException implements Exception {
 /// around it (a heading, a preamble, a fence). Asking again without the
 /// project would not help — the answer itself is wrong — so this is told
 /// apart from an answer that never came. [reason] goes to the event log,
-/// never to the user.
+/// never to the user; [raw] is what the model wrote, kept so that it can
+/// be handed to the person rather than thrown away (it is theirs to read,
+/// even when it is not the message).
 class ComposerPolishRejected extends ComposerPolishException {
-  const ComposerPolishRejected(this.reason);
+  const ComposerPolishRejected(this.reason, [this.raw]);
 
   final String reason;
+  final String? raw;
 }
 
 /// The composer's content as the model is given it: [text], each thing
@@ -172,9 +175,32 @@ const _system =
     'code, links and paths that cannot change: keep every marker exactly '
     'as written, once each, where it belongs in the sentence; never write '
     'what one stands for, and add none. Keep every name, number, code '
-    'identifier and Markdown mark. Where nothing needs changing, reply with '
-    'it as it is. Reply with the polished message only, nothing before or '
-    'after it.';
+    'identifier and Markdown mark. Write it in the language it is written '
+    'in, whatever language these instructions are in: a message in Chinese '
+    'stays in Chinese, a message in English stays in English, and one that '
+    'mixes them keeps each part in its own. Where a line break belongs, '
+    'write a real one, never the two characters \\n. Where nothing needs '
+    'changing, reply with it as it is. Reply with the polished message '
+    'only, nothing before or after it.';
+
+/// What a rewrite is doing while it waits (see [polishComposerText]'s
+/// `onStage`): looking at the project, waiting on the model's cheap tier,
+/// or waiting on the model itself — asked straight away, or once that tier
+/// gave no answer. Told to the caller so that a wait of a minute can say
+/// what it waits on.
+enum ComposerPolishStage {
+  /// Reading the project (Enhance, on this machine).
+  project,
+
+  /// Waiting for the model's cheap tier.
+  tier,
+
+  /// Waiting for the model itself, asked straight away.
+  model,
+
+  /// Waiting for the model itself, after its cheap tier gave no answer.
+  fallback,
+}
 
 /// Asks the model; [askClaudeHaiku] when null. For tests.
 @visibleForTesting
@@ -247,8 +273,9 @@ const _enhanceClosing =
     'you saw, spelt as it is there; add none you did not. Markers like '
     '⟦1⟧ stand for pictures, files, code, links and paths the person put '
     'in: keep every marker exactly as written, once each, where it '
-    'belongs; never write what one stands for, and add none. Reply with '
-    'the message only, nothing before or after it.';
+    'belongs; never write what one stands for, and add none. Where a line '
+    'break belongs, write a real one, never the two characters \\n. Reply '
+    'with the message only, nothing before or after it.';
 
 const _enhanceSystem =
     '$_enhanceOpening$_enhanceWithTools$_enhanceWithToolsWriting'
@@ -339,9 +366,13 @@ Future<String> _reply(
   required String? model,
   required String? location,
   required ClaudeHaikuTools? tools,
+  void Function(ComposerPolishStage stage)? onStage,
 }) async {
   final auxiliary = ModelProviders.current.auxiliary(model);
   Future<String> ask({required bool exact, Object? after}) async {
+    onStage?.call(
+      after == null ? ComposerPolishStage.model : ComposerPolishStage.fallback,
+    );
     try {
       return await _askText(
         system,
@@ -373,6 +404,11 @@ Future<String> _reply(
     if (!stop.isCompleted) stop.complete();
   });
   try {
+    // With tools the wait is the project being read, not only the model:
+    // that is what is slow, and what is worth saying.
+    onStage?.call(
+      tools == null ? ComposerPolishStage.tier : ComposerPolishStage.project,
+    );
     return await _askText(
       system,
       prompt,
@@ -421,6 +457,7 @@ Future<String> _rewrite(
   required String? location,
   required ClaudeHaikuTools? tools,
   required bool Function(int before, int after) longest,
+  void Function(ComposerPolishStage stage)? onStage,
 }) async {
   appEvent(
     'composer',
@@ -436,6 +473,7 @@ Future<String> _rewrite(
       model: model,
       location: location,
       tools: tools,
+      onStage: onStage,
     );
   } on ComposerPolishException catch (error) {
     appEvent(
@@ -452,19 +490,21 @@ Future<String> _rewrite(
       .replaceFirst(RegExp(r'\s*</message>$'), '');
   final words = cleaned.replaceAll(_marker, '');
   final before = asked.text.replaceAll(_marker, '');
-  if (words.trim().isEmpty) throw const ComposerPolishRejected('empty');
+  if (words.trim().isEmpty) {
+    throw ComposerPolishRejected('empty', cleaned);
+  }
   if (_structuralRejection(before, words) case final reason?) {
     appEvent('composer', 'rewrite rejected: $reason');
-    throw ComposerPolishRejected(reason);
+    throw ComposerPolishRejected(reason, cleaned);
   }
   if (!longest(before.length, words.length)) {
     appEvent('composer', 'rewrite rejected: too long');
-    throw const ComposerPolishRejected('too long');
+    throw ComposerPolishRejected('too long', cleaned);
   }
   final content = composerPolishContent(cleaned, asked);
   if (content == null) {
     appEvent('composer', 'rewrite rejected: markers');
-    throw const ComposerPolishRejected('markers');
+    throw ComposerPolishRejected('markers', cleaned);
   }
   return content;
 }
@@ -520,6 +560,7 @@ Future<String> polishComposerText(
   ComposerPolishText asked, {
   String? model,
   String? location,
+  void Function(ComposerPolishStage stage)? onStage,
 }) => _rewrite(
   asked,
   system: _system,
@@ -529,6 +570,7 @@ Future<String> polishComposerText(
   tools: null,
   // Twice the words is already more than a polish would write.
   longest: (before, after) => after <= before * 2 + 200,
+  onStage: onStage,
 );
 
 /// [asked] enhanced by the auxiliary model (automatic: [model]'s, the
@@ -541,6 +583,7 @@ Future<String> enhanceComposerText(
   ComposerPolishText asked, {
   String? model,
   String? location,
+  void Function(ComposerPolishStage stage)? onStage,
 }) async {
   final tools = _enhanceTools(location);
   final prompt = [
@@ -558,6 +601,7 @@ Future<String> enhanceComposerText(
     // It may say what it found and how to check it: several times the
     // words, not a whole file written out.
     longest: (before, after) => after <= before * 6 + 1500,
+    onStage: onStage,
   );
   if (tools == null) return ask(null);
   appEvent(

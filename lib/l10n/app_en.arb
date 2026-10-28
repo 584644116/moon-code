@@ -6440,6 +6440,30 @@
       }
     }
   },
+  "composerPolishUndo": "Undo Polish",
+  "composerEnhanceUndo": "Undo Enhance",
+  "composerPolishUndoGone": "That can no longer be undone here: the message has changed since.",
+  "composerPolishShowResult": "See the answer",
+  "composerPolishResultTitle": "What the model wrote",
+  "composerPolishResultDetail": "It was not used: {reason}",
+  "@composerPolishResultDetail": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "composerPolishRejectedEmpty": "it wrote nothing",
+  "composerPolishRejectedHeading": "it added a heading",
+  "composerPolishRejectedPreamble": "it wrote a preamble around the message",
+  "composerPolishRejectedFenced": "it put the whole message in a code fence",
+  "composerPolishRejectedTooLong": "it ran on far longer than the message",
+  "composerPolishRejectedMarkers": "it lost or changed a picture, file, code or link",
+  "composerPolishStageProject": "Reading the project…",
+  "composerPolishStageTier": "Asking the auxiliary model…",
+  "composerPolishStageModel": "Asking the model…",
+  "composerPolishStageFallback": "The auxiliary model did not answer; asking the model itself…",
+  "composerPolishWorking": "Working on it…",
   "composerEnhance": "Enhance",
   "composerEnhancing": "Enhancing…",
   "composerEnhanceHint": "Enhance: the auxiliary model reads the project and writes the message out again as the whole instruction — the files and names it touches, the order, what must not change, how to check it; pictures, files, code and links stay as they are; Undo takes it back",
