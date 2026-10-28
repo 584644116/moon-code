@@ -12597,6 +12597,12 @@ abstract class AppLocalizations {
   /// **'A folder on {host}: pick one, or type a path'**
   String remoteFolderPlaceholder(String host);
 
+  /// The button at the right of the quick pick browsing a remote host's folders: it lists the folder again, e.g. one made in a terminal since.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the folders again'**
+  String get remoteFolderRefresh;
+
   /// No description provided for @remoteOpenThisFolder.
   ///
   /// In en, this message translates to:
@@ -12620,6 +12626,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not list {path}'**
   String remoteListFailed(String path);
+
+  /// No description provided for @remoteReadingFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading {path}…'**
+  String remoteReadingFolder(String path);
 
   /// No description provided for @remoteFileHostPlaceholder.
   ///

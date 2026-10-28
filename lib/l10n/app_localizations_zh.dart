@@ -7296,6 +7296,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get remoteFolderRefresh => '重新读取文件夹';
+
+  @override
   String get remoteOpenThisFolder => '打开此文件夹';
 
   @override
@@ -7309,6 +7312,11 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String remoteListFailed(String path) {
     return '无法列出 $path';
+  }
+
+  @override
+  String remoteReadingFolder(String path) {
+    return '正在读取 $path…';
   }
 
   @override

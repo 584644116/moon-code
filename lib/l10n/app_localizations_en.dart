@@ -7755,6 +7755,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get remoteFolderRefresh => 'Read the folders again';
+
+  @override
   String get remoteOpenThisFolder => 'Open This Folder';
 
   @override
@@ -7768,6 +7771,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String remoteListFailed(String path) {
     return 'Could not list $path';
+  }
+
+  @override
+  String remoteReadingFolder(String path) {
+    return 'Reading $path…';
   }
 
   @override
