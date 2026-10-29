@@ -121,6 +121,10 @@ abstract final class ChatCodec {
       'label': item.label,
       if (item.whimsical) 'whimsical': true,
       if (!item.visible) 'visible': false,
+      // For the phone's line of figures under it, as the footer's here.
+      'startedAt': ?item.startedAt?.millisecondsSinceEpoch,
+      'tokens': ?item.output?.tokens,
+      'speed': ?item.output?.tokensPerSecond,
     },
   };
 
@@ -246,6 +250,14 @@ abstract final class ChatCodec {
         text('label'),
         whimsical: json['whimsical'] == true,
         visible: json['visible'] != false,
+        startedAt: time('startedAt'),
+        output: switch (json['tokens']) {
+          final num tokens => TurnOutput(
+            tokens: tokens.toInt(),
+            tokensPerSecond: (json['speed'] as num?)?.toDouble(),
+          ),
+          _ => null,
+        },
       ),
       _ => null,
     };
