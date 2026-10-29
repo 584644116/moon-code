@@ -12,6 +12,7 @@ import 'package:bao_editor/monaco/flutter/language_assets.dart';
 
 import 'base/quiet_view.dart';
 import 'base/smooth_scroll.dart' show BaoScrollBehavior;
+import 'bots/bots.dart';
 import 'browser/browser_bridge.dart';
 import 'browser/browser_tools.dart' show BrowserHistory;
 import 'chat/composer/composer_files.dart' show ComposerFile, pastedAsPicture;
@@ -443,9 +444,25 @@ Future<void> main(List<String> arguments) async {
   final customizations = CustomizationStore();
   // The phones paired with this computer (Settings → Mobile): listening
   // for them, if they are allowed to connect.
+  // The user's bots: agents that chat as a person does, with the phones.
+  final bots = kIsWeb
+      ? null
+      : Bots(
+          workspace: workspace,
+          store: PreferenceStore.file(
+            p.join(DataDirectory.current.botsDir, 'bots.json'),
+          ),
+          chinese: (locale.locale ?? AppLocale.systemLocale()).languageCode ==
+              'zh',
+        );
+  unawaited(bots?.start());
   final link = kIsWeb
       ? null
-      : LinkHost(workspace: workspace, customizations: customizations);
+      : LinkHost(
+          workspace: workspace,
+          customizations: customizations,
+          bots: bots,
+        );
   unawaited(link?.load());
   // The first frame is in the kept theme, restored from storage as VS Code
   // does before the workbench shows; its file is read after. The setting

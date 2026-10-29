@@ -1,0 +1,166 @@
+// The desktop's bots, as the phone lists and edits them (see
+// LinkMethods.saveBot and the others of theirs).
+
+/// What a bot may do, each turned on by the user: none for a new bot, all
+/// for the assistant the desktop starts with.
+enum BotAbility {
+  /// Sees the agents and what they said.
+  viewChats,
+
+  /// Stops an agent, has it try again, archives it.
+  manageTasks,
+
+  /// Writes to an agent, as the user would.
+  sendToChats,
+
+  /// Starts an agent in a project.
+  newChat,
+
+  /// Reads the projects' files.
+  readFiles,
+
+  /// Uses the user's browser, as the agents may.
+  browser,
+
+  /// Writes first, of what happened (an agent waits, fails).
+  proactive,
+}
+
+/// When a bot may write first ([BotAbility.proactive]): at most [perDay]
+/// times a day (none for 0), never from [quietFrom] to [quietTo] (minutes
+/// into the day, the desktop's time; the same for no quiet hours).
+class BotProactive {
+  const BotProactive({
+    this.perDay = 6,
+    this.quietFrom = 23 * 60,
+    this.quietTo = 8 * 60,
+  });
+
+  factory BotProactive.fromJson(Map<String, Object?> json) => BotProactive(
+    perDay: (json['perDay'] as num?)?.toInt() ?? 6,
+    quietFrom: (json['quietFrom'] as num?)?.toInt() ?? 23 * 60,
+    quietTo: (json['quietTo'] as num?)?.toInt() ?? 8 * 60,
+  );
+
+  final int perDay;
+  final int quietFrom;
+  final int quietTo;
+
+  /// Whether [minute] (into the day) is in the quiet hours, which may span
+  /// midnight.
+  bool isQuiet(int minute) {
+    if (quietFrom == quietTo) return false;
+    return quietFrom < quietTo
+        ? minute >= quietFrom && minute < quietTo
+        : minute >= quietFrom || minute < quietTo;
+  }
+
+  Map<String, Object?> toJson() => {
+    'perDay': perDay,
+    'quietFrom': quietFrom,
+    'quietTo': quietTo,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is BotProactive &&
+      other.perDay == perDay &&
+      other.quietFrom == quietFrom &&
+      other.quietTo == quietTo;
+
+  @override
+  int get hashCode => Object.hash(perDay, quietFrom, quietTo);
+}
+
+/// A bot: an agent of the user's own making that talks as a person does,
+/// who it is ([identity]) all the user's words; what it may do, its
+/// [abilities]. Its conversation is [session] (none until the first
+/// message), on the desktop, its memory there too.
+class LinkBot {
+  const LinkBot({
+    required this.id,
+    required this.name,
+    this.avatar,
+    this.identity = '',
+    this.abilities = const {},
+    this.proactive = const BotProactive(),
+    this.assistant = false,
+    this.session,
+    this.status = BotStatus.idle,
+    this.unread = 0,
+    this.last,
+    this.updatedAt,
+  });
+
+  factory LinkBot.fromJson(Map<String, Object?> json) => LinkBot(
+    id: json['id'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+    avatar: json['avatar'] as String?,
+    identity: json['identity'] as String? ?? '',
+    abilities: {
+      for (final name in (json['abilities'] as List?) ?? const [])
+        ?BotAbility.values.asNameMap()[name],
+    },
+    proactive: switch (json['proactive']) {
+      final Map<String, Object?> proactive => BotProactive.fromJson(proactive),
+      _ => const BotProactive(),
+    },
+    assistant: json['assistant'] == true,
+    session: json['session'] as String?,
+    status: BotStatus.values.asNameMap()[json['status']] ?? BotStatus.idle,
+    unread: (json['unread'] as num?)?.toInt() ?? 0,
+    last: json['last'] as String?,
+    updatedAt: switch (json['updated']) {
+      final num ms => DateTime.fromMillisecondsSinceEpoch(ms.toInt()),
+      _ => null,
+    },
+  );
+
+  final String id;
+  final String name;
+
+  /// An emoji, or none (its name's first letter then).
+  final String? avatar;
+
+  /// Who it is and how it talks, as the user wrote it.
+  final String identity;
+  final Set<BotAbility> abilities;
+  final BotProactive proactive;
+
+  /// The one the desktop starts with: not deleted.
+  final bool assistant;
+
+  /// Its conversation's id ([SessionSummary.id]'s kind).
+  final String? session;
+  final BotStatus status;
+
+  /// Its messages since the user last read it.
+  final int unread;
+
+  /// The last it said, one line.
+  final String? last;
+  final DateTime? updatedAt;
+
+  bool can(BotAbility ability) => abilities.contains(ability);
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'avatar': ?avatar,
+    'identity': identity,
+    'abilities': [
+      for (final ability in BotAbility.values)
+        if (abilities.contains(ability)) ability.name,
+    ],
+    'proactive': proactive.toJson(),
+    if (assistant) 'assistant': true,
+    'session': ?session,
+    'status': status.name,
+    if (unread > 0) 'unread': unread,
+    'last': ?last,
+    'updated': ?updatedAt?.millisecondsSinceEpoch,
+  };
+}
+
+/// Whether a bot is writing.
+enum BotStatus { idle, typing }

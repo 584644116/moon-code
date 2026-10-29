@@ -597,7 +597,7 @@ class ClaudeCodeKernel
       _launchedModel = custom != null ? _model : null;
       _launchedWindow = _autocompact;
       _launchedSuggestions = PromptSuggestions.current();
-      final sdkServers = ClaudeSdkTools.servers;
+      final sdkServers = ClaudeSdkTools.serversFor(_cwd);
       // What it starts with, as the transport gives it: a change is told
       // to it later (see _syncEnvironment).
       final launchedEnvironment = _proxyRoute().environment;
@@ -627,6 +627,7 @@ class ClaudeCodeKernel
               ? RemoteDrops.folders
               : [?PasteStore.directory],
           instructions: workspace?.instructions,
+          tools: workspace?.tools,
           models: switch (custom) {
             (final provider, _) => _requestedModels(provider),
             null => const [],

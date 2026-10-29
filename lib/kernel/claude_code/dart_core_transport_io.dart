@@ -73,6 +73,14 @@ class DartCoreTransport implements ClaudeCodeTransport {
       directories: launch.directories,
       flagSettings: launch.settings,
       sdkServers: launch.sdkServers,
+      // The app's servers' tools offered as well.
+      tools: switch (launch.tools) {
+        final tools? => [
+          ...tools,
+          for (final server in launch.sdkServers) 'mcp__$server',
+        ],
+        null => null,
+      },
       appendSystemPrompt: instructions == null || instructions.isEmpty
           ? ClaudeLaunch.appendedSystemPrompt
           : '${ClaudeLaunch.appendedSystemPrompt}\n\n$instructions',

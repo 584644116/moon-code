@@ -5,6 +5,8 @@ import 'dart:math' as math;
 import 'package:bao_link/bao_link.dart';
 import 'package:path/path.dart' as p;
 
+import '../bots/bot.dart';
+import '../bots/bots.dart';
 import '../chat/chat_models.dart';
 import '../chat/chat_session.dart';
 import '../chat/composer/composer_files.dart' show fileReferenceText;
@@ -40,6 +42,7 @@ class WorkspaceBridge {
     this.branchOf,
     this.filesOf = hostFilesOf,
     this.customizations,
+    this.bots,
     this.throttle = const Duration(milliseconds: 150),
   });
 
@@ -58,6 +61,9 @@ class WorkspaceBridge {
   /// Claude Code's customizations on this machine; none told without.
   final CustomizationStore? customizations;
 
+  /// The user's bots; none told without.
+  final Bots? bots;
+
   /// How often a phone hears of changes at most: a turn's text streams in
   /// many more times than that.
   final Duration throttle;
@@ -73,6 +79,7 @@ class WorkspaceBridge {
   /// Starts telling the phone of changes; what it asks goes to [handle].
   void start() {
     workspace.addListener(_stateChanged);
+    bots?.addListener(_stateChanged);
     unawaited(peer.done.then((_) => dispose()));
   }
 
@@ -80,6 +87,7 @@ class WorkspaceBridge {
     if (_disposed) return;
     _disposed = true;
     workspace.removeListener(_stateChanged);
+    bots?.removeListener(_stateChanged);
     _stateTimer?.cancel();
     for (final follow in _follows.values) {
       follow.dispose();
@@ -173,8 +181,46 @@ class WorkspaceBridge {
                 : null,
           ),
       ],
+      bots: [
+        if (bots case final bots?)
+          for (final bot in bots.bots) _linkBot(bots, bot),
+      ],
     );
   }
+
+  LinkBot _linkBot(Bots bots, Bot bot) {
+    final thread = bots.threadOf(bot);
+    final session = thread == null ? null : idOf(thread);
+    // Read as it comes, while the phone follows it.
+    if (session != null && _follows.containsKey(session)) bots.seen(bot);
+    return LinkBot(
+      id: bot.id,
+      name: bot.name,
+      avatar: bot.avatar,
+      identity: bot.identity,
+      abilities: bot.abilities,
+      proactive: bot.proactive,
+      assistant: bot.assistant,
+      session: session,
+      status: thread?.status == ThreadStatus.running
+          ? BotStatus.typing
+          : BotStatus.idle,
+      unread: bots.unread(bot),
+      last: bots.lastLine(bot),
+      updatedAt: thread?.updatedAt,
+    );
+  }
+
+  Bots _bots() =>
+      bots ??
+      (throw const LinkRemoteException(LinkErrors.unsupported, 'No bots'));
+
+  Bot _bot(Object? id) =>
+      switch (id) {
+        final String id => _bots().byId(id),
+        _ => null,
+      } ??
+      (throw LinkRemoteException(LinkErrors.notFound, 'No bot $id'));
 
   void _stateChanged() {
     if (_disposed || _stateTimer != null) return;
@@ -200,6 +246,9 @@ class WorkspaceBridge {
       case LinkMethods.open:
         final thread = _thread(params['session']);
         final id = idOf(thread);
+        if (bots?.botAt(thread.project.path) case final bot?) {
+          bots!.seen(bot);
+        }
         _follows.remove(id)?.dispose();
         final follow = _follows[id] = _Follow(
           id: id,
@@ -230,6 +279,8 @@ class WorkspaceBridge {
         final AgentThread thread;
         if (params['session'] case final Object id) {
           thread = _thread(id);
+        } else if (params['bot'] case final Object id) {
+          thread = _bots().threadFor(_bot(id));
         } else if (params['project'] case final String path) {
           thread = workspace.startAgent(_project(path));
         } else {
@@ -390,6 +441,38 @@ class WorkspaceBridge {
         return {
           'session': idOf(workspace.startAgent(_project(params['project']))),
         };
+      case LinkMethods.saveBot:
+        final bots = _bots();
+        final saved = bots.save(
+          id: params['bot'] as String?,
+          name: params['name'] as String? ?? '',
+          avatar: params['avatar'] as String?,
+          identity: params['identity'] as String? ?? '',
+          abilities: {
+            for (final name in (params['abilities'] as List?) ?? const [])
+              ?BotAbility.values.asNameMap()[name],
+          },
+          proactive: switch (params['proactive']) {
+            final Map<String, Object?> json => BotProactive.fromJson(json),
+            _ => const BotProactive(),
+          },
+        );
+        return {'bot': _linkBot(bots, saved).toJson()};
+      case LinkMethods.deleteBot:
+        final bot = _bot(params['bot']);
+        if (bot.assistant) {
+          throw const LinkRemoteException(
+            LinkErrors.unsupported,
+            'The assistant stays',
+          );
+        }
+        _bots().delete(bot.id);
+        return null;
+      case LinkMethods.botMemory:
+        return {'text': _bots().memory(_bot(params['bot']))};
+      case LinkMethods.setBotMemory:
+        _bots().setMemory(_bot(params['bot']), params['text'] as String? ?? '');
+        return null;
       case LinkMethods.icon:
         final id = params['id'];
         final image = id is String ? workspace.icons[id] : null;

@@ -10,6 +10,34 @@ abstract final class ChatCodec {
   /// on demand, and a build's log would weigh on every update.
   static const maxOutput = 64 * 1024;
 
+  // --- Bots ------------------------------------------------------------------
+
+  /// The tag the app's messages to a bot are wrapped in: what happened to
+  /// the user's agents, for it to tell of. Not the user's words: shown as
+  /// a note.
+  static const botEventTag = 'bao-event';
+
+  /// The bot's tool that shows one of the user's agents in its chat (its
+  /// input's `chat`), as a card that opens it.
+  static const botCardTool = 'bot_show_chat';
+
+  /// What the app told a bot in [item], if it is such a note.
+  static String? botEvent(UserMessageItem item) {
+    final text = item.text.trim();
+    const open = '<$botEventTag>', close = '</$botEventTag>';
+    if (!text.startsWith(open) || !text.endsWith(close)) return null;
+    return text.substring(open.length, text.length - close.length).trim();
+  }
+
+  /// The agent [item] shows as a card, if it is the bot's tool that does.
+  static String? botCard(ToolCallItem item) => switch (item) {
+    ToolCallItem(tool: botCardTool, :final input) => switch (input['chat']) {
+      final String chat when chat.isNotEmpty => chat,
+      _ => null,
+    },
+    _ => null,
+  };
+
   static Map<String, Object?> encode(ChatItem item) => switch (item) {
     UserMessageItem() => {
       't': 'user',
@@ -45,6 +73,7 @@ abstract final class ChatCodec {
       'status': item.status.name,
       'output': ?_head(item.output),
       'tool': ?item.tool,
+      'card': ?botCard(item),
       // What a browser's call does, for its line to say.
       if (item.kind == ToolKind.browser)
         'browse': {
@@ -181,14 +210,15 @@ abstract final class ChatCodec {
         output: optional('output'),
         tool: optional('tool'),
         images: _decodeImages(json['images']),
-        input: switch ((json['making'], json['browse'])) {
-          (final Map<String, Object?> making, _) => {
+        input: switch ((json['making'], json['browse'], json['card'])) {
+          (_, _, final String card) => {'chat': card},
+          (final Map<String, Object?> making, _, _) => {
             'prompt': '',
             'count': ?making['count'],
             'size': ?making['size'],
             'aspect_ratio': ?making['aspect'],
           },
-          (_, final Map<String, Object?> browse) => {
+          (_, final Map<String, Object?> browse, _) => {
             'action': ?browse['action'],
             if (browse['url'] == true) 'url': '',
           },

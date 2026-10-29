@@ -80,12 +80,20 @@ class KernelContext {
 /// The folders an agent works in besides its directory, those of a
 /// multi-folder workspace, and what it is told of them.
 class KernelWorkspace {
-  const KernelWorkspace({required this.folders, this.instructions = ''});
+  const KernelWorkspace({
+    required this.folders,
+    this.instructions = '',
+    this.tools,
+  });
 
   final List<String> folders;
 
   /// Added to the agent's system prompt.
   final String instructions;
+
+  /// The only built-in tools it has (none for an empty list), the app's
+  /// own aside; all when null.
+  final List<String>? tools;
 }
 
 /// A setting the kernel offers a choice for. What is in effect is what the

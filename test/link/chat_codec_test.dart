@@ -126,4 +126,49 @@ void main() {
       sent,
     );
   });
+
+  group('a bot\'s', () {
+    test('cards go to the phone with the agent they open', () {
+      final card = roundTrip(
+        const ToolCallItem(
+          kind: ToolKind.other,
+          tool: ChatCodec.botCardTool,
+          target: 'Fix the tests',
+          input: {'chat': 's-1'},
+        ),
+      );
+      expect(ChatCodec.botCard(card), 's-1');
+      expect(card.tool, ChatCodec.botCardTool);
+      // Another tool's input is not a card's.
+      expect(
+        ChatCodec.botCard(
+          roundTrip(
+            const ToolCallItem(
+              kind: ToolKind.other,
+              tool: 'bot_read_chat',
+              target: 'x',
+              input: {'chat': 's-1'},
+            ),
+          ),
+        ),
+        isNull,
+      );
+    });
+
+    test('notes from the app are told from the user\'s words', () {
+      UserMessageItem user(String text) =>
+          ChatCodec.decode(
+                jsonDecode(
+                  jsonEncode(ChatCodec.encode(UserMessageItem(text: text))),
+                ),
+              )!
+              as UserMessageItem;
+      final note = user(
+        '<${ChatCodec.botEventTag}>\n- failed: "Build" in monad\n'
+        '</${ChatCodec.botEventTag}>',
+      );
+      expect(ChatCodec.botEvent(note), '- failed: "Build" in monad');
+      expect(ChatCodec.botEvent(user('hi <${ChatCodec.botEventTag}>')), isNull);
+    });
+  });
 }
