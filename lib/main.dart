@@ -382,6 +382,21 @@ Future<void> main(List<String> arguments) async {
     // Settings → Appearance: the code's font, size and ligatures, and the
     // window's text size.
     CodeFont.follow(files.settings, (key) => files.settings[key]);
+    // Interface Size as it changes, in the event log, with what
+    // settings.json held then: a window seen going back to 100% unasked
+    // tells there why.
+    var scale = CodeFont.uiScale.value;
+    CodeFont.uiScale.addListener(() {
+      final kept = files.settings[CodeFont.uiScaleSettingKey];
+      appEvent(
+        'zoom',
+        '$scale% -> ${CodeFont.uiScale.value}% '
+            '(settings.json: ${kept ?? 'unset'}, '
+            '${files.settings.values.length} settings'
+            '${files.settings.error == null ? '' : ', does not parse'})',
+      );
+      scale = CodeFont.uiScale.value;
+    });
     // Whether the editors wrap long lines.
     EditorWordWrap.follow(files.settings);
   }

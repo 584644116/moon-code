@@ -90,6 +90,7 @@ import 'notifications/attention_host.dart';
 import 'notifications/attention_service.dart';
 import 'notifications/attention_settings.dart';
 import 'platform/data_dir.dart' show DataDirectory;
+import 'platform/event_log.dart' show appEvent;
 import 'platform/local_paths.dart'
     if (dart.library.io) 'platform/local_paths_io.dart';
 import 'platform/open_requests.dart';
@@ -1108,6 +1109,14 @@ class _WorkbenchState extends State<Workbench> implements WindowDelegate {
         ? CodeFont.defaultUiScale
         : CodeFont.zoomedUiScale(now, steps);
     if (percent == now) return;
+    appEvent(
+      'zoom',
+      'Zoom ${switch (steps) {
+        null => 'Reset',
+        > 0 => 'In',
+        _ => 'Out',
+      }}, keys down: ${HardwareKeyboard.instance.logicalKeysPressed.map((key) => key.keyLabel).join('+')}',
+    );
     CodeFont.uiScale.value = percent;
     final settings = widget.settings?.files?.settings;
     if (settings == null) return;
