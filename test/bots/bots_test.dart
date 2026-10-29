@@ -209,6 +209,10 @@ void main() {
       expect(workspace.listsInSidebar(thread), isFalse);
       expect(bots.threadFor(bot), same(thread));
       expect(workspace.agentSetup!(bot.folder)!.settings, Bots.settings);
+      // Named by none of what it is told.
+      thread.session.send(const ComposerMessage(text: '<bao-event>x'));
+      workspace.notifyListeners();
+      expect(thread.title, isNot(contains('bao-event')));
       expect(workspace.agentSetup!('/tmp/app'), isNull);
     });
 

@@ -2597,12 +2597,18 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
     _noteLimit(thread);
     // Renamed in Claude Code (/rename): named so here too.
     if (session.takeRenamed() case final title?) rename(thread, title);
-    if (thread._title.isEmpty && session.itemCount > 0) {
-      if (session.itemAt(0) case UserMessageItem(:final text)) {
-        thread._title = text.trim().split('\n').first;
+    // An agent of the app's own (a bot's) is named by it, not by what it
+    // was first told, nor by a model.
+    if (isAppFolder(thread.project.path)) {
+      thread._wantsTitle = false;
+    } else {
+      if (thread._title.isEmpty && session.itemCount > 0) {
+        if (session.itemAt(0) case UserMessageItem(:final text)) {
+          thread._title = text.trim().split('\n').first;
+        }
       }
+      if (thread._wantsTitle) _askTitle(thread);
     }
-    if (thread._wantsTitle) _askTitle(thread);
     // Sent something: its folder is a project now, if it was not.
     if (!_isUntouched(thread) && !_projects.contains(thread.project)) {
       _listProject(thread.project);

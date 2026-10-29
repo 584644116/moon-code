@@ -444,7 +444,8 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
           _event(
             thread,
             BotEventKind.running,
-            detail: 'running for ${now.difference(since).inMinutes} min',
+            detail:
+                'running for ${(now.difference(since).inSeconds / 60).round()} min',
           ),
         );
       } else if (next == null || due.isBefore(next)) {
