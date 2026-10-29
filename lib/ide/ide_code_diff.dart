@@ -924,8 +924,8 @@ class _HunkCheck extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = themeColors;
     final l10n = context.l10n;
-    final accent =
-        colors.get('checkbox.selectBackground') ?? colors['button.background'];
+    // As the commit panel's: checkbox.selectBackground is a gray.
+    final accent = colors['button.background'];
     final on = checked != false;
     final box = line ? 11.0 : 13.0;
     return IdeHover(

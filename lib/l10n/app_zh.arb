@@ -3129,7 +3129,6 @@
   "gitCommitMarkResolved": "标记为已解决",
   "gitCommitExpandAll": "全部展开",
   "gitCommitCollapseAll": "全部折叠",
-  "gitCommitGroupByDirectory": "按目录分组",
   "gitCommitEmptyMessage": "请填写提交信息。",
   "gitCommitNothingSelected": "请勾选要提交的文件。",
   "gitCommitNoChanges": "没有本地更改",

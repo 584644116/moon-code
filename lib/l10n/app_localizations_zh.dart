@@ -10878,9 +10878,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get gitCommitCollapseAll => '全部折叠';
 
   @override
-  String get gitCommitGroupByDirectory => '按目录分组';
-
-  @override
   String get gitCommitEmptyMessage => '请填写提交信息。';
 
   @override

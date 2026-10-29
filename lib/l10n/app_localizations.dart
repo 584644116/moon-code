@@ -18789,12 +18789,6 @@ abstract class AppLocalizations {
   /// **'Collapse All'**
   String get gitCommitCollapseAll;
 
-  /// No description provided for @gitCommitGroupByDirectory.
-  ///
-  /// In en, this message translates to:
-  /// **'Group by Directory'**
-  String get gitCommitGroupByDirectory;
-
   /// No description provided for @gitCommitEmptyMessage.
   ///
   /// In en, this message translates to:

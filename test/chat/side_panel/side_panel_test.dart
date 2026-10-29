@@ -1106,7 +1106,7 @@ void main() {
     // Not grouped by directory: each file with its folder, and the panel
     // remembers it.
     await tester.tap(
-      find.descendant(of: list, matching: find.byTooltip('Group by Directory')),
+      find.descendant(of: list, matching: find.byIcon(Codicons.listFlat)),
     );
     await tester.pumpAndSettle();
     expect(panel.changesAsTree, isFalse);

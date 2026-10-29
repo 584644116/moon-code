@@ -50,6 +50,7 @@ import 'git_model.dart';
 import 'git_partial.dart';
 import 'git_repository.dart';
 import 'git_service.dart';
+import 'ide_git_list_tree_switch.dart';
 import 'ide_git_rebase_dialog.dart';
 import 'ide_git_ref_labels.dart';
 import 'ide_scm_view.dart';
@@ -3375,22 +3376,12 @@ class _CommitDetails extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            _Segment(
-              icon: Codicons.listFlat,
-              label: l10n.gitLogList,
-              selected: !log.filesAsTree,
-              onTap: () => log.filesAsTree = false,
-            ),
-            const SizedBox(width: 2),
-            _Segment(
-              icon: Codicons.listTree,
-              label: l10n.gitLogTree,
-              selected: log.filesAsTree,
-              onTap: () => log.filesAsTree = true,
-            ),
-          ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: IdeGitListTreeSwitch(
+            tree: log.filesAsTree,
+            onChanged: (tree) => log.filesAsTree = tree,
+          ),
         ),
         const SizedBox(height: 6),
         IdeInputBox(
@@ -4392,64 +4383,6 @@ class _AgentMark extends StatelessWidget {
       ),
     ),
   );
-}
-
-/// One of the files' List and Tree.
-class _Segment extends StatefulWidget {
-  const _Segment({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  State<_Segment> createState() => _SegmentState();
-}
-
-class _SegmentState extends State<_Segment> {
-  bool _hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final foreground = IdeListColors.foreground;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: Container(
-          height: 24,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: widget.selected
-                ? IdeListColors.inactiveSelection
-                : _hover
-                ? IdeActionButton.hoverBackground
-                : null,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(widget.icon, size: 14, color: foreground),
-              const SizedBox(width: 4),
-              Text(
-                widget.label,
-                style: TextStyle(fontSize: 12, color: foreground),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// An author's picture: their initial on a color of their own.

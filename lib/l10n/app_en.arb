@@ -8004,7 +8004,6 @@
   "gitCommitMarkResolved": "Mark Resolved",
   "gitCommitExpandAll": "Expand All",
   "gitCommitCollapseAll": "Collapse All",
-  "gitCommitGroupByDirectory": "Group by Directory",
   "gitCommitEmptyMessage": "Enter a commit message.",
   "gitCommitNothingSelected": "Check the files to commit.",
   "gitCommitNoChanges": "No local changes",
