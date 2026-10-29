@@ -1340,41 +1340,19 @@ class MarkdownEditorState extends State<MarkdownEditor>
   TextInputConnection? _connection;
 
   /// What the platform was last told of the text: some lines around the
-  /// caret's, from [_remoteStart].
+  /// caret's ([_told]).
   TextEditingValue _remote = TextEditingValue.empty;
-  int _remoteStart = 0;
+
+  /// Those lines as told, each atom one character: where the platform's
+  /// offsets are in the text.
+  MdTold _told = MdTold.empty;
 
   /// The selection was too long to tell the platform: it was told of the
   /// caret alone; what it types replaces the selection.
   bool _remoteCaretOnly = false;
 
-  /// The atoms ([MdAtoms]) in what the platform was told, each told as
-  /// one character ([MdAtoms.shown]): where that is in [_remote], and how
-  /// long the atom is in the text. In order.
-  List<(int, int)> _remoteAtoms = const [];
-
   /// The text's offset of [remote], an offset in [_remote].
-  int _sourceAt(int remote) {
-    var offset = _remoteStart + remote;
-    for (final (at, length) in _remoteAtoms) {
-      if (at >= remote) break;
-      offset += length - 1;
-    }
-    return offset;
-  }
-
-  /// [_remoteAtoms] after [start] to [end] of [_remote] was replaced by
-  /// [inserted] characters: those in it gone, those after it moved.
-  void _remoteEdited(int start, int end, int inserted) {
-    if (_remoteAtoms.isEmpty) return;
-    _remoteAtoms = [
-      for (final (at, length) in _remoteAtoms)
-        if (at < start)
-          (at, length)
-        else if (at >= end)
-          (at + inserted - (end - start), length),
-    ];
-  }
+  int _sourceAt(int remote) => _told.toSource(remote);
 
   bool get _hasInput => _connection?.attached ?? false;
 
@@ -1411,9 +1389,8 @@ class MarkdownEditorState extends State<MarkdownEditor>
   TextEditingValue _windowValue() {
     final selection = controller.selection;
     if (!selection.isValid) {
-      _remoteStart = 0;
+      _told = MdTold.empty;
       _remoteCaretOnly = false;
-      _remoteAtoms = const [];
       return TextEditingValue.empty;
     }
     final lines = controller.lines;
@@ -1424,41 +1401,28 @@ class MarkdownEditorState extends State<MarkdownEditor>
     );
     var start = lines.lineStart(first);
     var end = lines.lineEnd(last);
-    var (text, atoms) = _told(start, end);
+    var told = _tell(start, end);
     _remoteCaretOnly = false;
-    if (text.length > 4000) {
+    if (told.text.length > 4000) {
       final line = controller.lineAt(selection.extentOffset);
       first = last = line;
       start = lines.lineStart(line);
       end = lines.lineEnd(line);
-      (text, atoms) = _told(start, end);
+      told = _tell(start, end);
       _remoteCaretOnly = !selection.isCollapsed;
     }
-    _remoteStart = start;
-    _remoteAtoms = atoms;
-    // Where an offset of the text is in what is told: an atom's inside, at
-    // its start.
-    int told(int offset) {
-      var remote = offset - start;
-      var shift = 0;
-      for (final (at, length) in atoms) {
-        final from = start + at + shift;
-        if (offset <= from) break;
-        remote -= offset >= from + length ? length - 1 : offset - from;
-        shift += length - 1;
-      }
-      return remote;
-    }
+    _told = told;
+    final text = told.text;
 
     TextSelection remoteSelection;
     if (_remoteCaretOnly) {
       remoteSelection = TextSelection.collapsed(
-        offset: told(selection.extentOffset),
+        offset: told.toTold(selection.extentOffset),
       );
     } else {
       remoteSelection = TextSelection(
-        baseOffset: told(selection.baseOffset),
-        extentOffset: told(selection.extentOffset),
+        baseOffset: told.toTold(selection.baseOffset),
+        extentOffset: told.toTold(selection.extentOffset),
         affinity: selection.affinity,
       );
     }
@@ -1470,37 +1434,24 @@ class MarkdownEditorState extends State<MarkdownEditor>
           controller.isComposing &&
               composing.start >= start &&
               composing.end <= end
-          ? TextRange(start: told(composing.start), end: told(composing.end))
+          ? TextRange(
+              start: told.toTold(composing.start),
+              end: told.toTold(composing.end),
+            )
           : TextRange.empty,
     );
   }
 
-  /// [start] to [end] of the text as the platform is told of it, each atom
-  /// one character; and the atoms, where they are in the text told and how
-  /// long they are in the text.
-  (String, List<(int, int)>) _told(int start, int end) {
-    final text = controller.substring(start, end);
-    if (!text.contains(MdAtoms.open)) return (text, const []);
-    final atoms = <(int, int)>[];
-    final buffer = StringBuffer();
-    var at = 0;
-    for (final run in MdAtoms.parse(text)) {
-      buffer
-        ..write(text.substring(at, run.start))
-        ..write(MdAtoms.shown);
-      atoms.add((buffer.length - 1, run.end - run.start));
-      at = run.end;
-    }
-    buffer.write(text.substring(at));
-    return (buffer.toString(), atoms);
-  }
+  /// [start] to [end] of the text as the platform is told of it.
+  MdTold _tell(int start, int end) =>
+      MdTold.of(controller.substring(start, end), start: start);
 
   /// Tells the platform of the text where it differs from what it has.
   void _syncRemote() {
     if (!_hasInput || _applyingRemote) return;
-    final start = _remoteStart;
+    final start = _told.start;
     final value = _windowValue();
-    if (start == _remoteStart && _sameAsRemote(value)) return;
+    if (start == _told.start && _sameAsRemote(value)) return;
     _remote = value;
     _connection!.setEditingState(value);
   }
@@ -1645,7 +1596,7 @@ class MarkdownEditorState extends State<MarkdownEditor>
       // what it gives back as it was is left be.
       (start, end, text) = _trimmed(old, start, end, text);
     }
-    final told = text.length;
+    final told = text;
     final clean = MdAtoms.strip(text.replaceAll(MdAtoms.shown, ''));
     final cleaned = clean.length != text.length;
     text = clean;
@@ -1656,7 +1607,7 @@ class MarkdownEditorState extends State<MarkdownEditor>
     } catch (_) {
       // Out of step with the platform: told again below.
     }
-    if (start >= 0) _remoteEdited(start, end, told);
+    if (start >= 0) _told = _told.edited(start, end, told);
     TextSelection selection(TextSelection remote) => cleaned
         ? TextSelection.collapsed(offset: sourceStart + text.length)
         : TextSelection(

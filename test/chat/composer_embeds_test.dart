@@ -297,6 +297,42 @@ void main() {
       });
     }
 
+    testWidgets('all of them among lines, cut and pasted back, as they were', (
+      tester,
+    ) async {
+      final clipboard = _Clipboard(tester);
+      await _pump(tester, [], images: [image]);
+      final controller = _controller(tester);
+      final things = [
+        for (final (embed, _) in cases.values)
+          if (embed.type != ComposerGhostEmbed.type) embed,
+      ];
+      String written(String Function(ComposerEmbed embed) each) => [
+        '  first ',
+        for (final (i, embed) in things.indexed) ...[
+          each(embed),
+          // A tag never ends a line (the composer pads it).
+          i.isEven ? ' 看 \u{1F600} ' : ' \nthen ',
+        ],
+      ].join();
+      final content = written((embed) => embed.atom);
+      controller.replace(
+        0,
+        controller.length,
+        content,
+        selection: TextSelection(baseOffset: 0, extentOffset: content.length),
+      );
+      await tester.pump();
+      final editor = tester.state<MarkdownEditorState>(_editor);
+      await editor.copy(cut: true);
+      expect(controller.text, '');
+      expect(clipboard.text, written((embed) => embed.copiedText));
+
+      await editor.paste();
+      await tester.pump();
+      expect(controller.text, content);
+    });
+
     testWidgets('text from elsewhere with the marks in it stays text', (
       tester,
     ) async {

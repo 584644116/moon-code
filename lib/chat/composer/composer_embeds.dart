@@ -142,15 +142,8 @@ String renumberPastes(String content, {required int from}) {
 }
 
 /// The composer's text as it shows, each thing in it one character
-/// (U+FFFC), as an input method is told of it.
-String composerShownText(String content) {
-  if (!content.contains(MdAtoms.open)) return content;
-  final shown = StringBuffer();
-  for (final piece in composerPieces(content)) {
-    shown.write(piece is String ? piece : MdAtoms.shown);
-  }
-  return shown.toString();
-}
+/// (U+FFFC): as an input method is told of it ([MdTold]).
+String composerShownText(String content) => MdTold.of(content).text;
 
 /// The composer's text as text: each thing as the message says it.
 String composerPlainText(String content) {

@@ -518,8 +518,9 @@ Future<void> main(List<String> arguments) async {
   }
   WindowControls.trackActiveView();
   // What an editor copies, its tags and all, on the clipboard itself.
-  if (WindowControls.isDesktop)
+  if (WindowControls.isDesktop) {
     MdClipboard.instance = const NativeMdClipboard();
+  }
   // An older `code` script opened windows for `code --version`.
   unawaited(ShellCommand.refresh());
   final ColorThemeStorage colorTheme = files == null
