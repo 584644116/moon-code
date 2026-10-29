@@ -1691,6 +1691,41 @@ void main() {
       expect(editorInHistory(), findsNothing);
     });
 
+    testWidgets('the editor is outside the history\'s selection: a drag in '
+        'it selects its own text', (tester) async {
+      await pumpScreen(tester);
+      await reveal(tester, '第 2 轮');
+      await tester.tap(bubble('第 2 轮'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      // Not in the history's selection, whose gestures, keys (⌘C with
+      // nothing selected in the editor) and menu would be the editor's too.
+      expect(
+        find.ancestor(
+          of: editorInHistory(),
+          matching: find.byType(SelectionArea),
+        ),
+        findsNothing,
+      );
+      final controller = editController(tester);
+      final state = tester.state<MarkdownEditorState>(editorInHistory());
+      final from = state.caretRect(0)!.center;
+      final to = state.caretRect(4)!.center;
+      final drag = await tester.startGesture(
+        from,
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pump();
+      await drag.moveTo(to);
+      await tester.pump();
+      await drag.up();
+      await tester.pump();
+      expect(
+        controller.selection,
+        const TextSelection(baseOffset: 0, extentOffset: 4),
+      );
+    });
+
     testWidgets('a message with inline tags copies as its text', (
       tester,
     ) async {

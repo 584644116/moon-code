@@ -274,16 +274,26 @@ void main() {
         await tester.pump();
         final editor = tester.state<MarkdownEditorState>(_editor);
         await editor.copy();
-        // Outside, it is text: the message's.
-        expect(clipboard.text, 'see ${embed.plainText} now');
+        // Outside, it is text: what was pasted to make it (a long paste's,
+        // the code), else the message's.
+        expect(clipboard.text, 'see ${embed.copiedText} now');
+        expect(embed.copiedText, switch (embed.type) {
+          ComposerCodeEmbed.type => code.code,
+          ComposerPastedTextEmbed.type => pasted.text,
+          _ => embed.plainText,
+        });
 
         controller.selection = TextSelection.collapsed(
           offset: controller.length,
         );
         await editor.paste();
         await tester.pump();
-        expect(controller.text, '$content$content');
-        expect(controller.embeds.map((thing) => thing.embed), [embed, embed]);
+        // A long paste numbered on from the one there, as pasted anew.
+        final again = embed.type == ComposerPastedTextEmbed.type
+            ? ComposerPastedTextEmbed.of(pasted.numbered(pasted.number + 1))
+            : embed;
+        expect(controller.text, '${content}see ${again.atom} now');
+        expect(controller.embeds.map((thing) => thing.embed), [embed, again]);
       });
     }
 
