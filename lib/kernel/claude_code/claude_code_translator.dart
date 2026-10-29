@@ -8,6 +8,7 @@ import '../output_meter.dart';
 import 'claude_goal.dart';
 import 'claude_sdk_tools.dart';
 import 'turn_stats.dart';
+import 'claude_numbers.dart';
 
 /// The agent's own context tools, called and answered: the chat shows what
 /// they did as a notice, not as a tool call.
@@ -370,6 +371,11 @@ class ClaudeTranslator {
     _goalRecords.clear();
   }
 
+  /// When [message] (the user's) was sent: as kept; live, now.
+  DateTime? _sentAt(Map<String, Object?> message) =>
+      DateTime.tryParse('${message['timestamp']}')?.toLocal() ??
+      (replaying ? null : DateTime.now());
+
   void _replayedAt(Map<String, Object?> message) {
     if (!replaying || _replayed == null) return;
     if (message['uuid'] == _replayed!.id) return;
@@ -543,9 +549,11 @@ class ClaudeTranslator {
       case 'message_delta':
         final usage = _map(event['usage']);
         for (final MapEntry(:key, :value) in usage.entries) {
-          if (value is num) _messageUsage[key] = value;
+          if (claudeNumber(value) != null) _messageUsage[key] = value;
         }
-        if (usage['output_tokens'] is num) _messageCounted = true;
+        if (claudeNumber(usage['output_tokens']) != null) {
+          _messageCounted = true;
+        }
         if (_map(usage['output_tokens_details'])['thinking_tokens']
             case final num tokens) {
           _messageThinking = tokens.toInt();
@@ -667,7 +675,7 @@ class ClaudeTranslator {
 
   /// Adds the message ended to the turn's usage.
   void _endMessage() {
-    int count(String key) => (_messageUsage[key] as num?)?.toInt() ?? 0;
+    int count(String key) => claudeInt(_messageUsage[key]) ?? 0;
     final output = count('output_tokens');
     _turnInput +=
         count('input_tokens') +
@@ -899,6 +907,7 @@ class ClaudeTranslator {
       final item = UserMessageItem(
         text: args.isEmpty ? command : '$command $args',
         images: images,
+        sentAt: _sentAt(message),
       );
       _answerPlan(feedback: item.text);
       _put(id, item);
@@ -917,7 +926,11 @@ class ClaudeTranslator {
       if (replaying) _replayedStopped = true;
       return;
     }
-    final item = UserMessageItem(text: trimmed, images: images);
+    final item = UserMessageItem(
+      text: trimmed,
+      images: images,
+      sentAt: _sentAt(message),
+    );
     // Said with a plan awaiting: what should change in it.
     _answerPlan(feedback: trimmed);
     _put(id, item);

@@ -1372,6 +1372,13 @@ void main() {
       expect(worked('p1'), const Duration(seconds: 45));
       expect(worked('p2'), isNull, reason: 'stopped');
       expect(worked('p3'), const Duration(seconds: 3));
+      // When each was sent, as kept: for a chat app's times.
+      expect(
+        (transcript.itemAt(
+          transcript.indexOf('p2')!,
+        ) as UserMessageItem).sentAt,
+        DateTime.utc(2026, 10, 1, 10, 0, 50).toLocal(),
+      );
     });
 
     test('translating a message twice changes nothing', () {
@@ -1613,6 +1620,62 @@ void main() {
         kernel.dispose();
       },
     );
+
+    test("a model's usage given as strings counts as the numbers", () async {
+      final cli = FakeCli();
+      final (:kernel, :transcript, events: _) = claude(cli);
+      kernel.send(const KernelTurn(id: 'u1', text: 'hi'));
+      await pumpEventQueue();
+      Future<void> stream(Map<String, Object?> event) async {
+        cli.push({'type': 'stream_event', 'event': event});
+        await pumpEventQueue();
+      }
+
+      await stream({
+        'type': 'message_start',
+        'message': {
+          'id': 'm1',
+          'usage': {
+            'input_tokens': '10',
+            'cache_read_input_tokens': '1000',
+            'output_tokens': 'n/a',
+          },
+        },
+      });
+      await stream({
+        'type': 'content_block_start',
+        'index': '0',
+        'content_block': {'type': 'text', 'text': ''},
+      });
+      await stream({
+        'type': 'content_block_delta',
+        'index': '0',
+        'delta': {'type': 'text_delta', 'text': 'Hi.'},
+      });
+      await stream({'type': 'content_block_stop', 'index': '0'});
+      await stream({
+        'type': 'message_delta',
+        'usage': {'output_tokens': '40'},
+      });
+      await stream({'type': 'message_stop'});
+      expect(transcript.output?.tokens, 40);
+      cli.push({
+        'type': 'result',
+        'subtype': 'success',
+        'usage': {'input_tokens': '10', 'output_tokens': '40'},
+      });
+      await pumpEventQueue();
+      final usage = (transcript.itemAt(
+        transcript.indexOf('u1')!,
+      ) as UserMessageItem).usage!;
+      expect(usage.inputTokens, 1010);
+      expect(usage.outputTokens, 40);
+      expect([
+        for (final (_, item) in transcript.liveItems)
+          if (item is NoticeItem && item.kind == NoticeKind.error) item,
+      ], isEmpty);
+      kernel.dispose();
+    });
 
     test('starts on first send, then writes the message', () async {
       final cli = FakeCli();
@@ -3535,6 +3598,50 @@ void main() {
           kernel.dispose();
         },
       );
+
+      test("reads a model's usage given as strings", () async {
+        final kernel = open(
+          (session, {required turns, before}) async => ClaudeHistoryPage([
+            prompt('u1'),
+            {
+              ...answer('u1', 0),
+              'message': {
+                ...answer('u1', 0)['message']! as Map<String, Object?>,
+                'usage': {
+                  'input_tokens': '1',
+                  'cache_read_input_tokens': 'none',
+                  'cache_creation_input_tokens': '300',
+                },
+              },
+            },
+            // As some write the stream too.
+            {
+              'type': 'stream_event',
+              'event': {
+                'type': 'message_start',
+                'message': {
+                  'id': 'm-x',
+                  'usage': {'input_tokens': '1', 'output_tokens': '2'},
+                },
+              },
+            },
+            {
+              'type': 'stream_event',
+              'event': {'type': 'message_stop'},
+            },
+          ]),
+        );
+        final transcript = Transcript();
+        kernel.events.listen(transcript.apply);
+        await pumpEventQueue();
+        expect(prompts(transcript), ['u1']);
+        expect([
+          for (final (_, item) in transcript.liveItems)
+            if (item is NoticeItem) item.text,
+        ], isEmpty);
+        expect(transcript.stats!.cache!.conversation.written, 300);
+        kernel.dispose();
+      });
 
       test('turns kept show as their footers did, on every page; those '
           'not kept as before', () async {

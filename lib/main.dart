@@ -6,11 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:path/path.dart' as p;
 import 'package:bao_editor/textmate/textmate_syntax.dart';
+import 'package:bao_markdown/bao_markdown.dart' show MdClipboard;
 
 import 'package:bao_editor/monaco/flutter/language_assets.dart';
 
 import 'base/quiet_view.dart';
 import 'base/smooth_scroll.dart' show BaoScrollBehavior;
+import 'bots/bots.dart';
 import 'browser/browser_bridge.dart';
 import 'browser/browser_tools.dart' show BrowserHistory;
 import 'chat/composer/composer_files.dart' show ComposerFile, pastedAsPicture;
@@ -77,6 +79,7 @@ import 'platform/adopt_former_data.dart';
 import 'platform/app_identity.dart';
 import 'platform/bundled_tools.dart';
 import 'platform/memory_budget.dart';
+import 'platform/native_md_clipboard.dart';
 import 'platform/app_platform.dart';
 import 'platform/data_dir.dart';
 import 'platform/error_log.dart';
@@ -380,6 +383,21 @@ Future<void> main(List<String> arguments) async {
     // Settings → Appearance: the code's font, size and ligatures, and the
     // window's text size.
     CodeFont.follow(files.settings, (key) => files.settings[key]);
+    // Interface Size as it changes, in the event log, with what
+    // settings.json held then: a window seen going back to 100% unasked
+    // tells there why.
+    var scale = CodeFont.uiScale.value;
+    CodeFont.uiScale.addListener(() {
+      final kept = files.settings[CodeFont.uiScaleSettingKey];
+      appEvent(
+        'zoom',
+        '$scale% -> ${CodeFont.uiScale.value}% '
+            '(settings.json: ${kept ?? 'unset'}, '
+            '${files.settings.values.length} settings'
+            '${files.settings.error == null ? '' : ', does not parse'})',
+      );
+      scale = CodeFont.uiScale.value;
+    });
     // Whether the editors wrap long lines.
     EditorWordWrap.follow(files.settings);
   }
@@ -426,9 +444,25 @@ Future<void> main(List<String> arguments) async {
   final customizations = CustomizationStore();
   // The phones paired with this computer (Settings → Mobile): listening
   // for them, if they are allowed to connect.
+  // The user's bots: agents that chat as a person does, with the phones.
+  final bots = kIsWeb
+      ? null
+      : Bots(
+          workspace: workspace,
+          store: PreferenceStore.file(
+            p.join(DataDirectory.current.botsDir, 'bots.json'),
+          ),
+          chinese: (locale.locale ?? AppLocale.systemLocale()).languageCode ==
+              'zh',
+        );
+  unawaited(bots?.start());
   final link = kIsWeb
       ? null
-      : LinkHost(workspace: workspace, customizations: customizations);
+      : LinkHost(
+          workspace: workspace,
+          customizations: customizations,
+          bots: bots,
+        );
   unawaited(link?.load());
   // The first frame is in the kept theme, restored from storage as VS Code
   // does before the workbench shows; its file is read after. The setting
@@ -515,6 +549,10 @@ Future<void> main(List<String> arguments) async {
         .layoutAtLaunch(workspace.layout);
   }
   WindowControls.trackActiveView();
+  // What an editor copies, its tags and all, on the clipboard itself.
+  if (WindowControls.isDesktop) {
+    MdClipboard.instance = const NativeMdClipboard();
+  }
   // An older `code` script opened windows for `code --version`.
   unawaited(ShellCommand.refresh());
   final ColorThemeStorage colorTheme = files == null

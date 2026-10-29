@@ -7880,6 +7880,8 @@
     }
   },
   "gitLogInNoBranch": "No branch has this commit.",
+  "gitLogInBranches": "In {count, plural, =1{1 branch} other{{count} branches}}",
+  "@gitLogInBranches": {"placeholders": {"count": {"type": "int"}}},
   "gitLogList": "List",
   "gitLogTree": "Tree",
   "gitLogFilterFiles": "Filter files (* and ? match any)",
@@ -7939,6 +7941,9 @@
     }
   },
   "gitLogCopyHash": "Copy the full hash",
+  "gitLogCopyRefNames": "Copy Branch or Tag Name",
+  "gitLogCopyName": "Copy '{name}'",
+  "@gitLogCopyName": {"placeholders": {"name": {"type": "String"}}},
   "gitLogLoading": "Loading history…",
   "gitLogWorktree": "Worktree",
   "gitLogWorktreeOf": "Worktree: {path}",
@@ -7999,7 +8004,6 @@
   "gitCommitMarkResolved": "Mark Resolved",
   "gitCommitExpandAll": "Expand All",
   "gitCommitCollapseAll": "Collapse All",
-  "gitCommitGroupByDirectory": "Group by Directory",
   "gitCommitEmptyMessage": "Enter a commit message.",
   "gitCommitNothingSelected": "Check the files to commit.",
   "gitCommitNoChanges": "No local changes",

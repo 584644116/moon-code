@@ -18471,6 +18471,12 @@ abstract class AppLocalizations {
   /// **'No branch has this commit.'**
   String get gitLogInNoBranch;
 
+  /// No description provided for @gitLogInBranches.
+  ///
+  /// In en, this message translates to:
+  /// **'In {count, plural, =1{1 branch} other{{count} branches}}'**
+  String gitLogInBranches(int count);
+
   /// No description provided for @gitLogList.
   ///
   /// In en, this message translates to:
@@ -18614,6 +18620,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copy the full hash'**
   String get gitLogCopyHash;
+
+  /// No description provided for @gitLogCopyRefNames.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Branch or Tag Name'**
+  String get gitLogCopyRefNames;
+
+  /// No description provided for @gitLogCopyName.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy \'{name}\''**
+  String gitLogCopyName(String name);
 
   /// No description provided for @gitLogLoading.
   ///
@@ -18770,12 +18788,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Collapse All'**
   String get gitCommitCollapseAll;
-
-  /// No description provided for @gitCommitGroupByDirectory.
-  ///
-  /// In en, this message translates to:
-  /// **'Group by Directory'**
-  String get gitCommitGroupByDirectory;
 
   /// No description provided for @gitCommitEmptyMessage.
   ///

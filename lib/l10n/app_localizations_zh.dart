@@ -10696,6 +10696,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get gitLogInNoBranch => '没有分支包含此提交。';
 
   @override
+  String gitLogInBranches(int count) {
+    return '所在分支（$count）';
+  }
+
+  @override
   String get gitLogList => '列表';
 
   @override
@@ -10777,6 +10782,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get gitLogCopyHash => '复制完整哈希';
+
+  @override
+  String get gitLogCopyRefNames => '复制分支或标签名';
+
+  @override
+  String gitLogCopyName(String name) {
+    return '复制“$name”';
+  }
 
   @override
   String get gitLogLoading => '正在读取历史…';
@@ -10863,9 +10876,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get gitCommitCollapseAll => '全部折叠';
-
-  @override
-  String get gitCommitGroupByDirectory => '按目录分组';
 
   @override
   String get gitCommitEmptyMessage => '请填写提交信息。';
