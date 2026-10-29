@@ -2432,6 +2432,60 @@ void main() {
     expect(find.byType(MarkdownEditor), findsNothing);
   });
 
+  testWidgets('a markdown file\'s changes (Git\'s) show it rendered as it is '
+      'after them, the changes a click away; a deleted one\'s, the '
+      'changes', (tester) async {
+    _bigWindow(tester);
+    await tester.pumpWidget(
+      _app(
+        FilePreview(
+          request: FileOpenRequest(
+            '/p/notes.md',
+            diff: true,
+            original: () async => '# Notes\n\nbefore\n',
+            readOnly: true,
+          ),
+          files: _Files({'/p/notes.md': '# Notes\n\nafter\n'}),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final preview = find.byType(MarkdownEditor);
+    expect(preview, findsOneWidget);
+    expect(tester.widget<MarkdownEditor>(preview).readOnly, isTrue);
+    expect(
+      tester.widget<MarkdownEditor>(preview).controller.text,
+      '# Notes\n\nafter\n',
+    );
+    expect(find.byType(IdeCodeDiff), findsNothing);
+
+    await tester.tap(find.text('Changes'));
+    await tester.pumpAndSettle();
+    expect(find.byType(MarkdownEditor), findsNothing);
+    expect(find.byType(IdeCodeDiff), findsOneWidget);
+    await tester.tap(find.text('Preview'));
+    await tester.pumpAndSettle();
+    expect(find.byType(MarkdownEditor), findsOneWidget);
+
+    await tester.pumpWidget(
+      _app(
+        FilePreview(
+          key: const ValueKey('deleted'),
+          request: FileOpenRequest(
+            '/p/gone.md',
+            diff: true,
+            original: () async => '# Gone\n',
+            readOnly: true,
+          ),
+          files: _Files({}),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(MarkdownEditor), findsNothing);
+    expect(find.byType(IdeCodeDiff), findsOneWidget);
+  });
+
   testWidgets('files dropped on a markdown file\'s preview are copied '
       'beside it and linked to, where they are let go', (tester) async {
     _bigWindow(tester);
