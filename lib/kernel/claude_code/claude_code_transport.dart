@@ -84,7 +84,9 @@ class ClaudeLaunch {
   final List<String> sdkServers;
 
   /// The only built-in tools it has (`--tools`; none for an empty list),
-  /// [sdkServers]' tools aside; all when null.
+  /// [sdkServers]' tools aside; all when null. Set, [sdkServers] are its
+  /// only MCP servers too (`--strict-mcp-config`): not the user's own,
+  /// configured for Claude Code.
   final List<String>? tools;
 
   /// Folders it works in besides [cwd] (a multi-folder workspace's): each
@@ -308,7 +310,11 @@ class ClaudeLaunch {
       jsonEncode(settings),
     ],
     if (!persist) '--no-session-persistence',
-    if (tools case final tools?) ...['--tools', tools.join(',')],
+    if (tools case final tools?) ...[
+      '--tools',
+      tools.join(','),
+      '--strict-mcp-config',
+    ],
     if (sdkServers.isNotEmpty) ...[
       '--mcp-config',
       jsonEncode({

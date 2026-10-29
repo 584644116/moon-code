@@ -231,6 +231,8 @@ void main() {
       // The browser's tool search, as it may use it; no other.
       expect(launch.tools, ['ToolSearch']);
       expect(launch.arguments, containsAllInOrder(['--tools', 'ToolSearch']));
+      // None of the user's MCP servers: their notices are not its to tell.
+      expect(launch.arguments, contains('--strict-mcp-config'));
     });
 
     test(

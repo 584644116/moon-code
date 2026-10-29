@@ -92,7 +92,8 @@ class KernelWorkspace {
   final String instructions;
 
   /// The only built-in tools it has (none for an empty list), the app's
-  /// own aside; all when null.
+  /// own aside; all when null. Set, the app's MCP servers are its only
+  /// ones: none of the user's.
   final List<String>? tools;
 }
 
