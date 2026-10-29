@@ -28,6 +28,7 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
     this.store,
     DateTime Function()? clock,
     this.chinese = false,
+    this.longRun = const Duration(minutes: 30),
   }) : folders = folders ?? BotFolders.data(),
        _clock = clock ?? DateTime.now;
 
@@ -40,6 +41,9 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
 
   /// Whether the assistant made at first is named and told in Chinese.
   final bool chinese;
+
+  /// How long an agent runs before the bots are told it does.
+  final Duration longRun;
 
   /// The settings its agent runs with: it asks nothing (its tools are
   /// allowed, all else refused), and works as an agent, not in Plan.
@@ -56,6 +60,11 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
 
   /// How each agent stood when last looked at, to tell what changed.
   final Map<AgentThread, ThreadStatus> _statuses = {};
+
+  /// Since when each agent at work has run; and those told of already.
+  final Map<AgentThread, DateTime> _runningSince = {};
+  final Set<AgentThread> _toldRunning = {};
+  Timer? _runningTimer;
 
   bool _started = false;
 
@@ -105,6 +114,7 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
       workspace.agentSetup = null;
     }
     _timer?.cancel();
+    _runningTimer?.cancel();
     super.dispose();
   }
 
@@ -132,7 +142,7 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
         // are deferred.
         tools: bot.can(BotAbility.browser) ? const ['ToolSearch'] : const [],
       ),
-      settings: settings,
+      settings: {...settings, 'model': ?bot.model},
       kernel: KernelRegistry.claudeCode.id,
     ),
     null => null,
@@ -231,7 +241,10 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
     String? id,
     required String name,
     String? avatar,
+    String gender = '',
+    String signature = '',
     required String identity,
+    String style = '',
     required Set<BotAbility> abilities,
     BotProactive proactive = const BotProactive(),
   }) {
@@ -248,7 +261,10 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
         name: name,
         folder: '',
         avatar: avatar,
+        gender: gender.trim(),
+        signature: signature.trim(),
         identity: identity.trim(),
+        style: style.trim(),
         abilities: abilities,
         proactive: proactive,
       );
@@ -266,7 +282,10 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
       name: name,
       avatar: avatar,
       clearAvatar: avatar == null,
+      gender: gender.trim(),
+      signature: signature.trim(),
       identity: identity.trim(),
+      style: style.trim(),
       abilities: abilities,
       proactive: proactive,
     );
@@ -305,6 +324,27 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
     notifyListeners();
   }
 
+  /// [bot] runs on [model] from now on: picked on its conversation, for
+  /// the next it starts to run on it too.
+  void setModel(Bot bot, String model) {
+    final index = _bots.indexWhere((b) => b.id == bot.id);
+    if (index < 0 || _bots[index].model == model) return;
+    _bots[index] = _bots[index].copyWith(model: model);
+    _save();
+    notifyListeners();
+  }
+
+  /// The model [bot]'s conversation runs on, as the picker names it.
+  String? modelOf(Bot bot) {
+    final thread = threadOf(bot);
+    if (thread != null && thread.isOpen) {
+      if (thread.session.models?.selected case final model?) {
+        return model.label;
+      }
+    }
+    return bot.model;
+  }
+
   String memory(Bot bot) => folders.readMemory(bot.folder);
 
   void setMemory(Bot bot, String text) {
@@ -327,6 +367,12 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
       final now = thread.status;
       final was = _statuses[thread];
       _statuses[thread] = now;
+      if (now == ThreadStatus.running) {
+        _runningSince[thread] ??= _clock();
+      } else {
+        _runningSince.remove(thread);
+        _toldRunning.remove(thread);
+      }
       if (was == null || was == now) continue;
       final kind = switch ((was, now)) {
         (_, ThreadStatus.needsInput) => BotEventKind.waiting,
@@ -339,19 +385,34 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
       };
       if (kind == null) continue;
       events.add(
-        BotEvent(
-          chat: BotTools.idOf(thread),
-          title: thread.title,
-          project: thread.project.name,
-          kind: kind,
-          at: _clock(),
+        _event(
+          thread,
+          kind,
           detail: kind == BotEventKind.failed ? _error(thread) : null,
         ),
       );
     }
     for (final thread in gone) {
       _statuses.remove(thread);
+      _runningSince.remove(thread);
+      _toldRunning.remove(thread);
     }
+    _tell(events);
+    _checkRunning();
+  }
+
+  BotEvent _event(AgentThread thread, BotEventKind kind, {String? detail}) =>
+      BotEvent(
+        chat: BotTools.idOf(thread),
+        title: thread.title,
+        project: thread.project.name,
+        kind: kind,
+        at: _clock(),
+        detail: detail,
+      );
+
+  /// [events] for the bots that write first, to tell when it is time.
+  void _tell(List<BotEvent> events) {
     if (events.isEmpty) return;
     for (final bot in _bots) {
       if (!bot.can(BotAbility.proactive) || bot.proactive.perDay <= 0) {
@@ -361,6 +422,39 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
       events.forEach(pacer.add);
     }
     _schedule();
+  }
+
+  /// The agents at work for [longRun] and more, told of once a run; and
+  /// a look again when the next of them will be.
+  @visibleForTesting
+  void checkRunning() => _checkRunning();
+
+  void _checkRunning() {
+    _runningTimer?.cancel();
+    _runningTimer = null;
+    final now = _clock();
+    final events = <BotEvent>[];
+    DateTime? next;
+    for (final MapEntry(key: thread, value: since) in _runningSince.entries) {
+      if (_toldRunning.contains(thread)) continue;
+      final due = since.add(longRun);
+      if (!due.isAfter(now)) {
+        _toldRunning.add(thread);
+        events.add(
+          _event(
+            thread,
+            BotEventKind.running,
+            detail: 'running for ${now.difference(since).inMinutes} min',
+          ),
+        );
+      } else if (next == null || due.isBefore(next)) {
+        next = due;
+      }
+    }
+    _tell(events);
+    if (next != null) {
+      _runningTimer = Timer(next.difference(now), _checkRunning);
+    }
   }
 
   bool isBotThread(AgentThread thread) => botAt(thread.project.path) != null;

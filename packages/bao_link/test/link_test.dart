@@ -131,8 +131,12 @@ void main() {
                 id: 'b1',
                 name: 'Mia',
                 avatar: '🌸',
+                gender: 'female',
+                signature: 'Tea first.',
                 identity: 'kind',
+                style: 'short',
                 proactive: BotProactive(perDay: 0),
+                model: 'Opus',
               ),
             ],
           ).toJson(),
@@ -149,6 +153,14 @@ void main() {
     expect(bao.updatedAt, DateTime.fromMillisecondsSinceEpoch(1000));
     expect(mia.abilities, isEmpty);
     expect((mia.avatar, mia.identity), ('🌸', 'kind'));
+    expect(
+      (mia.gender, mia.signature, mia.style, mia.model),
+      ('female', 'Tea first.', 'short', 'Opus'),
+    );
+    expect(
+      (bao.gender, bao.signature, bao.style, bao.model),
+      ('', '', '', null),
+    );
     expect(mia.proactive, const BotProactive(perDay: 0));
     // None, from a desktop before them.
     expect(

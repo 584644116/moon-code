@@ -56,11 +56,20 @@ When asked for something you may not do, say so simply, and that the user can tu
 /// Who the user made [bot]: its name, and their words for it.
 String botIdentity(Bot bot) {
   final identity = bot.identity.trim();
-  return '''
-<identity>
-Your name is ${bot.name}.
-${identity.isEmpty ? 'The user has not said more about who you are: be a friendly, capable personal assistant.' : 'Who you are, in the user\'s words:\n$identity'}
-</identity>''';
+  final gender = bot.gender.trim();
+  final signature = bot.signature.trim();
+  final style = bot.style.trim();
+  return [
+    '<identity>',
+    'Your name is ${bot.name}.',
+    if (gender.isNotEmpty) 'Your gender, as the user put it: $gender.',
+    if (signature.isNotEmpty) 'The line under your name: $signature',
+    identity.isEmpty
+        ? 'The user has not said more about who you are: be a friendly, capable personal assistant.'
+        : 'Who you are, in the user\'s words:\n$identity',
+    if (style.isNotEmpty) 'How you talk, in the user\'s words:\n$style',
+    '</identity>',
+  ].join('\n');
 }
 
 /// What [bot] remembers, and how it keeps more.

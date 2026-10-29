@@ -95,7 +95,10 @@ void main() {
       id: 'b',
       name: 'Mia',
       folder: '/bots/b',
-      identity: 'My girlfriend, playful and kind.',
+      gender: 'female',
+      signature: 'Tea first.',
+      identity: 'An old friend, playful and kind.',
+      style: 'Lowercase, lots of emoji.',
       abilities: {BotAbility.viewChats},
     );
 
@@ -108,9 +111,13 @@ void main() {
       expect(told, contains('cannot approve or deny'));
       expect(
         told.indexOf('<bot_rules>'),
-        lessThan(told.indexOf('My girlfriend')),
+        lessThan(told.indexOf('An old friend')),
       );
       expect(told, contains('Your name is Mia.'));
+      expect(told, contains('Your gender, as the user put it: female.'));
+      expect(told, contains('Tea first.'));
+      expect(told, contains('How you talk, in the user\'s words:'));
+      expect(told, contains('Lowercase, lots of emoji.'));
       expect(told, contains('Likes tea.'));
     });
 
@@ -282,6 +289,35 @@ void main() {
       );
     });
 
+    test('who it is, all the user wrote, kept; its model too', () async {
+      final mia = bots.save(
+        name: 'Mia',
+        gender: ' female ',
+        signature: 'Tea first.',
+        identity: 'An old friend.',
+        style: 'Short.',
+        abilities: {},
+      );
+      expect(
+        (mia.gender, mia.signature, mia.style),
+        ('female', 'Tea first.', 'Short.'),
+      );
+      bots.setModel(mia, 'opus');
+      expect(workspace.agentSetup!(mia.folder)!.settings, {
+        ...Bots.settings,
+        'model': 'opus',
+      });
+      await pumpEventQueue();
+      final kept = Bot.fromJson(
+        (store.preferences['bots'] as List).last,
+        root: folders.root!,
+      )!;
+      expect(
+        (kept.gender, kept.signature, kept.style, kept.model),
+        ('female', 'Tea first.', 'Short.', 'opus'),
+      );
+    });
+
     test('what it remembers: kept by it, seen, changed and cleared', () async {
       final bot = bots.bots.single;
       Future<void> remember(String action, String text) =>
@@ -325,6 +361,43 @@ void main() {
         ChatCodec.botEvent(note as UserMessageItem),
         contains('done: "${agent.title}"'),
       );
+    });
+
+    test('it tells of an agent at work a long while, once', () async {
+      final bot = bots.bots.single;
+      final agent = workspace.startAgent(workspace.projects.single);
+      agent.session.send(const ComposerMessage(text: 'build it'));
+      for (var i = 0; i < 300 && !agent.session.isStreaming; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      workspace.notifyListeners();
+      addTearDown(agent.session.stop);
+      now = now.add(const Duration(minutes: 29));
+      bots.checkRunning();
+      now = now.add(const Duration(minutes: 2));
+      bots.checkRunning();
+      now = now.add(const Duration(minutes: 2));
+      bots.deliver();
+      final session = bots.threadOf(bot)!.session;
+      expect(
+        ChatCodec.botEvent(session.itemAt(0) as UserMessageItem),
+        contains('running: "${agent.title}"'),
+      );
+      expect(
+        ChatCodec.botEvent(session.itemAt(0) as UserMessageItem),
+        contains('running for 31 min'),
+      );
+      // Not again, while it runs on.
+      now = now.add(const Duration(hours: 1));
+      bots.checkRunning();
+      now = now.add(const Duration(hours: 1));
+      bots.deliver();
+      expect([
+        for (var i = 0; i < session.itemCount; i++)
+          if (session.itemAt(i) case final UserMessageItem item
+              when ChatCodec.botEvent(item) != null)
+            item,
+      ], hasLength(1));
     });
   });
 }

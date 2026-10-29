@@ -197,9 +197,13 @@ class WorkspaceBridge {
       id: bot.id,
       name: bot.name,
       avatar: bot.avatar,
+      gender: bot.gender,
+      signature: bot.signature,
       identity: bot.identity,
+      style: bot.style,
       abilities: bot.abilities,
       proactive: bot.proactive,
+      model: bots.modelOf(bot),
       assistant: bot.assistant,
       session: session,
       status: thread?.status == ThreadStatus.running
@@ -353,11 +357,24 @@ class WorkspaceBridge {
         session.startPlan(workspace.l10n().planStartMessage);
         return null;
       case LinkMethods.choose:
-        _choose(
-          _thread(params['session']).session,
-          params['kind'] as String? ?? '',
-          params['option'] as String? ?? '',
-        );
+        final thread = _thread(params['session']);
+        final kind = params['kind'] as String? ?? '';
+        final option = params['option'] as String? ?? '';
+        final bot = bots?.botAt(thread.project.path);
+        // A bot's agent asks nothing and works as one: only its model,
+        // and how it thinks, are the user's to pick.
+        if (bot != null && (kind == 'mode' || kind == 'permission')) {
+          throw const LinkRemoteException(
+            LinkErrors.unsupported,
+            'A bot works as it does',
+          );
+        }
+        _choose(thread.session, kind, option);
+        if (bot != null && kind == 'model') {
+          if (thread.session.models?.selected.id case final model?) {
+            bots!.setModel(bot, model);
+          }
+        }
         return null;
       case LinkMethods.rename:
         workspace.rename(
@@ -448,7 +465,10 @@ class WorkspaceBridge {
           id: params['bot'] as String?,
           name: params['name'] as String? ?? '',
           avatar: params['avatar'] as String?,
+          gender: params['gender'] as String? ?? '',
+          signature: params['signature'] as String? ?? '',
           identity: params['identity'] as String? ?? '',
+          style: params['style'] as String? ?? '',
           abilities: {
             for (final name in (params['abilities'] as List?) ?? const [])
               ?BotAbility.values.asNameMap()[name],

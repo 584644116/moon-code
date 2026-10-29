@@ -73,7 +73,8 @@ class BotProactive {
 }
 
 /// A bot: an agent of the user's own making that talks as a person does,
-/// who it is ([identity]) all the user's words; what it may do, its
+/// who it is ([gender], [signature], [identity], [style]) all the user's
+/// words; what it may do, its
 /// [abilities]. Its conversation is [session] (none until the first
 /// message), on the desktop, its memory there too.
 class LinkBot {
@@ -81,9 +82,13 @@ class LinkBot {
     required this.id,
     required this.name,
     this.avatar,
+    this.gender = '',
+    this.signature = '',
     this.identity = '',
+    this.style = '',
     this.abilities = const {},
     this.proactive = const BotProactive(),
+    this.model,
     this.assistant = false,
     this.session,
     this.status = BotStatus.idle,
@@ -96,7 +101,10 @@ class LinkBot {
     id: json['id'] as String? ?? '',
     name: json['name'] as String? ?? '',
     avatar: json['avatar'] as String?,
+    gender: json['gender'] as String? ?? '',
+    signature: json['signature'] as String? ?? '',
     identity: json['identity'] as String? ?? '',
+    style: json['style'] as String? ?? '',
     abilities: {
       for (final name in (json['abilities'] as List?) ?? const [])
         ?BotAbility.values.asNameMap()[name],
@@ -105,6 +113,7 @@ class LinkBot {
       final Map<String, Object?> proactive => BotProactive.fromJson(proactive),
       _ => const BotProactive(),
     },
+    model: json['model'] as String?,
     assistant: json['assistant'] == true,
     session: json['session'] as String?,
     status: BotStatus.values.asNameMap()[json['status']] ?? BotStatus.idle,
@@ -122,10 +131,23 @@ class LinkBot {
   /// An emoji, or none (its name's first letter then).
   final String? avatar;
 
-  /// Who it is and how it talks, as the user wrote it.
+  /// As the user put it: a word, or none.
+  final String gender;
+
+  /// A line under its name.
+  final String signature;
+
+  /// Who it is, as the user wrote it.
   final String identity;
+
+  /// How it talks, as the user wrote it.
+  final String style;
   final Set<BotAbility> abilities;
   final BotProactive proactive;
+
+  /// The model its conversation runs on, as the model picker names it;
+  /// it is picked there ([LinkMethods.choose]).
+  final String? model;
 
   /// The one the desktop starts with: not deleted.
   final bool assistant;
@@ -147,12 +169,16 @@ class LinkBot {
     'id': id,
     'name': name,
     'avatar': ?avatar,
+    if (gender.isNotEmpty) 'gender': gender,
+    if (signature.isNotEmpty) 'signature': signature,
     'identity': identity,
+    if (style.isNotEmpty) 'style': style,
     'abilities': [
       for (final ability in BotAbility.values)
         if (abilities.contains(ability)) ability.name,
     ],
     'proactive': proactive.toJson(),
+    'model': ?model,
     if (assistant) 'assistant': true,
     'session': ?session,
     'status': status.name,

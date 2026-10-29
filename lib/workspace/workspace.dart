@@ -2619,7 +2619,8 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
     final snapshot = thread._snapshot;
     if (snapshot == before) return;
     var changed = _keepChoices(thread, snapshot);
-    if (before != null) {
+    // Picked for an agent of the app's own (a bot's): its alone.
+    if (before != null && !isAppFolder(thread.project.path)) {
       // Picked for this agent: the next new one starts with it too.
       if (before.kernel != snapshot.kernel) {
         _preferredKernel = thread.kernel;
@@ -2651,7 +2652,9 @@ class Workspace extends ChangeNotifier implements ColorThemeStorage {
           }
         }
       }
-      if (before.status != snapshot.status) thread.updatedAt = DateTime.now();
+    }
+    if (before != null && before.status != snapshot.status) {
+      thread.updatedAt = DateTime.now();
     }
     if (changed) _save();
     _snapshots[thread] = snapshot;

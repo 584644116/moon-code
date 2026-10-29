@@ -2,6 +2,8 @@ import 'package:bao_link/bao_link.dart';
 import 'package:bao_remote/claude.dart' show ClaudeHistoryPage;
 import 'package:baocode/chat/chat_session.dart' show ComposerMessage;
 import 'package:baocode/chat/chat_models.dart';
+import 'package:baocode/bots/bot_folders.dart';
+import 'package:baocode/bots/bots.dart';
 import 'package:baocode/kernel/agent_kernel.dart';
 import 'package:baocode/kernel/claude_code/claude_code_kernel.dart';
 import 'package:baocode/link/chat_codec.dart';
@@ -87,18 +89,11 @@ void main() {
     await pumpEventQueue();
     id = WorkspaceBridge.idOf(thread);
 
-    final (a, b) = MemoryLinkSocket.pair();
-    final desktop = LinkIdentity.generate();
-    final accepted = SecureChannel.accept(b, identity: desktop);
-    final connected = await SecureChannel.connect(
-      a,
-      identity: LinkIdentity.generate(),
-      serverKey: desktop.publicKey,
-    );
-    phone = LinkPeer(connected);
+    final LinkPeer desktop;
+    (phone, desktop) = await peers();
     bridge = WorkspaceBridge(
       workspace: workspace,
-      peer: LinkPeer(await accepted),
+      peer: desktop,
       device: () => const DeviceInfo(name: 'Mac', kind: 'mac', system: 'macOS'),
       throttle: const Duration(milliseconds: 10),
     )..start();
@@ -357,4 +352,71 @@ void main() {
       );
     });
   });
+
+  test('a bot\'s agent: its model the user picks, not how it asks', () async {
+    late final KernelDescriptor descriptor;
+    descriptor = KernelDescriptor(
+      id: 'claude-code',
+      label: 'Claude Code',
+      icon: Icons.auto_awesome_rounded,
+      description: '',
+      create: (context) =>
+          ClaudeCodeKernel(descriptor, context, start: (_) async => FakeCli()),
+    );
+    final workspace = Workspace(kernels: [descriptor]);
+    addTearDown(workspace.dispose);
+    final bots = Bots(workspace: workspace, folders: MemoryBotFolders());
+    await bots.start();
+    addTearDown(bots.dispose);
+    final (_, desktop) = await peers();
+    final withBots = WorkspaceBridge(
+      workspace: workspace,
+      peer: desktop,
+      device: () => const DeviceInfo(name: 'Mac', kind: 'mac', system: 'macOS'),
+      bots: bots,
+    );
+    addTearDown(withBots.dispose);
+    final assistant = bots.bots.single;
+    final thread = bots.threadFor(assistant);
+    final session = WorkspaceBridge.idOf(thread);
+    expect(
+      withBots.handle(LinkMethods.choose, {
+        'session': session,
+        'kind': 'permission',
+        'option': 'bypassPermissions',
+      }),
+      throwsA(
+        isA<LinkRemoteException>().having(
+          (e) => e.code,
+          'code',
+          LinkErrors.unsupported,
+        ),
+      ),
+    );
+    final models = thread.session.models!;
+    final other = models.options.firstWhere((o) => o != models.selected);
+    await withBots.handle(LinkMethods.choose, {
+      'session': session,
+      'kind': 'model',
+      'option': other.id,
+    });
+    expect(bots.byId('assistant')!.model, other.id);
+    expect(
+      withBots.state().bots.single,
+      isA<LinkBot>().having((b) => b.model, 'model', other.label),
+    );
+  });
+}
+
+/// A phone's end and a desktop's, connected.
+Future<(LinkPeer, LinkPeer)> peers() async {
+  final (a, b) = MemoryLinkSocket.pair();
+  final desktop = LinkIdentity.generate();
+  final accepted = SecureChannel.accept(b, identity: desktop);
+  final connected = await SecureChannel.connect(
+    a,
+    identity: LinkIdentity.generate(),
+    serverKey: desktop.publicKey,
+  );
+  return (LinkPeer(connected), LinkPeer(await accepted));
 }

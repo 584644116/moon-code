@@ -10,6 +10,9 @@ enum BotEventKind {
   /// Its turn ended on an error.
   failed,
 
+  /// It has been at work a long while (see [BotEvent.detail]).
+  running,
+
   /// Its turn is done.
   done,
 }
@@ -31,7 +34,7 @@ class BotEvent {
   final BotEventKind kind;
   final DateTime at;
 
-  /// A line more: what it asks, the error.
+  /// A line more: what it asks, the error, how long it has run.
   final String? detail;
 
   String get line {
