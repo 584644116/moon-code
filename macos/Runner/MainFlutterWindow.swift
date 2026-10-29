@@ -326,6 +326,10 @@ class BaoWindow: NSWindow {
       let pasteboard = NSPasteboard.general
       result(pasteboard.canReadObject(
         forClasses: [NSString.self, NSURL.self, NSImage.self], options: nil))
+    case "writePasteboardMarkdown":
+      result(Self.writePasteboardMarkdown(call.arguments as? [String: Any] ?? [:]))
+    case "readPasteboardMarkdown":
+      result(Self.readPasteboardMarkdown())
     case "trashItem":
       // The IDE's Move to Trash (Finder's Put Back works on it).
       guard let path = call.arguments as? String else {
@@ -501,6 +505,30 @@ class BaoWindow: NSWindow {
     let pasteboard = NSPasteboard.general
     pasteboard.clearContents()
     return pasteboard.writeObjects([item])
+  }
+
+  /// What an editor copied, beside its text: its markdown, the composer's
+  /// tags and all (see lib/platform/native_md_clipboard.dart).
+  static let markdownType = NSPasteboard.PasteboardType("dev.baocode.markdown")
+
+  /// Puts `text` on the clipboard for other apps, and beside it `copy`
+  /// (an editor's, as JSON, kept as it is) for the app's editors.
+  static func writePasteboardMarkdown(_ arguments: [String: Any]) -> Bool {
+    guard let text = arguments["text"] as? String,
+          let copy = arguments["copy"] as? String
+    else { return false }
+    let item = NSPasteboardItem()
+    item.setString(text, forType: .string)
+    item.setString(copy, forType: markdownType)
+    let pasteboard = NSPasteboard.general
+    pasteboard.clearContents()
+    return pasteboard.writeObjects([item])
+  }
+
+  /// The editors' copy on the clipboard; nil when something was copied
+  /// since (that cleared it).
+  static func readPasteboardMarkdown() -> String? {
+    NSPasteboard.general.string(forType: markdownType)
   }
 
   /// Images on the clipboard: copied image files, or, when there is no

@@ -13,6 +13,7 @@ import '../md_blocks.dart';
 import '../md_controller.dart';
 import '../md_edits.dart';
 import '../md_inline.dart';
+import 'md_clipboard.dart';
 import 'md_display.dart';
 import 'md_embeds.dart';
 import 'md_offsets.dart';
@@ -51,6 +52,7 @@ class MarkdownEditor extends StatefulWidget {
     this.physics,
     this.onKey,
     this.onPaste,
+    this.onPasteCopy,
     this.colorize,
     this.onClick,
     this.revealsLinks = true,
@@ -84,6 +86,11 @@ class MarkdownEditor extends StatefulWidget {
   /// pasted it (files, pictures, HTML made markdown…), else the text is
   /// put in as it is.
   final Future<bool> Function()? onPaste;
+
+  /// A paste of what an editor of its kind copied: its markdown as it is
+  /// to go in (its tags numbered on from those here, say); as it is
+  /// without.
+  final String Function(String markdown)? onPasteCopy;
 
   /// Code blocks' colors.
   final MarkdownCodeColorizer? colorize;
@@ -2074,14 +2081,6 @@ class MarkdownEditorState extends State<MarkdownEditor>
 
   // --- Copying and pasting ------------------------------------------------------------
 
-  /// What the editor last copied: as text (on the clipboard) and as its
-  /// markdown (pasted back here while the clipboard still has the text),
-  /// and whether that was a plain text's ([MarkdownController.plain]).
-  ({String plain, String markdown, bool fromPlain})? get lastCopy => _copied;
-
-  /// Any editor's, pasted in another of its kind (plain or markdown).
-  static ({String plain, String markdown, bool fromPlain})? _copied;
-
   /// [start] to [end] as text: what it shows, a picture as its embeds'
   /// [MarkdownEmbeds.plainText].
   String plainText(int start, int end) {
@@ -2127,31 +2126,31 @@ class MarkdownEditorState extends State<MarkdownEditor>
     return parts.join('\n');
   }
 
-  /// The selection copied (cut, where [cut]).
+  /// The selection copied (cut, where [cut]): as text, and as its markdown
+  /// for an editor of its kind to paste (see [MdClipboard]).
   Future<void> copy({bool cut = false}) async {
     final selection = controller.selection;
     if (!selection.isValid || selection.isCollapsed) return;
-    final markdown = controller.substring(selection.start, selection.end);
-    final plain = plainText(selection.start, selection.end);
-    _copied = (plain: plain, markdown: markdown, fromPlain: controller.plain);
+    final clip = MdClip(
+      plain: plainText(selection.start, selection.end),
+      markdown: controller.substring(selection.start, selection.end),
+      fromPlain: controller.plain,
+    );
     if (cut && !widget.readOnly) {
       controller.replace(selection.start, selection.end, '');
     }
-    await Clipboard.setData(ClipboardData(text: plain));
+    await MdClipboard.instance.write(clip);
   }
 
-  /// What the clipboard has, put in place of the selection.
+  /// What the clipboard has, put in place of the selection: an editor's
+  /// copy of its kind as its markdown, else [MarkdownEditor.onPaste]'s or
+  /// the text.
   Future<void> paste() async {
     if (widget.readOnly) return;
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    final text = data?.text;
+    final (:text, :clip) = await MdClipboard.instance.read();
     if (!mounted) return;
-    final copied = _copied;
-    if (text != null &&
-        copied != null &&
-        text == copied.plain &&
-        copied.fromPlain == controller.plain) {
-      insertText(copied.markdown);
+    if (clip != null && clip.fromPlain == controller.plain) {
+      insertText(widget.onPasteCopy?.call(clip.markdown) ?? clip.markdown);
       return;
     }
     if (widget.onPaste != null && await widget.onPaste!()) return;
