@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:bao_link/bao_link.dart';
 import 'package:bao_remote/claude.dart' show ClaudeHistoryPage;
 import 'package:baocode/chat/chat_session.dart' show ComposerMessage;
@@ -404,6 +406,75 @@ void main() {
     expect(
       withBots.state().bots.single,
       isA<LinkBot>().having((b) => b.model, 'model', other.label),
+    );
+  });
+
+  test('a bot\'s picture: sent with it, asked for, kept', () async {
+    final workspace = Workspace();
+    addTearDown(workspace.dispose);
+    final bots = Bots(workspace: workspace, folders: MemoryBotFolders());
+    await bots.start();
+    addTearDown(bots.dispose);
+    final (_, desktop) = await peers();
+    final withBots = WorkspaceBridge(
+      workspace: workspace,
+      peer: desktop,
+      device: () => const DeviceInfo(name: 'Mac', kind: 'mac', system: 'macOS'),
+      bots: bots,
+    );
+    addTearDown(withBots.dispose);
+    final jpeg = base64.encode([255, 216, 255, 1, 2, 3]);
+    final made = (await withBots.handle(LinkMethods.saveBot, {
+      'name': 'Mia',
+      'identity': '',
+      'abilities': <String>[],
+      'avatarImage': {'data': jpeg, 'type': 'image/jpeg'},
+    }) as Map)['bot'];
+    final mia = LinkBot.fromJson(made as Map<String, Object?>);
+    expect(mia.hasAvatarImage, isTrue);
+    expect(mia.avatar, endsWith('.jpg'));
+    expect(await withBots.handle(LinkMethods.botAvatar, {'bot': mia.id}), {
+      'type': 'image/jpeg',
+      'data': jpeg,
+    });
+    // Kept by its name as other things change.
+    await withBots.handle(LinkMethods.saveBot, {
+      'bot': mia.id,
+      'name': 'Mia B.',
+      'avatar': mia.avatar,
+      'identity': '',
+      'abilities': <String>[],
+    });
+    expect(bots.byId(mia.id)!.avatar, mia.avatar);
+    // What is not a picture, or too large, is refused.
+    for (final image in [
+      {'data': jpeg, 'type': 'text/html'},
+      {
+        'data': base64.encode(List.filled(LinkLimits.avatar + 1, 0)),
+        'type': 'image/png',
+      },
+    ]) {
+      expect(
+        withBots.handle(LinkMethods.saveBot, {
+          'bot': mia.id,
+          'name': 'Mia',
+          'identity': '',
+          'abilities': <String>[],
+          'avatarImage': image,
+        }),
+        throwsA(isA<LinkRemoteException>()),
+      );
+    }
+    // None for one with an emoji.
+    expect(
+      withBots.handle(LinkMethods.botAvatar, {'bot': 'assistant'}),
+      throwsA(
+        isA<LinkRemoteException>().having(
+          (e) => e.code,
+          'code',
+          LinkErrors.notFound,
+        ),
+      ),
     );
   });
 }

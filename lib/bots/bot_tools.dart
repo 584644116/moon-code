@@ -1,11 +1,16 @@
 import 'dart:async';
 
+import 'package:bao_link/bao_link.dart'
+    show LinkLimits, builtInSticker, builtInStickers;
+
 import '../chat/chat_models.dart';
 import '../chat/chat_session.dart';
 import '../ide/file_service.dart';
+import '../images/image_tools.dart' show imagePreview;
 import '../kernel/claude_code/claude_sdk_tools.dart';
 import '../link/chat_codec.dart';
 import '../link/workspace_bridge.dart' show WorkspaceBridge, hostFilesOf;
+import '../models/image_api.dart' show imageMediaType;
 import '../workspace/workspace.dart';
 import 'bot.dart';
 import 'bots.dart';
@@ -382,6 +387,95 @@ abstract final class BotTools {
           summary: (input, _) => '${input['path'] ?? ''}',
         ),
         const BotToolAccess({BotAbility.readFiles}),
+      ),
+      (
+        tool(
+          ChatCodec.botStickerTool,
+          'Sends one of the app\'s stickers into this chat, as a person '
+          'would in a chat app: now and then, where it fits the mood, '
+          'never in place of an answer. The user\'s own come as '
+          '"[Sticker: id]". The stickers:\n'
+          '${[for (final sticker in builtInStickers) '- ${sticker.id}: ${sticker.en}'].join('\n')}',
+          {
+            'sticker': {
+              'type': 'string',
+              'enum': [for (final sticker in builtInStickers) sticker.id],
+            },
+          },
+          (input, call) async {
+            final id = text(input, 'sticker');
+            if (builtInSticker(id) == null) {
+              throw ArgumentError('No sticker $id');
+            }
+            return 'Sent.';
+          },
+          required: ['sticker'],
+          summary: (input, _) => '${input['sticker'] ?? ''}',
+        ),
+        const BotToolAccess({}),
+      ),
+      (
+        tool(
+          ChatCodec.botImageTool,
+          'Sends a picture into this chat: one of a project\'s files '
+          '(project and path), or one on the web (url). A picture made '
+          'with generate_image shows in the chat by itself: do not send '
+          'it again.',
+          {
+            'project': {
+              'type': 'string',
+              'description': 'Its name or id, for one of its files.',
+            },
+            'path': {
+              'type': 'string',
+              'description': "The file, from the project's root.",
+            },
+            'url': {
+              'type': 'string',
+              'description': 'A picture on the web: its https address.',
+            },
+          },
+          (input, call) async {
+            final url = (input['url'] as String? ?? '').trim();
+            if (url.isNotEmpty) {
+              final uri = Uri.tryParse(url);
+              if (uri == null ||
+                  !(uri.isScheme('https') || uri.isScheme('http')) ||
+                  uri.host.isEmpty) {
+                throw ArgumentError('Not a web address: $url');
+              }
+              return 'Sent.';
+            }
+            if (!botOf(call).can(BotAbility.readFiles)) {
+              throw StateError(
+                "You cannot read the projects' files, so cannot send them.",
+              );
+            }
+            final found = project(input);
+            final (:files, :paths) = hostFilesOf(found);
+            final full = paths.normalize(
+              paths.join(found.root, text(input, 'path')),
+            );
+            if (!paths.isWithin(found.root, full)) {
+              throw StateError('Not in the project');
+            }
+            final bytes = await readBytesThrough(files, full);
+            if (bytes.length > LinkLimits.image) {
+              throw StateError('Too large to send (over 8 MB).');
+            }
+            final type =
+                imageMediaType(bytes) ??
+                (throw StateError('Not a PNG, JPEG, WebP or GIF picture.'));
+            // As small as the agent's own pictures: the phone shows it so.
+            final preview = await imagePreview(bytes, type);
+            return [
+              claudeSdkText('Sent.'),
+              claudeSdkImage(preview.base64, preview.type),
+            ];
+          },
+          summary: (input, _) => '${input['path'] ?? input['url'] ?? ''}',
+        ),
+        const BotToolAccess({}),
       ),
       (
         tool(

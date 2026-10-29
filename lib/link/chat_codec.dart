@@ -21,6 +21,14 @@ abstract final class ChatCodec {
   /// input's `chat`), as a card that opens it.
   static const botCardTool = 'bot_show_chat';
 
+  /// The bot's tool that sends one of the app's stickers (its input's
+  /// `sticker`, as `package:bao_link`'s builtInStickers has it).
+  static const botStickerTool = 'bot_send_sticker';
+
+  /// The bot's tool that sends a picture: a file's, which it answers with
+  /// (the item's images), or one on the web (its input's `url`).
+  static const botImageTool = 'bot_send_image';
+
   /// What the app told a bot in [item], if it is such a note.
   static String? botEvent(UserMessageItem item) {
     final text = item.text.trim();
@@ -30,13 +38,44 @@ abstract final class ChatCodec {
   }
 
   /// The agent [item] shows as a card, if it is the bot's tool that does.
-  static String? botCard(ToolCallItem item) => switch (item) {
-    ToolCallItem(tool: botCardTool, :final input) => switch (input['chat']) {
-      final String chat when chat.isNotEmpty => chat,
-      _ => null,
-    },
-    _ => null,
-  };
+  static String? botCard(ToolCallItem item) =>
+      _botInput(item, botCardTool, 'chat');
+
+  /// The sticker [item] sent, if it is the bot's tool that does.
+  static String? botSticker(ToolCallItem item) =>
+      _botInput(item, botStickerTool, 'sticker');
+
+  /// The picture on the web [item] sent, if it is the bot's tool that did.
+  static String? botImageUrl(ToolCallItem item) =>
+      switch (_botInput(item, botImageTool, 'url')) {
+        final String url
+            when item.status != ToolStatus.failed &&
+                (url.startsWith('https://') || url.startsWith('http://')) =>
+          url,
+        _ => null,
+      };
+
+  static String? _botInput(ToolCallItem item, String tool, String key) =>
+      switch (item) {
+        ToolCallItem(tool: final named, :final input) when named == tool =>
+          switch (input[key]) {
+            final String value when value.isNotEmpty => value,
+            _ => null,
+          },
+        _ => null,
+      };
+
+  /// What the user's message says when it is a sticker: [id]'s (its
+  /// picture goes with it).
+  static String stickerText(String id) => '[Sticker: $id]';
+
+  /// The sticker a message of the user's ([text], its pictures' references
+  /// aside) is, if it is one.
+  static String? sticker(String text) => _stickerText.firstMatch(
+    text.replaceAll(imageReferencePattern, '').trim(),
+  )?[1];
+
+  static final _stickerText = RegExp(r'^\[Sticker: ([\w-]+)\]$');
 
   static Map<String, Object?> encode(ChatItem item) => switch (item) {
     UserMessageItem() => {
@@ -74,6 +113,8 @@ abstract final class ChatCodec {
       'output': ?_head(item.output),
       'tool': ?item.tool,
       'card': ?botCard(item),
+      'sticker': ?botSticker(item),
+      'url': ?botImageUrl(item),
       // What a browser's call does, for its line to say.
       if (item.kind == ToolKind.browser)
         'browse': {
@@ -212,6 +253,8 @@ abstract final class ChatCodec {
         images: _decodeImages(json['images']),
         input: switch ((json['making'], json['browse'], json['card'])) {
           (_, _, final String card) => {'chat': card},
+          _ when json['sticker'] is String => {'sticker': json['sticker']},
+          _ when json['url'] is String => {'url': json['url']},
           (final Map<String, Object?> making, _, _) => {
             'prompt': '',
             'count': ?making['count'],

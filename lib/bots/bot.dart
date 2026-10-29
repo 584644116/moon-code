@@ -1,7 +1,9 @@
-import 'package:bao_link/bao_link.dart' show BotAbility, BotProactive;
+import 'package:bao_link/bao_link.dart'
+    show BotAbility, BotProactive, isAvatarImage;
 import 'package:path/path.dart' as p;
 
-export 'package:bao_link/bao_link.dart' show BotAbility, BotProactive;
+export 'package:bao_link/bao_link.dart'
+    show BotAbility, BotProactive, isAvatarImage;
 
 /// A bot as the user made it: who it is ([identity], [gender], [style],
 /// their words), what it
@@ -38,6 +40,15 @@ class Bot {
       abilities: {
         for (final name in (json['abilities'] as List?) ?? const [])
           ?BotAbility.values.asNameMap()[name],
+        // Those come since it was kept: on for the assistant, as all of
+        // its are; off for the user's own, as a new bot's are.
+        if (json['assistant'] == true)
+          for (final ability in BotAbility.values)
+            if (!switch (json['known']) {
+              final List known => known.contains(ability.name),
+              _ => _firstAbilities.contains(ability.name),
+            })
+              ability,
       },
       proactive: switch (json['proactive']) {
         final Map<String, Object?> proactive => BotProactive.fromJson(
@@ -57,8 +68,24 @@ class Bot {
   /// Where its conversation runs, and its memory is kept.
   final String folder;
 
-  /// An emoji; none for its name's first letter.
+  /// An emoji, or its picture: the name of its file in [folder]
+  /// ([isAvatarImage]); none for its name's first letter.
   final String? avatar;
+
+  /// Its picture's file, if it has one.
+  String? get avatarFile =>
+      isAvatarImage(avatar) ? p.join(folder, avatar) : null;
+
+  /// The abilities there were before the app kept which it knew of.
+  static const _firstAbilities = {
+    'viewChats',
+    'manageTasks',
+    'sendToChats',
+    'newChat',
+    'readFiles',
+    'browser',
+    'proactive',
+  };
 
   /// As the user put it: a word, or none.
   final String gender;
@@ -120,6 +147,8 @@ class Bot {
       for (final ability in BotAbility.values)
         if (abilities.contains(ability)) ability.name,
     ],
+    // Which there were, to tell those that come later.
+    'known': [for (final ability in BotAbility.values) ability.name],
     'proactive': proactive.toJson(),
     'model': ?model,
     if (assistant) 'assistant': true,

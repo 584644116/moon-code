@@ -93,6 +93,10 @@ abstract interface class ClaudeSdkGate {
   /// Whether what [feature] tells of its tools ([ClaudeSdkTools.instruct])
   /// is told there.
   bool tellsFeature(String cwd, String feature);
+
+  /// Whether a tool called there may wait on the user at the computer (to
+  /// pick a model, say): not where there is none to.
+  bool asksUser(String cwd);
 }
 
 /// The app's server and its tools (registered as their features start).
@@ -130,6 +134,10 @@ abstract final class ClaudeSdkTools {
 
   static bool _tells(String cwd, String feature) =>
       gate?.tellsFeature(cwd, feature) ?? true;
+
+  /// Whether a tool called by an agent working in [cwd] may wait on the
+  /// user at the computer ([ClaudeSdkGate.asksUser]).
+  static bool asksUser(String cwd) => gate?.asksUser(cwd) ?? true;
 
   /// The tool an agent calls [name] (`mcp__baocode__<name>`), if one of
   /// this server's.

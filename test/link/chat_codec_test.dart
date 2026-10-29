@@ -155,6 +155,52 @@ void main() {
       );
     });
 
+    test('stickers and pictures from the web go as they were sent', () {
+      final sticker = roundTrip(
+        const ToolCallItem(
+          kind: ToolKind.other,
+          tool: ChatCodec.botStickerTool,
+          target: 'happy',
+          input: {'sticker': 'happy'},
+        ),
+      );
+      expect(ChatCodec.botSticker(sticker), 'happy');
+      final url = roundTrip(
+        const ToolCallItem(
+          kind: ToolKind.other,
+          tool: ChatCodec.botImageTool,
+          target: 'x',
+          input: {'url': 'https://example.com/a.png'},
+        ),
+      );
+      expect(ChatCodec.botImageUrl(url), 'https://example.com/a.png');
+      // Not one that failed, nor what is no web address.
+      for (final item in [
+        const ToolCallItem(
+          kind: ToolKind.other,
+          tool: ChatCodec.botImageTool,
+          target: 'x',
+          status: ToolStatus.failed,
+          input: {'url': 'https://example.com/a.png'},
+        ),
+        const ToolCallItem(
+          kind: ToolKind.other,
+          tool: ChatCodec.botImageTool,
+          target: 'x',
+          input: {'url': 'file:///etc/passwd'},
+        ),
+      ]) {
+        expect(ChatCodec.botImageUrl(roundTrip(item)), isNull);
+      }
+    });
+
+    test('the user\'s sticker is told by its text', () {
+      expect(ChatCodec.sticker(ChatCodec.stickerText('love')), 'love');
+      expect(ChatCodec.sticker('[Sticker: love]\n[Image #3]'), 'love');
+      expect(ChatCodec.sticker('I [Sticker: love] it'), isNull);
+      expect(ChatCodec.sticker('hi'), isNull);
+    });
+
     test('notes from the app are told from the user\'s words', () {
       UserMessageItem user(String text) =>
           ChatCodec.decode(

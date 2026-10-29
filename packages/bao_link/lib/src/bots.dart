@@ -22,6 +22,9 @@ enum BotAbility {
   /// Uses the user's browser, as the agents may.
   browser,
 
+  /// Makes pictures, with the image model the desktop has set up.
+  images,
+
   /// Writes first, of what happened (an agent waits, fails).
   proactive,
 }
@@ -128,8 +131,13 @@ class LinkBot {
   final String id;
   final String name;
 
-  /// An emoji, or none (its name's first letter then).
+  /// An emoji, or a picture ([isAvatarImage]: the name of its file on the
+  /// desktop, asked for with [LinkMethods.botAvatar]); none for its name's
+  /// first letter.
   final String? avatar;
+
+  /// Whether its [avatar] is a picture.
+  bool get hasAvatarImage => isAvatarImage(avatar);
 
   /// As the user put it: a word, or none.
   final String gender;
@@ -190,3 +198,49 @@ class LinkBot {
 
 /// Whether a bot is writing.
 enum BotStatus { idle, typing }
+
+/// Whether [avatar] (a bot's) is a picture, by its file's name, rather
+/// than an emoji. Its name changes with what it shows.
+bool isAvatarImage(String? avatar) =>
+    avatar != null && _avatarFile.hasMatch(avatar);
+
+final _avatarFile = RegExp(r'^[\w-]+\.(png|jpe?g|webp|gif)$');
+
+/// One of the stickers the app comes with: its [id], as a message names it
+/// (`[Sticker: id]`, see the chat codec) and the phone's picture of it;
+/// what it says, in English ([en]) and Chinese ([zh]).
+class LinkSticker {
+  const LinkSticker(this.id, this.en, this.zh);
+
+  final String id;
+  final String en;
+  final String zh;
+}
+
+/// The stickers the app comes with, as the phone shows them to pick.
+const builtInStickers = [
+  LinkSticker('hi', 'hi', '嗨'),
+  LinkSticker('ok', 'OK, thumbs up', '好的'),
+  LinkSticker('happy', 'happy', '开心'),
+  LinkSticker('laugh', 'laughing', '哈哈'),
+  LinkSticker('love', 'love it', '喜欢'),
+  LinkSticker('thanks', 'thank you', '谢谢'),
+  LinkSticker('thinking', 'thinking', '想想'),
+  LinkSticker('confused', 'confused', '疑惑'),
+  LinkSticker('surprised', 'surprised', '惊讶'),
+  LinkSticker('sad', 'sad', '难过'),
+  LinkSticker('cry', 'crying', '哭哭'),
+  LinkSticker('angry', 'angry', '生气'),
+  LinkSticker('sleepy', 'sleepy', '困了'),
+  LinkSticker('awkward', 'awkward', '尴尬'),
+  LinkSticker('cool', 'cool', '酷'),
+  LinkSticker('party', 'celebrating', '庆祝'),
+];
+
+/// The built-in sticker [id], if there is one.
+LinkSticker? builtInSticker(String id) {
+  for (final sticker in builtInStickers) {
+    if (sticker.id == id) return sticker;
+  }
+  return null;
+}

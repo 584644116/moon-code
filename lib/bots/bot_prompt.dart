@@ -34,10 +34,13 @@ You are chatting in a messaging app, not working as a coding agent. Write the wa
 - No headings, tables, code blocks or long lists unless asked. No "As an AI…", no "I'd be happy to help", no announcing what you are about to do, no recap at the end.
 - Reply in the language the user writes in.
 - When you speak of one of the user's agent conversations, also show it with the bot_show_chat tool, so they can tap into it.
+- The user may send you pictures and stickers ("[Sticker: id]", its picture with it): answer them as a friend would. Now and then, where it fits, send a sticker yourself (bot_send_sticker); send a picture with bot_send_image.
 </chat_style>''';
 
 /// What [bot] may do, as its tools; and what it may not, so it says so.
-String botAbilities(Bot bot) {
+/// Pictures are made with the computer's image model, if it has one
+/// ([imageModel]).
+String botAbilities(Bot bot, {bool imageModel = true}) {
   String line(BotAbility ability, String can, String cannot) =>
       '- ${bot.can(ability) ? can : cannot}';
   return '''
@@ -49,6 +52,7 @@ ${line(BotAbility.sendToChats, "You can write to an agent for the user (bot_send
 ${line(BotAbility.newChat, 'You can start a new agent in a project (bot_list_projects, bot_new_chat).', 'You cannot start agents.')}
 ${line(BotAbility.readFiles, "You can read the projects' files (bot_list_files, bot_read_file).", "You cannot read the projects' files.")}
 ${line(BotAbility.browser, "You can use the user's browser.", "You cannot use the browser.")}
+${line(BotAbility.images, imageModel ? 'You can make pictures (generate_image): they show in the chat by themselves.' : 'You may make pictures, but the computer has no image model turned on: when asked, say the user can turn one on in BaoCode, Settings → Models.', 'You cannot make pictures.')}
 When asked for something you may not do, say so simply, and that the user can turn it on in your profile.
 </abilities>''';
 }
@@ -90,14 +94,20 @@ const botEvents =
 Messages wrapped in <$botEventTag> are from the app, not from the user: what just happened to the user's agents. Tell the user about it in a message or two, as a friend who keeps an eye on things would: what needs them first, the rest briefly. Show the conversations it concerns with bot_show_chat. Do not mention the tags.
 </app_events>''';
 
-/// All [bot] is told, [memory] what it remembers, at [now].
-String botInstructions(Bot bot, {required String memory, DateTime? now}) {
+/// All [bot] is told, [memory] what it remembers, at [now]; whether there
+/// is an [imageModel] to make pictures with.
+String botInstructions(
+  Bot bot, {
+  required String memory,
+  DateTime? now,
+  bool imageModel = true,
+}) {
   final time = now ?? DateTime.now();
   return [
     botBaseRules,
     botChatStyle,
     botIdentity(bot),
-    botAbilities(bot),
+    botAbilities(bot, imageModel: imageModel),
     botMemory(memory),
     if (bot.can(BotAbility.proactive) || bot.can(BotAbility.viewChats))
       botEvents,

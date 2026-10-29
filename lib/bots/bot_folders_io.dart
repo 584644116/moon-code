@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 
@@ -50,6 +51,35 @@ class DataBotFolders implements BotFolders {
       }
     } on FileSystemException {
       // Left as it was.
+    }
+  }
+
+  @override
+  Uint8List? readFile(String path) {
+    try {
+      return File(path).readAsBytesSync();
+    } on FileSystemException {
+      return null;
+    }
+  }
+
+  @override
+  void writeFile(String path, Uint8List bytes) {
+    try {
+      final file = File(path);
+      file.parent.createSync(recursive: true);
+      file.writeAsBytesSync(bytes, flush: true);
+    } on FileSystemException {
+      // Left as it was.
+    }
+  }
+
+  @override
+  void deleteFile(String path) {
+    try {
+      File(path).deleteSync();
+    } on FileSystemException {
+      // Gone already.
     }
   }
 }

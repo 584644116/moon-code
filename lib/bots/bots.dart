@@ -1,13 +1,17 @@
 import 'dart:async';
 
+import 'package:bao_link/bao_link.dart' show builtInSticker;
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import '../chat/chat_models.dart';
 import '../chat/chat_session.dart';
+import '../images/image_tools.dart' show ImageTools;
 import '../kernel/agent_kernel.dart';
 import '../kernel/claude_code/claude_sdk_tools.dart';
 import '../kernel/kernel_registry.dart';
+import '../link/chat_codec.dart';
 import '../workspace/preference_store.dart';
 import '../workspace/workspace.dart';
 import 'bot.dart';
@@ -15,6 +19,9 @@ import 'bot_folders.dart';
 import 'bot_pacer.dart';
 import 'bot_prompt.dart';
 import 'bot_tools.dart';
+
+/// A bot's picture: its bytes, and their media type.
+typedef BotAvatarImage = ({Uint8List bytes, String type});
 
 /// The user's bots: agents of their own making that chat as a person does
 /// (see bot.dart), each a conversation in a folder of its own, which the
@@ -137,6 +144,11 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
           bot,
           memory: folders.readMemory(bot.folder),
           now: _clock(),
+          imageModel:
+              ClaudeSdkTools.called(
+                'mcp__${ClaudeSdkTools.server}__${ImageTools.name}',
+              ) !=
+              null,
         ),
         // Its own tools only; the tool search, for the browser's, which
         // are deferred.
@@ -156,11 +168,18 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
     final ability = BotTools.abilityOf(tool);
     if (bot == null) return ability == null;
     if (ability != null) return ability.allows(bot);
-    // The app's other tools: the browser's, if it may use it.
+    // The app's other tools: pictures made, if it may make them; the
+    // browser's, if it may use it.
+    if (tool == ImageTools.name) return bot.can(BotAbility.images);
     return bot.can(BotAbility.browser) &&
         ClaudeSdkTools.called('mcp__${ClaudeSdkTools.server}__$tool')?.kind ==
             ToolKind.browser;
   }
+
+  /// Not a bot's: there is no one at the computer to ask, its user on the
+  /// phone.
+  @override
+  bool asksUser(String cwd) => botAt(cwd) == null;
 
   @override
   bool tellsFeature(String cwd, String feature) => switch (botAt(cwd)) {
@@ -215,20 +234,33 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
     notifyListeners();
   }
 
-  /// The last [bot] said: its first line.
+  /// The last [bot] said: its first line; a picture or a sticker, as a
+  /// chat app's list says it.
   String? lastLine(Bot bot) {
     final thread = threadOf(bot);
     if (thread == null || !thread.isOpen) return null;
     final session = thread.session;
     for (var i = session.itemCount - 1; i >= 0; i--) {
-      if (session.itemAt(i) case AssistantTextItem(:final text)) {
-        final line = text
-            .split('\n')
-            .map((l) => l.trim())
-            .firstWhere((l) => l.isNotEmpty, orElse: () => '');
-        if (line.isNotEmpty) {
-          return line.length > 120 ? '${line.substring(0, 120)}…' : line;
-        }
+      switch (session.itemAt(i)) {
+        case AssistantTextItem(:final text):
+          final line = text
+              .split('\n')
+              .map((l) => l.trim())
+              .firstWhere((l) => l.isNotEmpty, orElse: () => '');
+          if (line.isNotEmpty) {
+            return line.length > 120 ? '${line.substring(0, 120)}…' : line;
+          }
+        case final ToolCallItem item when ChatCodec.botSticker(item) != null:
+          final sticker = builtInSticker(ChatCodec.botSticker(item)!);
+          final said = sticker == null
+              ? ''
+              : ' ${chinese ? sticker.zh : sticker.en}';
+          return '${chinese ? '[表情]' : '[Sticker]'}$said';
+        case final ToolCallItem item
+            when item.status != ToolStatus.failed &&
+                (item.images.isNotEmpty || ChatCodec.botImageUrl(item) != null):
+          return chinese ? '[图片]' : '[Picture]';
+        default:
       }
     }
     return null;
@@ -247,20 +279,20 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
     String style = '',
     required Set<BotAbility> abilities,
     BotProactive proactive = const BotProactive(),
+    BotAvatarImage? avatarImage,
   }) {
     final root = folders.root;
     if (root == null) throw StateError('No bots here');
     name = name.trim();
     if (name.isEmpty) throw ArgumentError('A bot needs a name');
-    avatar = avatar?.trim();
-    if (avatar?.isEmpty ?? false) avatar = null;
     final Bot bot;
     if (id == null) {
+      final newId = _newId();
       bot = Bot(
-        id: _newId(),
+        id: newId,
         name: name,
         folder: '',
-        avatar: avatar,
+        avatar: _avatar(p.join(root, newId), avatar, avatarImage),
         gender: gender.trim(),
         signature: signature.trim(),
         identity: identity.trim(),
@@ -278,10 +310,15 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
     }
     final index = _bots.indexWhere((b) => b.id == id);
     if (index < 0) throw StateError('No bot $id');
-    bot = _bots[index] = _bots[index].copyWith(
+    final had = _bots[index];
+    final picked = _avatar(had.folder, avatar, avatarImage, had: had.avatar);
+    if (had.avatarFile case final file? when picked != had.avatar) {
+      folders.deleteFile(file);
+    }
+    bot = _bots[index] = had.copyWith(
       name: name,
-      avatar: avatar,
-      clearAvatar: avatar == null,
+      avatar: picked,
+      clearAvatar: picked == null,
       gender: gender.trim(),
       signature: signature.trim(),
       identity: identity.trim(),
@@ -296,6 +333,50 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
     _restart(bot);
     notifyListeners();
     return bot;
+  }
+
+  /// The avatar a bot in [folder] is saved with: [image], kept there as
+  /// a file named after what it shows; else [asked], an emoji, or the
+  /// picture it [had].
+  String? _avatar(
+    String folder,
+    String? asked,
+    BotAvatarImage? image, {
+    String? had,
+  }) {
+    if (image != null) {
+      final hash = sha1.convert(image.bytes).toString().substring(0, 12);
+      final name = 'avatar-$hash${_extensions[image.type] ?? '.png'}';
+      folders.writeFile(p.join(folder, name), image.bytes);
+      return name;
+    }
+    final avatar = asked?.trim();
+    if (avatar == null || avatar.isEmpty) return null;
+    // A picture only by the name of the one it has.
+    if (isAvatarImage(avatar)) return avatar == had ? avatar : null;
+    return avatar;
+  }
+
+  static const _extensions = {
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/webp': '.webp',
+    'image/gif': '.gif',
+  };
+
+  /// [bot]'s picture, if it has one there.
+  BotAvatarImage? avatarImage(Bot bot) {
+    final file = bot.avatarFile;
+    if (file == null) return null;
+    final bytes = folders.readFile(file);
+    if (bytes == null) return null;
+    final type = switch (p.extension(file).toLowerCase()) {
+      '.jpg' || '.jpeg' => 'image/jpeg',
+      '.webp' => 'image/webp',
+      '.gif' => 'image/gif',
+      _ => 'image/png',
+    };
+    return (bytes: bytes, type: type);
   }
 
   String _newId() {

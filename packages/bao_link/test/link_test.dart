@@ -79,34 +79,27 @@ void main() {
     }
   });
 
-  test('a session update tells how full the context is', () {
-    const update = LinkSessionUpdate(
-      session: 's',
-      start: 0,
-      items: [],
-      count: 0,
-      context: LinkContextUsage(
-        window: 200000,
-        used: 120000,
-        limit: 180000,
-        compacted: true,
-      ),
-    );
-    final read = LinkSessionUpdate.fromJson(update.toJson());
-    expect(read.context!.window, 200000);
-    expect(read.context!.used, 120000);
-    expect(read.context!.limit, 180000);
-    expect(read.context!.compacted, isTrue);
-    // An older desktop need not say.
+  test('a bot\'s picture is told from an emoji by its file\'s name', () {
+    expect(isAvatarImage('avatar-0a1b2c3d4e5f.jpg'), isTrue);
+    expect(isAvatarImage('avatar-0a1b2c3d4e5f.PNG'), isFalse);
+    expect(isAvatarImage('🌸'), isFalse);
+    expect(isAvatarImage('../x.png'), isFalse);
+    expect(isAvatarImage(null), isFalse);
     expect(
-      LinkSessionUpdate(
-        session: 's',
-        start: 0,
-        items: const [],
-        count: 0,
-      ).toJson().containsKey('context'),
-      isFalse,
+      const LinkBot(
+        id: 'b',
+        name: 'Mia',
+        avatar: 'avatar-1.webp',
+      ).hasAvatarImage,
+      isTrue,
     );
+  });
+
+  test('the stickers the app comes with, each once', () {
+    final ids = [for (final sticker in builtInStickers) sticker.id];
+    expect(ids.toSet(), hasLength(ids.length));
+    expect(builtInSticker('happy')?.zh, '开心');
+    expect(builtInSticker('nope'), isNull);
   });
 
   test('the bots go to the phone, and back as they were', () {

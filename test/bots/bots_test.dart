@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:baocode/bots/bot.dart';
 import 'package:baocode/bots/bot_folders.dart';
 import 'package:baocode/bots/bot_pacer.dart';
@@ -12,6 +16,7 @@ import 'package:baocode/kernel/claude_code/claude_code_transport.dart';
 import 'package:baocode/kernel/claude_code/claude_sdk_tools.dart';
 import 'package:baocode/kernel/claude_code/mock_claude_code_transport.dart';
 import 'package:baocode/workspace/preference_store.dart';
+import 'package:baocode/images/image_tools.dart';
 import 'package:baocode/workspace/workspace.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -126,6 +131,24 @@ void main() {
       expect(told, contains('bot_list_chats'));
       expect(told, contains('You cannot stop, retry or archive agents.'));
       expect(told, contains('You cannot use the browser.'));
+      expect(told, contains('You cannot make pictures.'));
+    });
+
+    test('pictures: made with the image model, or said there is none', () {
+      final painter = Bot(
+        id: 'p',
+        name: 'Pia',
+        folder: '/bots/p',
+        abilities: {BotAbility.images},
+      );
+      expect(botAbilities(painter), contains('generate_image'));
+      expect(
+        botAbilities(painter, imageModel: false),
+        contains('no image model turned on'),
+      );
+      // Stickers and pictures, the user's and its own.
+      expect(botChatStyle, contains('[Sticker: id]'));
+      expect(botChatStyle, contains('bot_send_sticker'));
     });
   });
 
@@ -151,13 +174,13 @@ void main() {
     late MemoryBotFolders folders;
     late MemoryPreferenceStore store;
     late DateTime now;
+    late String app;
 
     setUp(() async {
       launches.clear();
-      workspace = Workspace(
-        kernels: [kernel],
-        projects: const [Project('app', '/tmp/app')],
-      );
+      app = Directory.systemTemp.createTempSync('bots-app').path;
+      addTearDown(() => Directory(app).deleteSync(recursive: true));
+      workspace = Workspace(kernels: [kernel], projects: [Project('app', app)]);
       folders = MemoryBotFolders();
       store = MemoryPreferenceStore();
       now = DateTime(2026, 10, 29, 14);
@@ -213,7 +236,7 @@ void main() {
       thread.session.send(const ComposerMessage(text: '<bao-event>x'));
       workspace.notifyListeners();
       expect(thread.title, isNot(contains('bao-event')));
-      expect(workspace.agentSetup!('/tmp/app'), isNull);
+      expect(workspace.agentSetup!(app), isNull);
     });
 
     test('its agent is told who it is, with its own tools only', () async {
@@ -243,8 +266,8 @@ void main() {
           await offered(assistant.folder),
           containsAll(['bot_list_chats', 'bot_stop_chat', 'bot_remember']),
         );
-        expect(await offered('/tmp/app'), isNot(contains('bot_list_chats')));
-        expect(ClaudeSdkTools.serversFor('/tmp/app'), isEmpty);
+        expect(await offered(app), isNot(contains('bot_list_chats')));
+        expect(ClaudeSdkTools.serversFor(app), isEmpty);
 
         // A new one may do nothing until the user says.
         final mia = bots.save(
@@ -257,7 +280,11 @@ void main() {
         expect(hers, isNot(contains('bot_stop_chat')));
         expect(hers, isNot(contains('bot_read_file')));
         final none = bots.save(name: 'Quiet', identity: '', abilities: {});
-        expect(await offered(none.folder), ['bot_remember']);
+        expect(await offered(none.folder), [
+          'bot_send_sticker',
+          'bot_send_image',
+          'bot_remember',
+        ]);
         // Nor called, though named.
         final refused = await ClaudeSdkTools.handle({
           'jsonrpc': '2.0',
@@ -321,6 +348,177 @@ void main() {
       expect(
         (kept.gender, kept.signature, kept.style, kept.model),
         ('female', 'Tea first.', 'Short.', 'opus'),
+      );
+    });
+
+    test('its picture: kept in its folder, named by what it shows', () {
+      final png = Uint8List.fromList([137, 80, 78, 71, 1, 2, 3]);
+      final mia = bots.save(
+        name: 'Mia',
+        identity: '',
+        abilities: {},
+        avatarImage: (bytes: png, type: 'image/png'),
+      );
+      expect(mia.avatar, matches(RegExp(r'^avatar-[0-9a-f]{12}\.png$')));
+      expect(isAvatarImage(mia.avatar), isTrue);
+      expect(folders.files[mia.avatarFile], png);
+      expect(bots.avatarImage(mia), (bytes: png, type: 'image/png'));
+
+      // Kept as it is, by its name; not another file by a name.
+      final kept = bots.save(
+        id: mia.id,
+        name: 'Mia',
+        avatar: mia.avatar,
+        identity: 'x',
+        abilities: {},
+      );
+      expect(kept.avatar, mia.avatar);
+      expect(
+        bots
+            .save(
+              id: mia.id,
+              name: 'Mia',
+              avatar: 'avatar-000000000000.png',
+              identity: 'x',
+              abilities: {},
+            )
+            .avatar,
+        isNull,
+      );
+      // An emoji in its place: the file gone.
+      final again = bots.save(
+        id: mia.id,
+        name: 'Mia',
+        identity: '',
+        abilities: {},
+        avatarImage: (bytes: png, type: 'image/png'),
+      );
+      final emoji = bots.save(
+        id: mia.id,
+        name: 'Mia',
+        avatar: '🌸',
+        identity: '',
+        abilities: {},
+      );
+      expect(emoji.avatar, '🌸');
+      expect(folders.files, isNot(contains(again.avatarFile)));
+      expect(bots.avatarImage(emoji), isNull);
+    });
+
+    test('the assistant has abilities that came since it was kept', () {
+      final root = folders.root!;
+      final assistant = Bot.fromJson({
+        'id': 'assistant',
+        'name': 'Bao',
+        'assistant': true,
+        'abilities': ['viewChats'],
+      }, root: root)!;
+      // Those the user had turned off stay off; the new ones are on.
+      expect(assistant.can(BotAbility.images), isTrue);
+      expect(assistant.can(BotAbility.browser), isFalse);
+      // Not so for the user's own, as a new one has none.
+      final mia = Bot.fromJson({
+        'id': 'b1',
+        'name': 'Mia',
+        'abilities': ['viewChats'],
+      }, root: root)!;
+      expect(mia.can(BotAbility.images), isFalse);
+      // Once kept with it, as the user left it.
+      final off = Bot.fromJson(
+        assistant.copyWith(abilities: {BotAbility.viewChats}).toJson(),
+        root: root,
+      )!;
+      expect(off.abilities, {BotAbility.viewChats});
+    });
+
+    test('pictures are made by those that may, the model not asked', () async {
+      ClaudeSdkTools.register(
+        ClaudeSdkTool(
+          name: ImageTools.name,
+          description: '',
+          inputSchema: const {'type': 'object'},
+          run: (input, call) async => '',
+        ),
+      );
+      addTearDown(() => ClaudeSdkTools.unregister(ImageTools.name));
+      final assistant = bots.bots.single;
+      expect(await offered(assistant.folder), contains(ImageTools.name));
+      final mia = bots.save(name: 'Mia', identity: '', abilities: {});
+      expect(await offered(mia.folder), isNot(contains(ImageTools.name)));
+      // No one at the computer to pick the model for it.
+      expect(ClaudeSdkTools.asksUser(assistant.folder), isFalse);
+      expect(ClaudeSdkTools.asksUser(app), isTrue);
+    });
+
+    test('it sends stickers, and pictures from the web or a project', () async {
+      Future<Map> call(
+        Bot bot,
+        String tool,
+        Map<String, Object?> input,
+      ) async =>
+          (await ClaudeSdkTools.handle({
+                'jsonrpc': '2.0',
+                'id': 4,
+                'method': 'tools/call',
+                'params': {'name': tool, 'arguments': input},
+              }, ClaudeSdkCall(cwd: bot.folder)))['result']
+              as Map;
+      final assistant = bots.bots.single;
+      expect(
+        (await call(assistant, 'bot_send_sticker', {
+          'sticker': 'happy',
+        }))['isError'],
+        isNot(isTrue),
+      );
+      expect(
+        (await call(assistant, 'bot_send_sticker', {
+          'sticker': 'nope',
+        }))['isError'],
+        isTrue,
+      );
+      expect(
+        (await call(assistant, 'bot_send_image', {
+          'url': 'https://example.com/cat.png',
+        }))['isError'],
+        isNot(isTrue),
+      );
+      expect(
+        (await call(assistant, 'bot_send_image', {
+          'url': 'file:///etc/x',
+        }))['isError'],
+        isTrue,
+      );
+
+      // A project's picture: back as the picture, for the chat.
+      final png = base64.decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk'
+        '+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      );
+      File('$app/pic.png').writeAsBytesSync(png);
+      final sent = await call(assistant, 'bot_send_image', {
+        'project': 'app',
+        'path': 'pic.png',
+      });
+      expect(sent['isError'], isNot(isTrue));
+      expect(
+        (sent['content'] as List).map((c) => (c as Map)['type']),
+        contains('image'),
+      );
+      expect(
+        (await call(assistant, 'bot_send_image', {
+          'project': 'app',
+          'path': '../outside.png',
+        }))['isError'],
+        isTrue,
+      );
+      // Not by one that may not read the projects' files.
+      final mia = bots.save(name: 'Mia', identity: '', abilities: {});
+      expect(
+        (await call(mia, 'bot_send_image', {
+          'project': 'app',
+          'path': 'pic.png',
+        }))['isError'],
+        isTrue,
       );
     });
 
