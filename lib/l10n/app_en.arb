@@ -6372,8 +6372,19 @@
   "mobilePublicAddress": "Public Address",
   "mobilePublicAddressDescription": "A domain or IP this computer can be reached at from the internet (with the port forwarded), put in the QR code; several separated by commas. Behind a proxy that only takes HTTPS (such as a Cloudflare Tunnel), write it as wss://domain. Public IPv6 addresses are found by themselves.",
   "mobileRelay": "Relay",
-  "mobileRelayDescription": "Reach this computer through MoonCode's relay when none of its addresses can be reached. Coming later.",
-  "mobileRelayUnavailable": "Not Available Yet",
+  "mobileRelayDescription": "Reach this computer through a relay server when it is on another network and none of its addresses can be reached. This computer reaches out to it, so nothing else is installed here.",
+  "mobileRelayHint": "wss://relay.example.com",
+  "mobileRelayToken": "Token",
+  "mobileRelayConnecting": "Reaching the relay…",
+  "mobileRelayOnline": "Through to the relay. Phones reach this computer from any network.",
+  "mobileRelayFailed": "The relay could not be reached: {error}",
+  "@mobileRelayFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "mobilePair": "Pair a Phone",
   "mobilePairDescription": "Scan the code with MoonCode on the phone (Me → Paired computers → Pair a computer), or pick this computer under Nearby Computers there.",
   "mobilePairShow": "Show QR Code",

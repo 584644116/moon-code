@@ -8,14 +8,15 @@ import '../../ide/ide_button.dart';
 import '../../l10n/l10n.dart';
 import '../../link/firewall.dart';
 import '../../link/link_host.dart';
+import '../../link/link_relay.dart';
 import '../../link/qr_view.dart';
 import '../../theme/codicons.dart';
 import '../../theme/workbench_theme.dart' show themeColors;
 import 'settings_widgets.dart';
 
 /// Settings → Mobile: whether phones may connect, where they reach this
-/// computer (its addresses, the port, public ones given), pairing one by
-/// QR code, and the phones paired. The relay is listed, not there yet.
+/// computer (its addresses, the port, public ones given, the relay),
+/// pairing one by QR code, and the phones paired.
 class MobileSettingsPage extends StatefulWidget {
   const MobileSettingsPage({super.key, required this.host});
 
@@ -167,11 +168,50 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
             ),
             SettingsRow(
               label: l10n.mobileRelay,
-              description: l10n.mobileRelayDescription,
-              trailing: Text(
-                l10n.mobileRelayUnavailable,
-                style: SettingsText.description,
-              ),
+              description: switch (host.relayState) {
+                RelayState.online => l10n.mobileRelayOnline,
+                RelayState.connecting => l10n.mobileRelayConnecting,
+                RelayState.failed => l10n.mobileRelayFailed(
+                  host.relayError ?? '',
+                ),
+                RelayState.off => l10n.mobileRelayDescription,
+              },
+              below: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: SettingsTextField(
+                        value: host.relayAddress,
+                        hint: l10n.mobileRelayHint,
+                        semanticLabel: l10n.mobileRelay,
+                        width: double.infinity,
+                        onSubmitted: (text) => unawaited(
+                          host.setRelay(
+                            address: text,
+                            token: host.relayToken,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    SizedBox(
+                      width: 180,
+                      child: SettingsTextField(
+                        value: host.relayToken,
+                        hint: l10n.mobileRelayToken,
+                        semanticLabel: l10n.mobileRelayToken,
+                        width: double.infinity,
+                        onSubmitted: (text) => unawaited(
+                          host.setRelay(
+                            address: host.relayAddress,
+                            token: text,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ],
         ),

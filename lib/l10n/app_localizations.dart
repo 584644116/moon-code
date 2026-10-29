@@ -14166,14 +14166,38 @@ abstract class AppLocalizations {
   /// No description provided for @mobileRelayDescription.
   ///
   /// In en, this message translates to:
-  /// **'Reach this computer through MoonCode\'s relay when none of its addresses can be reached. Coming later.'**
+  /// **'Reach this computer through a relay server when it is on another network and none of its addresses can be reached. This computer reaches out to it, so nothing else is installed here.'**
   String get mobileRelayDescription;
 
-  /// No description provided for @mobileRelayUnavailable.
+  /// No description provided for @mobileRelayHint.
   ///
   /// In en, this message translates to:
-  /// **'Not Available Yet'**
-  String get mobileRelayUnavailable;
+  /// **'wss://relay.example.com'**
+  String get mobileRelayHint;
+
+  /// No description provided for @mobileRelayToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Token'**
+  String get mobileRelayToken;
+
+  /// No description provided for @mobileRelayConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Reaching the relay…'**
+  String get mobileRelayConnecting;
+
+  /// No description provided for @mobileRelayOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Through to the relay. Phones reach this computer from any network.'**
+  String get mobileRelayOnline;
+
+  /// No description provided for @mobileRelayFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The relay could not be reached: {error}'**
+  String mobileRelayFailed(String error);
 
   /// No description provided for @mobilePair.
   ///

@@ -55,6 +55,18 @@ class BrowserBridge extends ChangeNotifier {
   /// 127.0.0.1 and the token it says first, `<port> <token>`.
   static String get portPath => p.join(_folder, 'baocode-browser.port');
 
+  /// Where the same is written as well, for a host whose browser does not
+  /// see the folder above: `TEMP` is read when a browser starts, so one
+  /// started before the user changed it looks there still, and a host that
+  /// found yesterday's file there waited on a port nothing listens on. The
+  /// app's own folder is one both find: `%APPDATA%`, as the host asks for
+  /// it (windows/BrowserBridge/host.cpp).
+  static List<String> get _portCopies {
+    if (!Platform.isWindows) return const [];
+    final data = DataDirectory.current.browserDir;
+    return [if (!p.equals(data, _folder)) data];
+  }
+
   /// Over [loopback], held while this MoonCode has the browsers: another
   /// that cannot have it leaves them to it.
   static String get _lockPath => p.join(_folder, 'baocode-browser.lock');
@@ -249,9 +261,22 @@ class BrowserBridge extends ChangeNotifier {
         for (var i = 0; i < 32; i++)
           random.nextInt(256).toRadixString(16).padLeft(2, '0'),
       ].join();
+      final said = '${server.port} $token';
       final written = File('$portPath.${server.port}');
-      await written.writeAsString('${server.port} $token', flush: true);
+      await written.writeAsString(said, flush: true);
       await written.rename(portPath);
+      // And where a host whose browser started under another `TEMP` looks.
+      for (final copy in _portCopies) {
+        try {
+          final beside = Directory(copy)..createSync(recursive: true);
+          final file = File(p.join(beside.path, 'baocode-browser.port'));
+          await file.writeAsString(said, flush: true);
+          _portCopiesWritten.add(file.path);
+        } on FileSystemException catch (error) {
+          // Not ours to write: the host finds the app as it did before.
+          debugPrint('browser bridge: $error');
+        }
+      }
       _lock = lock;
       _token = token;
       return server;
@@ -265,6 +290,10 @@ class BrowserBridge extends ChangeNotifier {
 
   /// Held over [loopback] while listening: [_lockPath]'s, locked.
   RandomAccessFile? _lock;
+
+  /// The copies of [portPath] this run wrote ([_portCopies]): removed with
+  /// it, so a host reads a port that is still waiting on.
+  final Set<String> _portCopiesWritten = {};
 
   /// What a host says first over [loopback], as [portPath] says it: set
   /// before its server listens, and cleared once it is closed.
@@ -292,6 +321,15 @@ class BrowserBridge extends ChangeNotifier {
     } on FileSystemException {
       // Gone.
     }
+    // With it, the copies: a host reading one would wait on a port closed.
+    for (final path in _portCopiesWritten) {
+      try {
+        File(path).deleteSync();
+      } on FileSystemException {
+        // Gone, or not ours.
+      }
+    }
+    _portCopiesWritten.clear();
     await server.close();
     // Over loopback, let go once the port's file is gone: another MoonCode
     // may write its own then.

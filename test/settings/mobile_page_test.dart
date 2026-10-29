@@ -27,7 +27,12 @@ void main() {
     await tester.pump();
     expect(find.text('Off'), findsOneWidget);
     expect(find.text('192.168.1.5:47100'), findsOneWidget);
-    expect(find.text('Not Available Yet'), findsOneWidget);
+    // No relay given, so its row says what one is for.
+    expect(
+      find.textContaining('Reach this computer through a relay server'),
+      findsOneWidget,
+    );
+    expect(find.text('wss://relay.example.com'), findsOneWidget);
 
     await tester.tap(find.text('Show QR Code'));
     await tester.pump();

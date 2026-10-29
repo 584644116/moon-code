@@ -112,13 +112,10 @@ static void tell_browser(bool connected) {
   to_browser(text, static_cast<uint32_t>(strlen(text)));
 }
 
-// BaoCode's port and token, from its file: false while there is none
-// (BaoCode is not running) or it is not whole yet.
-static bool find_bao(unsigned* port, char* token, size_t size) {
-  wchar_t path[MAX_PATH + 32];
-  const DWORD n = GetTempPathW(MAX_PATH + 1, path);
-  if (n == 0 || n > MAX_PATH) return false;
-  if (wcscat_s(path, L"baocode-browser.port") != 0) return false;
+// Reads one of BaoCode's port files: false while it is not there, or not
+// whole yet.
+static bool read_bao(const wchar_t* path, unsigned* port, char* token,
+                     size_t size) {
   HANDLE file = CreateFileW(
       path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
       nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -141,6 +138,63 @@ static bool find_bao(unsigned* port, char* token, size_t size) {
   token[length] = 0;
   *port = static_cast<unsigned>(value);
   return true;
+}
+
+// Where BaoCode writes its port: the user's temporary folder, and its own
+// (BrowserBridge._portCopies). Two, because `TEMP` is read when a browser
+// starts: one started before the user changed it looks in the folder it
+// had then, and would find yesterday's file there — a port nothing
+// listens on — while BaoCode writes to today's.
+static int bao_files(wchar_t paths[][MAX_PATH + 64], int most) {
+  int count = 0;
+  const DWORD n = GetTempPathW(MAX_PATH + 1, paths[count]);
+  if (n != 0 && n <= MAX_PATH &&
+      wcscat_s(paths[count], MAX_PATH + 64, L"baocode-browser.port") == 0) {
+    count++;
+  }
+  wchar_t* app_data = nullptr;
+  size_t app_data_size = 0;
+  if (_wdupenv_s(&app_data, &app_data_size, L"APPDATA") == 0 && app_data) {
+    // %APPDATA%\mooncode\browser, as DataDirectory.browserDir has it.
+    const wchar_t* rest = L"\\mooncode\\browser\\baocode-browser.port";
+    const size_t need = wcslen(app_data) + wcslen(rest) + 1;
+    if (count < most && need <= MAX_PATH + 64) {
+      wcscpy_s(paths[count], MAX_PATH + 64, app_data);
+      wcscat_s(paths[count], MAX_PATH + 64, rest);
+      count++;
+    }
+    free(app_data);
+  }
+  return count;
+}
+
+static SOCKET connect_bao(unsigned port);
+
+// BaoCode's port and token, from the first of its files that leads to one
+// listening — the app's own before the temporary folder's. None listening:
+// the app's own all the same, which is the one it writes now, so that the
+// wait is on a port that may come back rather than one that is gone.
+static bool find_bao(unsigned* port, char* token, size_t size) {
+  wchar_t paths[2][MAX_PATH + 64];
+  const int count = bao_files(paths, 2);
+  bool have = false;
+  for (int i = count - 1; i >= 0; i--) {
+    unsigned found = 0;
+    char said[128];
+    if (!read_bao(paths[i], &found, said, sizeof said)) continue;
+    const size_t length = strnlen(said, sizeof said - 1);
+    if (connect_bao(found) != INVALID_SOCKET) {
+      memcpy(token, said, length + 1);
+      *port = found;
+      return true;
+    }
+    if (!have) {
+      memcpy(token, said, length + 1);
+      *port = found;
+      have = true;
+    }
+  }
+  return have;
 }
 
 static SOCKET connect_bao(unsigned port) {

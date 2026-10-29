@@ -131,6 +131,28 @@ void main() {
     );
   });
 
+  test('a phone that reconnects asks hello and confirm once more, and is '
+      'not turned away', () async {
+    final peer = await pair();
+    await peer.close();
+
+    // The same phone, on a socket of its own: it says hello again, and — as a
+    // phone does when it has the pairing screen still open — says the codes
+    // matched too. Neither is a request the bridge knows, and neither is a
+    // failure: the phone is paired, and connected.
+    final again = await connect(phone);
+    final hello = await again.call(LinkMethods.hello, {'name': 'iPhone'}) as Map;
+    expect((hello['device'] as Map)['name'], 'Test Mac');
+
+    final confirmed = await again.call(LinkMethods.confirm) as Map;
+    expect((confirmed['device'] as Map)['name'], 'Test Mac');
+    expect(host.isConnected(deviceIdOf(phone.publicKey)), isTrue);
+
+    // And the bridge it does know still answers.
+    expect(await again.call(LinkMethods.state), isA<Map>());
+    await again.close();
+  });
+
   test(
     'a phone without the code, or with a wrong one, is turned away',
     () async {

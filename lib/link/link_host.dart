@@ -8,6 +8,7 @@ import '../platform/event_log.dart';
 import '../workspace/workspace.dart';
 import 'firewall.dart';
 import 'link_platform.dart';
+import 'link_relay.dart';
 import 'workspace_bridge.dart';
 
 /// A phone paired with this desktop.
@@ -173,6 +174,61 @@ class LinkHost extends ChangeNotifier {
 
   List<DirectEndpoint> _local = const [];
 
+  /// The relay this desktop reaches out to, as the user gave it, and the
+  /// token that says it is this desktop's end of it.
+  String _relayAddress = '';
+  String _relayToken = '';
+
+  /// Where phones reach this desktop at the relay: the address with no
+  /// token, which only this desktop holds.
+  String get relayAddress => _relayAddress;
+
+  /// The token, as it was given: the settings screen shows it back.
+  String get relayToken => _relayToken;
+
+  bool get relayConfigured => _relayAddress.trim().isNotEmpty;
+
+  RelayState _relayState = RelayState.off;
+
+  /// Where this desktop's end of the relay stands.
+  RelayState get relayState => _relayState;
+
+  String? _relayError;
+  String? get relayError => _relayError;
+
+  /// The relay as a phone takes it — a `wss://` address among this
+  /// desktop's own, so that a phone dials it as it dials any other.
+  DirectEndpoint? get relayEndpoint {
+    if (!relayConfigured || !LinkRelay.supported) return null;
+    final uri = _relayUri;
+    if (uri == null) return null;
+    return _parse('${relayForPhones(uri)}');
+  }
+
+  /// What this desktop connects to, token and all: null when what was
+  /// given is not an address.
+  ///
+  /// `relay.example.com` is taken as TLS on 443, as `wss://relay.example.com`:
+  /// the way it would be typed in a browser, and the only way a relay on
+  /// the internet is reached.
+  Uri? get _relayUri {
+    var text = _relayAddress.trim();
+    if (text.isEmpty) return null;
+    if (!text.contains('://')) text = 'wss://$text';
+    final Uri uri;
+    try {
+      uri = Uri.parse(text);
+    } on FormatException {
+      return null;
+    }
+    if (uri.host.isEmpty) return null;
+    final token = _relayToken.trim();
+    if (token.isEmpty) return uri;
+    return uri.replace(
+      queryParameters: {...uri.queryParameters, 'token': token},
+    );
+  }
+
   /// When the addresses were looked for last, and the look in progress:
   /// each one is a process to start, so the screen opening, the listener
   /// starting and the button being pressed ask for one between them, not
@@ -185,10 +241,11 @@ class LinkHost extends ChangeNotifier {
   static const endpointLifetime = Duration(seconds: 30);
 
   /// Where phones can reach this desktop: its own addresses, then those
-  /// given.
+  /// given, then the relay's — which reaches it wherever it is.
   List<DirectEndpoint> get endpoints => [
     ..._local,
     for (final address in _publicAddresses) ?_parse(address),
+    ?relayEndpoint,
   ];
 
   FirewallState _firewall = FirewallState.unknown;
@@ -282,6 +339,9 @@ class LinkHost extends ChangeNotifier {
   StreamSubscription<LinkSocket>? _accepting;
   DeviceInfo? _device;
 
+  LinkRelayConnection? _relay;
+  StreamSubscription<LinkSocket>? _relayTakes;
+
   // --- Loading and keeping ----------------------------------------------------
 
   /// Reads what is kept, and listens if phones are allowed.
@@ -308,6 +368,8 @@ class LinkHost extends ChangeNotifier {
       ...?(json['publicAddresses'] as List?)?.whereType<String>(),
     ];
     _discoverable = json['discoverable'] != false;
+    _relayAddress = json['relayAddress'] as String? ?? '';
+    _relayToken = json['relayToken'] as String? ?? '';
     for (final phone in (json['phones'] as List?) ?? const []) {
       try {
         final paired = PairedPhone.fromJson(phone as Map<String, Object?>);
@@ -328,6 +390,8 @@ class LinkHost extends ChangeNotifier {
     'port': _port,
     'publicAddresses': _publicAddresses,
     'discoverable': _discoverable,
+    if (_relayAddress.isNotEmpty) 'relayAddress': _relayAddress,
+    if (_relayToken.isNotEmpty) 'relayToken': _relayToken,
     'phones': [for (final phone in _phones.values) phone.toJson()],
   };
 
@@ -391,6 +455,23 @@ class LinkHost extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Sets the relay to reach out to, and the token it takes. Empty either,
+  /// and phones reach this desktop the way they did before.
+  Future<void> setRelay({required String address, required String token}) async {
+    if (!_loaded) return;
+    final cleanAddress = address.trim();
+    final cleanToken = token.trim();
+    if (cleanAddress == _relayAddress && cleanToken == _relayToken) return;
+    _relayAddress = cleanAddress;
+    _relayToken = cleanToken;
+    unawaited(_save());
+    notifyListeners();
+    if (_enabled) {
+      await _stopRelay();
+      await _startRelay();
+    }
+  }
+
   // --- Listening --------------------------------------------------------------
 
   Future<void> _start() async {
@@ -416,10 +497,50 @@ class LinkHost extends ChangeNotifier {
       _error = '$error';
       appEvent('link', 'could not listen on $_port: $error');
     }
+    await _startRelay();
     await refreshEndpoints();
   }
 
+  /// Reaches out to the relay, when one is given: phones then reach this
+  /// desktop through it wherever it is, and a phone that attaches there is
+  /// taken as one that knocked here ([_accept]).
+  Future<void> _startRelay() async {
+    if (_relay != null || !LinkRelay.supported) return;
+    final url = _relayUri;
+    if (url == null) {
+      _relayState = RelayState.failed;
+      _relayError = 'not an address: $_relayAddress';
+      notifyListeners();
+      return;
+    }
+    final relay = LinkRelay.connect(url, onState: _relayChanged);
+    if (relay == null) return;
+    _relay = relay;
+    _relayTakes = relay.sockets.listen((socket) => unawaited(_accept(socket)));
+    appEvent('link', 'reaching the relay at ${relayForPhones(url)}');
+  }
+
+  Future<void> _stopRelay() async {
+    final takes = _relayTakes;
+    _relayTakes = null;
+    await takes?.cancel();
+    final relay = _relay;
+    _relay = null;
+    await relay?.close();
+    _relayState = RelayState.off;
+    _relayError = null;
+  }
+
+  void _relayChanged(RelayState state, String? error) {
+    if (state == _relayState && error == _relayError) return;
+    _relayState = state;
+    _relayError = error;
+    if (error != null) appEvent('link', 'relay: $error');
+    notifyListeners();
+  }
+
   Future<void> _stop() async {
+    await _stopRelay();
     final listener = _listener;
     _listener = null;
     await _accepting?.cancel();
@@ -642,6 +763,16 @@ class LinkHost extends ChangeNotifier {
     String method,
     Map<String, Object?> params,
   ) async {
+    // Pairing belongs to the connection, not to the bridge: a phone that is
+    // pairing asks these of a socket with no bridge yet, and one that
+    // reconnects asks `hello` again of a socket that already has one — and
+    // then `confirm` of that same socket, which the bridge knows nothing of.
+    switch (method) {
+      case LinkMethods.hello:
+        return _hello(connection, key, params);
+      case LinkMethods.confirm:
+        return _confirm(connection);
+    }
     if (connection.bridge case final bridge?) {
       if (method == LinkMethods.unpair) {
         if (connection.phone case final phone?) {
@@ -658,102 +789,116 @@ class LinkHost extends ChangeNotifier {
       }
       return bridge.handle(method, params);
     }
-    switch (method) {
-      case LinkMethods.hello:
-        final name = params['name'] as String? ?? '';
-        final system = params['system'] as String? ?? '';
-        if (_phones[connection.id] case final phone?) {
-          _phones[phone.id] = phone.copyWith(
-            name: name.isEmpty ? null : name,
-            system: system.isEmpty ? null : system,
-            lastSeen: DateTime.now(),
-          );
-          unawaited(_save());
-          _connect(connection, _phones[phone.id]!);
-          return {'device': _deviceInfo().toJson()};
-        }
-        final offer = _offer;
-        final token = switch (params['token']) {
-          final String text => _decode(text),
-          _ => null,
-        };
-        if (token == null && params['request'] == true) {
-          // Found nearby: no secret, so the user here allows it.
-          if (offer == null || offer.expiredAt(DateTime.now())) {
-            appEvent('link', 'pairing asked for nearby, no code shown');
-            throw const LinkRemoteException(
-              LinkErrors.notPairing,
-              'Not pairing a phone now',
-            );
-          }
-          if (_pending != null) {
-            appEvent(
-              'link',
-              'pairing asked for nearby, another phone is at it',
-            );
-            throw const LinkRemoteException(
-              LinkErrors.busy,
-              'Another phone is pairing',
-            );
-          }
-          appEvent('link', 'pairing asked for nearby, waiting for the user');
-          _pending = PendingPairing._(
-            connection,
-            name,
-            system,
-            safetyCode(_identity.publicKey, key),
-            needsApproval: true,
-          );
-          notifyListeners();
-          return {
-            'device': _deviceInfo().toJson(),
-            'pairing': true,
-            'approval': true,
-          };
-        }
-        if (token == null) {
-          throw const LinkRemoteException(LinkErrors.unpaired, 'Not paired');
-        }
-        if (offer == null ||
-            offer.expiredAt(DateTime.now()) ||
-            !_same(token, offer.token) ||
-            _pending != null) {
-          final why = offer == null
-              ? 'no code is shown'
-              : offer.expiredAt(DateTime.now())
-              ? 'the code expired'
-              : !_same(token, offer.token)
-              ? 'the code does not match'
-              : 'another phone is at it';
-          appEvent('link', 'pairing refused: $why');
-          throw const LinkRemoteException(
-            LinkErrors.badToken,
-            'The code is not shown, or has expired',
-          );
-        }
-        appEvent('link', 'pairing started, comparing the safety code');
-        _pending = PendingPairing._(
-          connection,
-          name,
-          system,
-          safetyCode(_identity.publicKey, key),
-        );
-        notifyListeners();
-        return {'device': _deviceInfo().toJson(), 'pairing': true};
-      case LinkMethods.confirm:
-        final pending = _pending;
-        if (pending == null || pending._connection != connection) {
-          throw const LinkRemoteException(LinkErrors.unpaired, 'Not pairing');
-        }
-        if (pending.needsApproval && !pending.approved) {
-          // Answered once the user here says.
-          final confirmed = pending._confirmed ??= Completer();
-          notifyListeners();
-          return confirmed.future;
-        }
-        return _finishPairing(pending);
-    }
     throw const LinkRemoteException(LinkErrors.unpaired, 'Not paired');
+  }
+
+  /// The first request on a connection: the phone says who it is, and pairs
+  /// with the code shown here, or asks to be let in.
+  Future<Object?> _hello(
+    _Connection connection,
+    Uint8List key,
+    Map<String, Object?> params,
+  ) async {
+    final name = params['name'] as String? ?? '';
+    final system = params['system'] as String? ?? '';
+    if (_phones[connection.id] case final phone?) {
+      _phones[phone.id] = phone.copyWith(
+        name: name.isEmpty ? null : name,
+        system: system.isEmpty ? null : system,
+        lastSeen: DateTime.now(),
+      );
+      unawaited(_save());
+      // Paired already: connected — unless this socket has its bridge, which
+      // is the phone asking again on a connection that is up.
+      if (connection.bridge == null) _connect(connection, _phones[phone.id]!);
+      return {'device': _deviceInfo().toJson()};
+    }
+    final offer = _offer;
+    final token = switch (params['token']) {
+      final String text => _decode(text),
+      _ => null,
+    };
+    if (token == null && params['request'] == true) {
+      // Found nearby: no secret, so the user here allows it.
+      if (offer == null || offer.expiredAt(DateTime.now())) {
+        appEvent('link', 'pairing asked for nearby, no code shown');
+        throw const LinkRemoteException(
+          LinkErrors.notPairing,
+          'Not pairing a phone now',
+        );
+      }
+      if (_pending != null) {
+        appEvent('link', 'pairing asked for nearby, another phone is at it');
+        throw const LinkRemoteException(
+          LinkErrors.busy,
+          'Another phone is pairing',
+        );
+      }
+      appEvent('link', 'pairing asked for nearby, waiting for the user');
+      _pending = PendingPairing._(
+        connection,
+        name,
+        system,
+        safetyCode(_identity.publicKey, key),
+        needsApproval: true,
+      );
+      notifyListeners();
+      return {
+        'device': _deviceInfo().toJson(),
+        'pairing': true,
+        'approval': true,
+      };
+    }
+    if (token == null) {
+      throw const LinkRemoteException(LinkErrors.unpaired, 'Not paired');
+    }
+    if (offer == null ||
+        offer.expiredAt(DateTime.now()) ||
+        !_same(token, offer.token) ||
+        _pending != null) {
+      final why = offer == null
+          ? 'no code is shown'
+          : offer.expiredAt(DateTime.now())
+          ? 'the code expired'
+          : !_same(token, offer.token)
+          ? 'the code does not match'
+          : 'another phone is at it';
+      appEvent('link', 'pairing refused: $why');
+      throw const LinkRemoteException(
+        LinkErrors.badToken,
+        'The code is not shown, or has expired',
+      );
+    }
+    appEvent('link', 'pairing started, comparing the safety code');
+    _pending = PendingPairing._(
+      connection,
+      name,
+      system,
+      safetyCode(_identity.publicKey, key),
+    );
+    notifyListeners();
+    return {'device': _deviceInfo().toJson(), 'pairing': true};
+  }
+
+  /// While pairing, the phone says the safety codes matched here.
+  Future<Object?> _confirm(_Connection connection) {
+    final pending = _pending;
+    if (pending == null || pending._connection != connection) {
+      // A phone that is paired already and asks again on the socket it holds:
+      // it has compared nothing, and there is nothing left to compare. Said
+      // so rather than turned away — a phone reconnecting is not a failure.
+      if (connection.bridge != null && connection.phone != null) {
+        return Future.value({'device': _deviceInfo().toJson()});
+      }
+      throw const LinkRemoteException(LinkErrors.unpaired, 'Not pairing');
+    }
+    if (pending.needsApproval && !pending.approved) {
+      // Answered once the user here says.
+      final confirmed = pending._confirmed ??= Completer();
+      notifyListeners();
+      return confirmed.future;
+    }
+    return Future.value(_finishPairing(pending));
   }
 
   /// Keeps [pending]'s phone, and connects it.

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:baocode/browser/browser_bridge.dart';
 import 'package:baocode/l10n/app_localizations_en.dart';
+import 'package:baocode/platform/data_dir.dart';
 import 'package:baocode/settings/pages/browser_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -198,6 +199,25 @@ void main() {
       await bridge.stop();
       expect(File(BrowserBridge.portPath).existsSync(), isFalse);
       expect(bridge.browsers, isEmpty);
+    });
+
+    test('the port and token are kept in the app\'s folder too, for a host '
+        'whose browser started under another TEMP', () async {
+      await bridge.start();
+      final said = File(BrowserBridge.portPath).readAsStringSync();
+      expect(said, matches(RegExp(r'^\d+ [0-9a-f]{64}$')));
+
+      final copy = File(
+        p.join(DataDirectory.current.browserDir, 'baocode-browser.port'),
+      );
+      expect(copy.existsSync(), isTrue);
+      expect(copy.readAsStringSync(), said);
+
+      // And it goes with the bridge, as the first does: a host reading it
+      // must not wait on a port that closed.
+      await bridge.stop();
+      expect(copy.existsSync(), isFalse);
+      expect(File(BrowserBridge.portPath).existsSync(), isFalse);
     });
 
     test('a connection without the token is let go, never listed', () async {

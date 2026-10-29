@@ -8735,10 +8735,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mobileRelayDescription =>
-      'Reach this computer through MoonCode\'s relay when none of its addresses can be reached. Coming later.';
+      'Reach this computer through a relay server when it is on another network and none of its addresses can be reached. This computer reaches out to it, so nothing else is installed here.';
 
   @override
-  String get mobileRelayUnavailable => 'Not Available Yet';
+  String get mobileRelayHint => 'wss://relay.example.com';
+
+  @override
+  String get mobileRelayToken => 'Token';
+
+  @override
+  String get mobileRelayConnecting => 'Reaching the relay…';
+
+  @override
+  String get mobileRelayOnline =>
+      'Through to the relay. Phones reach this computer from any network.';
+
+  @override
+  String mobileRelayFailed(String error) {
+    return 'The relay could not be reached: $error';
+  }
 
   @override
   String get mobilePair => 'Pair a Phone';

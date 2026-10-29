@@ -8245,10 +8245,24 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mobileRelayDescription =>
-      '当这台电脑的地址都无法直连时，经由 MoonCode 中转服务连接。即将推出。';
+      '手机在别的网络里、这台电脑又连不进来时，经由中转服务器连接。这台电脑会主动连上去，不用在本机另装软件。';
 
   @override
-  String get mobileRelayUnavailable => '暂不可用';
+  String get mobileRelayHint => 'wss://relay.example.com';
+
+  @override
+  String get mobileRelayToken => '密钥';
+
+  @override
+  String get mobileRelayConnecting => '正在连接中转服务器…';
+
+  @override
+  String get mobileRelayOnline => '已连上中转服务器。手机在别的网络里也能连到这台电脑。';
+
+  @override
+  String mobileRelayFailed(String error) {
+    return '连不上中转服务器：$error';
+  }
 
   @override
   String get mobilePair => '配对手机';
