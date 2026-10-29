@@ -17,6 +17,13 @@ abstract final class ChatCodec {
       if (item.queued) 'queued': true,
       if (item.images.isNotEmpty) 'images': _images(item.images),
       'worked': ?item.worked?.inMilliseconds,
+      if (item.usage case final usage?)
+        'usage': {
+          'in': ?usage.inputTokens,
+          'out': ?usage.outputTokens,
+          'speed': ?usage.tokensPerSecond,
+          'cost': ?usage.costUsd,
+        },
     },
     AssistantTextItem() => {'t': 'text', 'text': item.text},
     ThinkingItem() => {
@@ -37,6 +44,12 @@ abstract final class ChatCodec {
       'status': item.status.name,
       'output': ?_head(item.output),
       'tool': ?item.tool,
+      // What a browser's call does, for its line to say.
+      if (item.kind == ToolKind.browser)
+        'browse': {
+          'action': ?(item.input['action'] as String?),
+          if (item.input['url'] != null) 'url': true,
+        },
       // The pictures it returned (an image model's, a file read), but for
       // a failed call's.
       if (item.images.isNotEmpty && item.status != ToolStatus.failed)
@@ -134,6 +147,15 @@ abstract final class ChatCodec {
         queued: json['queued'] == true,
         images: _decodeImages(json['images']),
         worked: duration('worked'),
+        usage: switch (json['usage']) {
+          final Map<String, Object?> usage => TurnUsage(
+            inputTokens: (usage['in'] as num?)?.toInt(),
+            outputTokens: (usage['out'] as num?)?.toInt(),
+            tokensPerSecond: (usage['speed'] as num?)?.toDouble(),
+            costUsd: (usage['cost'] as num?)?.toDouble(),
+          ),
+          _ => null,
+        },
       ),
       'text' => AssistantTextItem(text('text')),
       'thinking' => ThinkingItem(
@@ -153,12 +175,16 @@ abstract final class ChatCodec {
         output: optional('output'),
         tool: optional('tool'),
         images: _decodeImages(json['images']),
-        input: switch (json['making']) {
-          final Map<String, Object?> making => {
+        input: switch ((json['making'], json['browse'])) {
+          (final Map<String, Object?> making, _) => {
             'prompt': '',
             'count': ?making['count'],
             'size': ?making['size'],
             'aspect_ratio': ?making['aspect'],
+          },
+          (_, final Map<String, Object?> browse) => {
+            'action': ?browse['action'],
+            if (browse['url'] == true) 'url': '',
           },
           _ => const {},
         },

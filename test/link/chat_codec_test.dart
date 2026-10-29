@@ -71,4 +71,46 @@ void main() {
       isNot(contains('making')),
     );
   });
+
+  test('a browser\'s action and a turn\'s spending go too', () {
+    final step =
+        ChatCodec.decode(
+              jsonDecode(
+                jsonEncode(
+                  ChatCodec.encode(
+                    const ToolCallItem(
+                      kind: ToolKind.browser,
+                      target: 'example.com',
+                      tool: 'browser_navigate',
+                      input: {
+                        'tabId': 3,
+                        'url': 'https://example.com/a?token=x',
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            )!
+            as ToolCallItem;
+    expect(step.tool, 'browser_navigate');
+    // What it does, not where: the address is the step's target already.
+    expect(step.input, {'url': ''});
+
+    final prompt =
+        ChatCodec.decode(
+              ChatCodec.encode(
+                const UserMessageItem(
+                  text: 'go',
+                  usage: TurnUsage(
+                    inputTokens: 10,
+                    outputTokens: 5,
+                    costUsd: 0.5,
+                  ),
+                ),
+              ),
+            )!
+            as UserMessageItem;
+    expect(prompt.usage?.totalTokens, 15);
+    expect(prompt.usage?.costUsd, 0.5);
+  });
 }
