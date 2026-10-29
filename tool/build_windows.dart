@@ -13,6 +13,12 @@
 //                                                  without VERSION; tool/
 //                                                  fetch_remote_server.dart)
 //                                                  instead of building one
+//   dart run tool/build_windows.dart --check       ask only what the build
+//                                                  needs (Inno Setup, an
+//                                                  engine that fits, plugin
+//                                                  links CMake can walk,
+//                                                  nothing running from the
+//                                                  bundle), and stop
 //   dart run tool/build_windows.dart --stock-engine keep Flutter's own
 //                                                  flutter_windows.dll
 //   dart run tool/build_windows.dart --channel      the channel build
@@ -148,6 +154,26 @@ Future<void> main(List<String> arguments) async {
   final installers = Directory('${root.path}\\$_installersRelative');
   final version = _readVersion(File('${root.path}\\pubspec.yaml'));
 
+  // Everything that can be known without building, before the ten minutes
+  // a build takes: no Inno Setup, a Flutter the patched engine does not
+  // fit, a plugin link CMake will not be able to walk, a running app
+  // holding the output. Each of them otherwise comes out only after the
+  // wait, and the build is thrown away.
+  _step('Checking what the build needs, before building');
+  final iscc = _findIscc();
+  _checkEngineFits(root, bundle, arch, stockEngine);
+  _checkPlugins(root);
+  _checkRunningApp(root, arch);
+  if (arguments.contains('--check')) {
+    _step('Everything the build needs is here');
+    stdout.writeln(
+      '  Not built: --check asks only what can be known beforehand.\n'
+      '  Build with: dart run tool/build_windows.dart'
+      '${stockEngine ? ' --stock-engine' : ''}',
+    );
+    return;
+  }
+
   if (!skipBuild) {
     _step(
       'Building the Release bundle for $arch'
@@ -230,7 +256,6 @@ Future<void> main(List<String> arguments) async {
   _checkBundle(bundle, [for (final name in _openSshFiles) 'openssh\\$name']);
 
   _step('Compiling the installer');
-  final iscc = _findIscc();
   installers.createSync(recursive: true);
   await _run(iscc, [
     '/DBundleDir=${bundle.path}',
@@ -330,6 +355,253 @@ void _checkBundle(Directory directory, List<String> required) {
     'install step that writes data\\ never ran. If the build reported\n'
     'LNK1104, a running mooncode.exe is holding the output file — close it and\n'
     'build again.',
+  );
+}
+
+/// Says whether Flutter this machine builds with is the one tool/engine's
+/// engine was built from, before the build rather than after it: the patched
+/// engine is a Flutter release, and only the release of its own snapshot can
+/// take it. Asked of the SDK's own cached engine, whose SHA-256 is known
+/// without building anything ([_stockEngineSha256] is that release's).
+///
+/// With [stockEngine] there is nothing to fit: Flutter's own is kept, and
+/// whatever version this is, the build is right.
+void _checkEngineFits(
+  Directory root,
+  Directory bundle,
+  String arch,
+  bool stockEngine,
+) {
+  if (stockEngine) {
+    stdout.writeln(
+      '  Flutter\'s own engine is kept'
+      '${arch == 'x64' ? '' : ' (none patched for $arch)'}: any version fits.',
+    );
+    return;
+  }
+  final flutter = _flutterRoot();
+  final stock = File(
+    '${flutter.path}\\bin\\cache\\artifacts\\engine\\windows-x64'
+    '\\flutter_windows.dll',
+  );
+  if (!stock.existsSync()) {
+    _fail(
+      'Flutter has no windows-x64 engine cached at\n'
+      '  ${stock.path}\n'
+      '\n'
+      'Run `flutter doctor` once to download it, then build again.',
+    );
+  }
+  final current = sha256.convert(stock.readAsBytesSync()).toString();
+  if (current != _stockEngineSha256) {
+    _fail(
+      'This machine\'s Flutter is not the release the patched engine was built\n'
+      'from, so the patched engine would not run against its snapshot.\n'
+      '\n'
+      '  ${stock.path}\n'
+      '  is $current\n'
+      '  the patched engine replaces $_stockEngineSha256\n'
+      '\n'
+      'Either build with --stock-engine (keeps Flutter\'s own engine: text\n'
+      'rendering is Flutter\'s, and the build is otherwise the same), or\n'
+      'rebuild the engine for this Flutter with\n'
+      'tool/engine/build_windows_engine.ps1 -Tag <its version> -Mode release,\n'
+      'put its flutter_windows.dll in tool/engine, and update both hashes in\n'
+      'this script (see tool/engine/README.md).\n'
+      '\n'
+      '  flutter: ${flutter.path}',
+    );
+  }
+  stdout.writeln('  The patched engine fits this machine\'s Flutter.');
+}
+
+/// Where the Flutter this build uses is installed: the SDK the running
+/// `dart` belongs to, which is the one `_run('flutter', …)` resolves.
+Directory _flutterRoot() {
+  final sdk = File(Platform.resolvedExecutable).parent.parent;
+  final flutterRoot = Directory('${sdk.parent.path}\\flutter');
+  // dart run from Flutter's own cache: <flutter>\bin\cache\dart-sdk\bin.
+  if (flutterRoot.existsSync() &&
+      File('${flutterRoot.path}\\bin\\flutter.bat').existsSync()) {
+    return flutterRoot;
+  }
+  // Not Flutter's dart (a standalone one): ask PATH's flutter where it is.
+  final which = Process.runSync('where', ['flutter'], runInShell: true);
+  final first = '${which.stdout}'
+      .split(RegExp(r'\r?\n'))
+      .firstWhere((line) => line.trim().isNotEmpty, orElse: () => '');
+  if (which.exitCode == 0 && first.isNotEmpty) {
+    return File(first.trim()).parent.parent;
+  }
+  _fail(
+    'No Flutter found: neither beside the running Dart (${sdk.path}) nor on\n'
+    'the PATH. Put its bin on the PATH, or run this with that Flutter\'s own\n'
+    'dart: <flutter>\\bin\\dart run tool/build_windows.dart',
+  );
+}
+
+
+/// The plugins, through the links `flutter build windows` makes under
+/// windows\flutter\ephemeral\.plugin_symlinks and CMake then reads. Asking
+/// whether each can be walked is the only way to know: a link Windows will
+/// not traverse is still a link, and the failure comes out deep in CMake as
+/// "add_subdirectory given source … which is not an existing directory" —
+/// no mention of the plugin, after nothing has been compiled.
+///
+/// A link is not walkable when Windows marks it an untrusted mount point,
+/// which is what a process running below the integrity the link was made at
+/// leaves behind (ERROR_UNTRUSTED_MOUNT_POINT, 448). Making them again from
+/// here cannot help — this script runs in that same process. So it says what
+/// to do, before the build rather than after it.
+///
+/// A directory that has never been built has none of them yet: whether this
+/// process can make a working one is asked instead, with a link of its own
+/// that is taken away again.
+void _checkPlugins(Directory root) {
+  final links = Directory(
+    '${root.path}\\windows\\flutter\\ephemeral\\.plugin_symlinks',
+  );
+  if (links.existsSync()) {
+    final unreachable = [
+      for (final entity in links.listSync(followLinks: false))
+        if (_unwalkable(entity) case final why?)
+          '${entity.path.split(RegExp(r'[\\/]')).last}: $why',
+    ];
+    if (unreachable.isEmpty) {
+      stdout.writeln('  The plugins\' links can be walked.');
+      return;
+    }
+    _fail(
+      'Flutter\'s plugin links cannot be walked on this machine, so the CMake\n'
+      'step would fail with a path that does not exist and no mention of the\n'
+      'plugin:\n'
+      '\n'
+      '${unreachable.map((line) => '  $line').join('\n')}\n'
+      '\n'
+      'They were made by a process Windows did not vouch for, and the ones\n'
+      'this build makes would be the same (see below). Delete them:\n'
+      '\n'
+      '  rmdir /s /q "${links.path}"',
+    );
+  }
+  final probe = _linksWork(root);
+  if (probe == null) {
+    stdout.writeln('  The plugins\' links this build makes can be walked.');
+    return;
+  }
+  _fail(
+    'A link this process makes cannot be walked on this machine, so the\n'
+    'plugins `flutter build windows` links would fail in CMake as\n'
+    '"add_subdirectory given source … which is not an existing directory",\n'
+    'with no mention of the plugin and after nothing has been compiled:\n'
+    '\n'
+    '  $probe\n'
+    '\n'
+    'Windows marks a link untrusted when the process that made it runs on a\n'
+    'token Windows will not vouch for, and then refuses to walk it\n'
+    '(ERROR_UNTRUSTED_MOUNT_POINT, 448). Nothing in this script can change\n'
+    'that: it runs on the same token, and so does every process it starts.\n'
+    '\n'
+    'Run it once from a Command Prompt started with "Run as administrator".\n'
+    'That token holds SeCreateSymbolicLinkPrivilege, which is what makes a\n'
+    'link trusted. Flutter makes them once, in windows\\flutter\\ephemeral,\n'
+    'and every later build — this one included — finds them walkable.',
+  );
+}
+
+/// Why a link this process makes cannot be walked, or null when one can. A
+/// folder beside the plugin links is used, made and removed again: the same
+/// volume, the same token, nothing of the build's touched.
+String? _linksWork(Directory root) {
+  final probe = Directory(
+    '${root.path}\\windows\\flutter\\ephemeral\\.link_probe',
+  ).path;
+  final target = Directory('$probe-target');
+  try {
+    target.createSync(recursive: true);
+    File('${target.path}\\a.txt').writeAsStringSync('a');
+    final link = Link(probe);
+    if (link.existsSync()) link.deleteSync();
+    link.createSync(target.path);
+    try {
+      if (Directory(probe).listSync(followLinks: false).isEmpty) {
+        return 'a link it made lists as empty';
+      }
+      return null;
+    } on Object catch (error) {
+      return 'a link it made cannot be walked (${_shortError(error)})';
+    } finally {
+      if (link.existsSync()) link.deleteSync();
+    }
+  } on Object catch (error) {
+    return _shortError(error);
+  } finally {
+    if (target.existsSync()) target.deleteSync(recursive: true);
+  }
+}
+
+/// Why CMake cannot read [entity], one line, or null when it can.
+String? _unwalkable(FileSystemEntity entity) {
+  try {
+    // Not resolveSymbolicLinksSync: what CMake does is list the folder
+    // itself, and only that says whether the path can be walked.
+    Directory(entity.path).listSync(followLinks: false);
+    return null;
+  } on Object catch (error) {
+    return _shortError(error);
+  }
+}
+
+/// [error]'s own words, without what the line beside it already says: the
+/// kind of exception goes, the machine's own error code goes, and the path
+/// goes — the reason alone is left.
+String _shortError(Object error) {
+  var text = '$error';
+  for (final prefix in ['FileSystemException: ', 'PathAccessException: ']) {
+    if (text.startsWith(prefix)) {
+      text = text.substring(prefix.length);
+      break;
+    }
+  }
+  final path = text.indexOf(", path = ");
+  if (path > 0) text = text.substring(0, path);
+  return text;
+}
+
+/// A running mooncode.exe holds build\windows\<arch>\runner\Release\mooncode.exe
+/// against being written, and CMake fails at the link with LNK1104 — after
+/// the whole compile. One running from elsewhere (the installed app) holds
+/// nothing of the build's, and is left alone: only that path is the fault.
+void _checkRunningApp(Directory root, String arch) {
+  final bundle = '${root.path}\\${_bundleRelative(arch)}'.toLowerCase();
+  final result = Process.runSync('powershell', [
+    '-NoProfile',
+    '-Command',
+    r'Get-Process mooncode -ErrorAction SilentlyContinue |'
+        r' ForEach-Object { try { $_.Path } catch { "" } }',
+  ], runInShell: true);
+  final running = '${result.stdout}'
+      .split(RegExp(r'\r?\n'))
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .toList();
+  final holding = [
+    for (final path in running)
+      if (path.toLowerCase().startsWith(bundle)) path,
+  ];
+  if (holding.isEmpty) {
+    stdout.writeln('  Nothing is holding the bundle.');
+    return;
+  }
+  _fail(
+    'A mooncode.exe built here is running, and holds the file the link step\n'
+    'writes:\n'
+    '\n'
+    '${holding.map((path) => '  $path').join('\n')}\n'
+    '\n'
+    'Close it (the build would fail with LNK1104 after the whole compile),\n'
+    'then build again. An installed copy running from\n'
+    '"%LOCALAPPDATA%\\Programs" holds nothing of the build\'s and is fine.',
   );
 }
 

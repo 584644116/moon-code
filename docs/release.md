@@ -334,6 +334,8 @@ releases/
 | `publish` 在上传 `latest.json` 之前失败 | 用户什么都看不到。修好后按第 3 节重新发布同一个版本即可 |
 | 发出去的版本有问题 | 尽快发一个修复版（版本号更高）。也可以把上一版的 `latest.json` 传回去，让还没更新的人停在旧版，但已经更新的人不会被降级。见 [auto-update.md 5.5](auto-update.md#55-撤回一个版本) |
 | 用户报“检查更新失败” | 见 [auto-update.md 第 10 节](auto-update.md#10-故障排查) |
+| 本机构建：`A link this process makes cannot be walked` | 当前这个终端造不出 Windows 信任的符号链接（`whoami /priv` 里没有 `SeCreateSymbolicLinkPrivilege`），而 `flutter build windows` 要给每个插件在 `windows\flutter\ephemeral\.plugin_symlinks` 造一条，CMake 走不进去就报 `add_subdirectory given source … which is not an existing directory`，还说不出是哪个插件。**用管理员身份开一个命令提示符**，在仓库里跑一次 `flutter build windows --release`：链接造好之后就一直在（`windows/.gitignore` 忽略了 `flutter/ephemeral/`），之后普通终端跑 `dart run tool/build_windows.dart` 都能过。已经存在但走不进去的链接，先 `rmdir /s /q windows\flutter\ephemeral\.plugin_symlinks` |
+| 本机构建：`--check` 说引擎不匹配 | 补丁引擎（`tool/engine/`）只对它自己那个 Flutter 版本有效，本机 Flutter 换过版本就对不上。加 `--stock-engine` 用 Flutter 自带的引擎（只是文字渲染和补丁版不同），或者按 `tool/engine/README.md` 重编 |
 
 ## 9. 不用 CI，手动发布
 
