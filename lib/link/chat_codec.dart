@@ -17,6 +17,7 @@ abstract final class ChatCodec {
       if (item.queued) 'queued': true,
       if (item.images.isNotEmpty) 'images': _images(item.images),
       'worked': ?item.worked?.inMilliseconds,
+      'at': ?item.sentAt?.millisecondsSinceEpoch,
       if (item.usage case final usage?)
         'usage': {
           'in': ?usage.inputTokens,
@@ -151,6 +152,7 @@ abstract final class ChatCodec {
         queued: json['queued'] == true,
         images: _decodeImages(json['images']),
         worked: duration('worked'),
+        sentAt: time('at'),
         usage: switch (json['usage']) {
           final Map<String, Object?> usage => TurnUsage(
             inputTokens: (usage['in'] as num?)?.toInt(),

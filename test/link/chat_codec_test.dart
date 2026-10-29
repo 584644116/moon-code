@@ -112,5 +112,18 @@ void main() {
             as UserMessageItem;
     expect(prompt.usage?.totalTokens, 15);
     expect(prompt.usage?.costUsd, 0.5);
+    final sent = DateTime(2026, 10, 29, 14, 5);
+    expect(
+      (ChatCodec.decode(
+                jsonDecode(
+                  jsonEncode(
+                    ChatCodec.encode(UserMessageItem(text: 'hi', sentAt: sent)),
+                  ),
+                ),
+              )!
+              as UserMessageItem)
+          .sentAt,
+      sent,
+    );
   });
 }

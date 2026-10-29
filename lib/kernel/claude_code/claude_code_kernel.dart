@@ -940,7 +940,12 @@ class ClaudeCodeKernel
       ItemUpserted(
         nextSeq,
         turn.id,
-        UserMessageItem(text: turn.text, queued: busy, images: turn.images),
+        UserMessageItem(
+          text: turn.text,
+          queued: busy,
+          images: turn.images,
+          sentAt: DateTime.now(),
+        ),
       ),
     );
     // Taken now, as the message was sent.
@@ -2114,6 +2119,7 @@ class ClaudeCodeKernel
               UserMessageItem(
                 text: _sent[id]?.text ?? '',
                 images: _sent[id]?.images ?? const [],
+                sentAt: DateTime.now(),
               ),
             ),
           );

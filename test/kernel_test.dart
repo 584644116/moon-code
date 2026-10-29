@@ -1372,6 +1372,13 @@ void main() {
       expect(worked('p1'), const Duration(seconds: 45));
       expect(worked('p2'), isNull, reason: 'stopped');
       expect(worked('p3'), const Duration(seconds: 3));
+      // When each was sent, as kept: for a chat app's times.
+      expect(
+        (transcript.itemAt(
+          transcript.indexOf('p2')!,
+        ) as UserMessageItem).sentAt,
+        DateTime.utc(2026, 10, 1, 10, 0, 50).toLocal(),
+      );
     });
 
     test('translating a message twice changes nothing', () {
