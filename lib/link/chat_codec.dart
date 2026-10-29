@@ -15,16 +15,7 @@ abstract final class ChatCodec {
       't': 'user',
       'text': item.text,
       if (item.queued) 'queued': true,
-      if (item.images.isNotEmpty)
-        'images': [
-          for (final image in item.images)
-            {
-              'data': base64.encode(image.bytes),
-              'type': image.mediaType,
-              'name': ?image.name,
-              'n': ?image.number,
-            },
-        ],
+      if (item.images.isNotEmpty) 'images': _images(item.images),
       'worked': ?item.worked?.inMilliseconds,
     },
     AssistantTextItem() => {'t': 'text', 'text': item.text},
@@ -46,6 +37,21 @@ abstract final class ChatCodec {
       'status': item.status.name,
       'output': ?_head(item.output),
       'tool': ?item.tool,
+      // The pictures it returned (an image model's, a file read), but for
+      // a failed call's.
+      if (item.images.isNotEmpty && item.status != ToolStatus.failed)
+        'images': _images(item.images),
+      // Pictures under way: how many, and of what shape, for their places
+      // to show as big as they will be; once its input has come.
+      if (item.kind == ToolKind.image && item.input.containsKey('prompt'))
+        'making': {
+          'count': switch (item.input['count']) {
+            final num count => count.toInt().clamp(1, 4),
+            _ => 1,
+          },
+          'size': ?(item.input['size'] as String?),
+          'aspect': ?(item.input['aspect_ratio'] as String?),
+        },
     },
     AgentItem() => {
       't': 'agent',
@@ -126,19 +132,7 @@ abstract final class ChatCodec {
       'user' => UserMessageItem(
         text: text('text'),
         queued: json['queued'] == true,
-        images: [
-          for (final image in (json['images'] as List?) ?? const [])
-            if (image case {
-              'data': final String data,
-              'type': final String type,
-            })
-              ImageAttachment(
-                bytes: base64.decode(data),
-                mediaType: type,
-                name: image['name'] as String?,
-                number: (image['n'] as num?)?.toInt(),
-              ),
-        ],
+        images: _decodeImages(json['images']),
         worked: duration('worked'),
       ),
       'text' => AssistantTextItem(text('text')),
@@ -158,6 +152,16 @@ abstract final class ChatCodec {
         status: named(ToolStatus.values, 'status', ToolStatus.succeeded),
         output: optional('output'),
         tool: optional('tool'),
+        images: _decodeImages(json['images']),
+        input: switch (json['making']) {
+          final Map<String, Object?> making => {
+            'prompt': '',
+            'count': ?making['count'],
+            'size': ?making['size'],
+            'aspect_ratio': ?making['aspect'],
+          },
+          _ => const {},
+        },
       ),
       'agent' => AgentItem(
         description: text('description'),
@@ -220,6 +224,27 @@ abstract final class ChatCodec {
       _ => null,
     };
   }
+
+  static List<Map<String, Object?>> _images(List<ImageAttachment> images) => [
+    for (final image in images)
+      {
+        'data': base64.encode(image.bytes),
+        'type': image.mediaType,
+        'name': ?image.name,
+        'n': ?image.number,
+      },
+  ];
+
+  static List<ImageAttachment> _decodeImages(Object? json) => [
+    for (final image in (json as List?) ?? const [])
+      if (image case {'data': final String data, 'type': final String type})
+        ImageAttachment(
+          bytes: base64.decode(data),
+          mediaType: type,
+          name: image['name'] as String?,
+          number: (image['n'] as num?)?.toInt(),
+        ),
+  ];
 
   static String? _head(String? text) => text == null || text.length <= maxOutput
       ? text
