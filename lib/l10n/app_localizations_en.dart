@@ -11308,6 +11308,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get gitLogInNoBranch => 'No branch has this commit.';
 
   @override
+  String gitLogInBranches(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count branches',
+      one: '1 branch',
+    );
+    return 'In $_temp0';
+  }
+
+  @override
   String get gitLogList => 'List';
 
   @override
@@ -11390,6 +11401,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get gitLogCopyHash => 'Copy the full hash';
+
+  @override
+  String get gitLogCopyRefNames => 'Copy Branch or Tag Name';
+
+  @override
+  String gitLogCopyName(String name) {
+    return 'Copy \'$name\'';
+  }
 
   @override
   String get gitLogLoading => 'Loading history…';
