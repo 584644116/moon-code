@@ -42,6 +42,7 @@ import 'turn_stats.dart';
 import 'control_channel.dart';
 import 'local_time_zone.dart';
 import 'usage_limit.dart';
+import 'claude_numbers.dart';
 
 /// Reads a kept session: its conversation lines, oldest first, along the
 /// branch the session ended on.
@@ -2182,16 +2183,12 @@ class ClaudeCodeKernel
       // API time is the session's, too coarse for a speed).
       usage: switch (message['usage']) {
         final Map<Object?, Object?> usage => TurnUsage(
-          inputTokens:
-              [
-                'input_tokens',
-                'cache_creation_input_tokens',
-                'cache_read_input_tokens',
-              ].fold<int>(
-                0,
-                (sum, key) => sum + ((usage[key] as num?) ?? 0).toInt(),
-              ),
-          outputTokens: (usage['output_tokens'] as num?)?.toInt(),
+          inputTokens: [
+            'input_tokens',
+            'cache_creation_input_tokens',
+            'cache_read_input_tokens',
+          ].fold<int>(0, (sum, key) => sum + (claudeInt(usage[key]) ?? 0)),
+          outputTokens: claudeInt(usage['output_tokens']),
           costUsd: turnCost,
         ),
         _ => TurnUsage(costUsd: turnCost),
@@ -2603,10 +2600,7 @@ class ClaudeCodeKernel
     };
     if (id == null || usage == null) return false;
     final model = (body as Map)['model'] as String?;
-    int count(String key) => switch (usage[key]) {
-      final num n => n.toInt(),
-      _ => 0,
-    };
+    int count(String key) => claudeInt(usage[key]) ?? 0;
     final tokens = CacheTokens(
       read: count('cache_read_input_tokens'),
       written: count('cache_creation_input_tokens'),

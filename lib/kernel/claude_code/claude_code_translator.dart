@@ -8,6 +8,7 @@ import '../output_meter.dart';
 import 'claude_goal.dart';
 import 'claude_sdk_tools.dart';
 import 'turn_stats.dart';
+import 'claude_numbers.dart';
 
 /// The agent's own context tools, called and answered: the chat shows what
 /// they did as a notice, not as a tool call.
@@ -543,9 +544,11 @@ class ClaudeTranslator {
       case 'message_delta':
         final usage = _map(event['usage']);
         for (final MapEntry(:key, :value) in usage.entries) {
-          if (value is num) _messageUsage[key] = value;
+          if (claudeNumber(value) != null) _messageUsage[key] = value;
         }
-        if (usage['output_tokens'] is num) _messageCounted = true;
+        if (claudeNumber(usage['output_tokens']) != null) {
+          _messageCounted = true;
+        }
         if (_map(usage['output_tokens_details'])['thinking_tokens']
             case final num tokens) {
           _messageThinking = tokens.toInt();
@@ -667,7 +670,7 @@ class ClaudeTranslator {
 
   /// Adds the message ended to the turn's usage.
   void _endMessage() {
-    int count(String key) => (_messageUsage[key] as num?)?.toInt() ?? 0;
+    int count(String key) => claudeInt(_messageUsage[key]) ?? 0;
     final output = count('output_tokens');
     _turnInput +=
         count('input_tokens') +
