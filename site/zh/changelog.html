@@ -30,6 +30,41 @@
   <h1>更新日志</h1>
   <p class="subtitle">BaoCode 每个版本的变化。</p>
 
+  <section class="release" id="v1.7.0">
+    <h2 class="plain"><a href="#v1.7.0">1.7.0</a></h2>
+    <p>诊断、bots，和更顺手的应用</p>
+    <p>这一版主要在说两件事：出了问题能查到，平时不挡路。卡住或崩溃会留下可以看、可以发出去的报告，界面不再时不时冻住几秒，Enhance Prompt 也从一两分钟降到十几秒。另外新增了 bots——像和人聊天一样跟它说话的 agent，手机上就能用；还有一条中继，让手机在任何网络下都能连回这台电脑。</p>
+    <p>新功能</p>
+    <ul>
+    <li>Bots：像和人聊天一样说话的 agent，在手机上使用。每个 bot 有自己的名字、头像、性别、签名和说话风格，模型也可以单独选。它能看 agent 的对话、在项目里开一个新对话、像你一样给 agent 发消息、读项目文件、用浏览器、生成图片，也能在有事发生时先开口（一次运行结束了、失败了），每天最多几次，安静时段不打扰。它自己的图片和表情包会显示在聊天里。</li>
+    <li>手机从任何网络连回来：两边互相看不见时，由中继转发手机的连接，不用开放端口，也不用公网地址。桌面端自己拿着中继地址和只有它知道的 token；数据在到达中继之前就已经加密，中继读不到内容。设置 → 手机 里能看到桌面端这一头的状态。</li>
+    <li>诊断：应用卡住或一次运行不正常结束时，事件日志会记下是怎么结束的；macOS 上会把系统的卡顿和崩溃报告连同日志一起收集，卡住时还会采样调用栈，并把 Dart 的帧对应到源码。在设置 → 诊断 里可以一次性发出去。</li>
+    <li>Git 图：泳道不再截断在 12 条，提交详情可以选中复制，分支名按原样显示——名字里带斜杠的本地分支不再被当成远程分支。</li>
+    <li>提交面板：每个改动前有一个复选框，文件列表可以切换成列表或树，还能只按勾选的改动生成提交信息。</li>
+    <li>会话侧栏的文件树会显示每个文件的 Git 状态；改动过的 markdown 文件按渲染结果显示，点一下就切到 diff。</li>
+    <li>回复里的 Mermaid 图会画出来，并且会告诉 agent 聊天界面能渲染什么，让它写出能显示的内容。</li>
+    <li>查找和搜索支持跨行：粘贴进去的多行文本按原样能找到，分成两行的短语也能搜到。</li>
+    <li>用键盘缩放界面、恢复默认大小；界面尺寸的变化会连同原因一起记进事件日志。</li>
+    <li>IDE 活动栏底部加了设置齿轮。</li>
+    <li>手机端能看到工具调用带回来的图片、浏览器每一步做了什么、agent 的目标和当前轮次进展，以及每条 bot 消息的发送时间。</li>
+    </ul>
+    <p>改进</p>
+    <ul>
+    <li>不再卡住：读取系统代理时会在界面线程上执行一条命令，现在放到别处执行，不会再冻住窗口。截图和构建启动的进程也一样。</li>
+    <li>Enhance Prompt 快了很多。实测六次里有三次返回过长，而这三次恰好是最慢的——其中一次耗了两分钟才放弃。现在会要求它按提问的体量来写，写超了会在生成过程中就停下。</li>
+    <li>浏览器的大消息不再每收一块就把整个缓冲区复制一遍：20MB 从 5.5 秒降到 0.3 秒。</li>
+    <li>复制回复时保留 Markdown 原文：长文本粘贴回来不再被截成「[Pasted text #1 +660 lines]」。</li>
+    <li>用 GBK 编码回应的 MCP 服务器能正确读出内容，不再乱码。</li>
+    </ul>
+    <p>修复</p>
+    <ul>
+    <li>模型把 token 数写成字符串（&quot;input_tokens&quot;: &quot;1234&quot;）时不再报错。</li>
+    <li>正在编辑的消息保持是编辑框那一行，不会被缓存的旧气泡盖住。</li>
+    <li>输入法在选中文字上组合输入时替换选中内容，而不是两者都留下。</li>
+    <li>Windows 上浏览器后台程序读到过期的 TEMP 目录时，现在能找回正确的端口。</li>
+    </ul>
+  </section>
+
   <section class="release" id="v1.6.0">
     <h2 class="plain"><a href="#v1.6.0">1.6.0</a></h2>
     <p>性能优化</p>
@@ -72,6 +107,126 @@
     <li>侧边栏放在左边且隐藏侧栏时，标签页会避开 macOS 左上角的红绿灯，显示侧栏的按钮也挪到了这里；拖动侧边栏边缘时从当前宽度开始跟手。</li>
     <li>远程项目里跳转到定义，会在远程主机上打开正确的文件。</li>
     <li>Windows：升级或卸载时会先关掉浏览器扩展的后台程序，不再报「DeleteFile failed; code 5」。</li>
+    </ul>
+  </section>
+
+  <section class="release" id="v1.5.2">
+    <h2 class="plain"><a href="#v1.5.2">1.5.2</a></h2>
+    <p>新功能</p>
+    <ul>
+    <li>A /command shows its whole description, its file opens</li>
+    <li>A changed file's menu opens it as a file, in the browser, its default app or an editor</li>
+    <li>An upstream or a model duplicated in a click</li>
+    <li>Enter in the empty composer while the agent works sends the queued message now</li>
+    <li>the CLI is the default core; the built-in one suggests it</li>
+    <li>Subagents may run on another upstream's model, through the proxy</li>
+    <li>Stashes are the projects' issues, kept in step; listed as rows</li>
+    <li>the codex adapter answers everything the server asks</li>
+    <li>export the conversation shown as a ZIP</li>
+    <li>the reply's language reaches both cores</li>
+    <li>say what an approval is about; full access where it is taken</li>
+    <li>the reply's language, the thinking, the permission it starts in</li>
+    <li>a tool call says how long it took; a card is sent once</li>
+    <li>read a command before letting it through, on Windows too</li>
+    <li>bring in what another conversation said</li>
+    <li>tell the phone how full the context is</li>
+    <li>show what an MCP server offers</li>
+    <li>show what the turn changed, and what it delivered</li>
+    <li>export a session as a ZIP</li>
+    <li>say what an approval is about, and keep secrets out of logs</li>
+    <li>ask an empty answer again, and let compaction be tuned</li>
+    <li>cut the middle out of old tool results before clearing them</li>
+    <li>keep the context reserve, repeated calls and slow tools in check</li>
+    <li>compact with room for the answer, and keep the last exchange</li>
+    <li>let the model fold, search and restore its own context</li>
+    <li>fold a range of the conversation, and bring it back</li>
+    <li>classify API failures, guard the dangerous, wait less</li>
+    <li>independent subagent contexts, safer auto mode, and leaner long sessions</li>
+    <li>auto approvals on another provider's model, and the pending work</li>
+    <li>A / starting any word opens the command menu, not only the message's first</li>
+    <li>the agents' times can be turned off in Settings → Appearance, their hover still telling them</li>
+    <li>a long conversation is read from its end, the earlier turns as the list is scrolled to its top; a phone may follow it so too (open with a window, earlier)</li>
+    <li>an event log of windows, views, the app's state and its theme, uploaded with the diagnostics</li>
+    <li>stash forge and threads, accounts page, agent edits in the IDE, chat branch bar, UI zoom</li>
+    <li>reach a desktop over wss:// (Cloudflare Tunnel without turning HTTPS off)</li>
+    <li>a graph commit's files show as a tree, its references outlined</li>
+    <li>the Fast Ide opens in the main window by default</li>
+    <li>the graph names every commit's branches and tags</li>
+    <li>the archived agents' heading has their menu too</li>
+    <li>a repository's submodules are repositories of their own</li>
+    <li>the graph shows all branches when asked</li>
+    <li>a repository on the changes page has a context menu</li>
+    <li>a block between tags is a section that folds, not raw text</li>
+    <li>no global shortcut until one is set</li>
+    <li>an agent's changes open in a diff only when turned on</li>
+    </ul>
+    <p>改进</p>
+    <ul>
+    <li>Editors share one tokenizer and its compiled patterns, and line shapes keep to 32MB</li>
+    <li>Skia's and the image cache are kept small, and malloc hands back large blocks</li>
+    <li>a long reply lets go of what is far out of view</li>
+    <li>Paths in a long session's text looked up by index; hang reports readable</li>
+    <li>The focused input no longer draws on every frame</li>
+    <li>the code shows at once; the probes behind it are kept</li>
+    <li>a reply grows without its whole text parsed again each frame</li>
+    <li>start a search from the conversations that can match</li>
+    <li>let a tool call's input go once its result is in</li>
+    </ul>
+    <p>修复</p>
+    <ul>
+    <li>the export command is titled in Chinese too</li>
+    <li>the side panel's entry is closed, the command's after it</li>
+    <li>A range's ~ strikes nothing out; the / menu keeps its height; Setup ends the browser host</li>
+    <li>a file named two ways is one file</li>
+    <li>At the window's left, the sidebar's toggle is the panel's, by the traffic lights</li>
+    <li>A conversation shown again is where it was left</li>
+    <li>A conversation renamed in Claude Code (/rename) is named so in the list</li>
+    <li>At the window's top left, its tabs clear of the traffic lights</li>
+    <li>@ finds folders too, by their names, among the files</li>
+    <li>The browser not opening the setup page is said, with its address to copy</li>
+    <li>The panel's edge follows the pointer from where it shows</li>
+    <li>A menu's bare icon at 16px in the label's color, not over the label</li>
+    <li>A drag in the preview selects under the pointer when zoomed</li>
+    <li>prevent dirty Quill editors from stealing focus back</li>
+    <li>An SSH connection lost is made again to the same session, nothing there ended or lost</li>
+    <li>A trackpad flings the editors as it does lists, and nothing bounces at its ends</li>
+    <li>a file icon for a name of one letter; the mode a new chat starts in</li>
+    <li>Polish and Enhance keep the message it was given</li>
+    <li>quit without a crash; drawn by Skia, not Impeller</li>
+    <li>a definition in a remote project opens on its host, its path read as the host spells it, not as a path on this machine</li>
+    <li>a NO_PROXY network is passed on to Claude Code too, which talks to a provider on a Tailscale address itself and reads it (#138)</li>
+    <li>an address in a NO_PROXY network (100.64.0.0/10, Tailscale's) goes around the proxy, as curl reads it (#137)</li>
+    <li>the main window opens where it was left, as big, maximized if it was (#128)</li>
+    <li>a build run from the source leaves Claude Code's skills to the installed app, not pointing the user's agents at its own stashes</li>
+    <li>the button to read the earlier turns again is the app's own, not Material's</li>
+    <li>the earlier turns come in before what is shown, which stays where it is, the spinner on till they are read; a failed read is left whole</li>
+    <li>back in the window after an Alt+Tab, its first key types and its frames go on, no click needed</li>
+    <li>a function bash exports (environment modules' ml, module) reaches the terminal whole, the shell's environment read NUL-separated</li>
+    <li>a symbolic link is listed in the explorer as what it leads to, remote projects' too</li>
+    <li>a page of a session leaves out what is not shown of it, a file read whole, a picture, a file before an edit</li>
+    <li>a long turn is read a page at a time too, cut where the agent began a message, its calls with their results</li>
+    <li>a subagent continued (SendMessage) opens from its row above the composer, and goes on in its card</li>
+    <li>another provider picked is taken up with the next message even while a task works in the background</li>
+    <li>a message sent while the agent works waits for the turn running, or joins it when set to</li>
+    <li>with the Stash or Customize shown, the conversation picked before is not shown picked too</li>
+    <li>a stash moved in place (an agent's write on Windows) shows without a restart</li>
+    <li>a queued message taken back to edit lands in the composer</li>
+    <li>the editors' icons are the IDE's codicons</li>
+    <li>Back to Chat and Open in Fast Ide are as wide as each other</li>
+    <li>the files of a repository inside the project are listed too</li>
+    <li>Quick Open in a remote project waits on neither the connection nor the scoring</li>
+    <li>text typed in a URL stays where it is typed</li>
+    <li>a subagent's row over the composer opens it wherever it is</li>
+    <li>a file shown again has its caret where it was left</li>
+    <li>the window's buttons at its right end, in the IDE title bar's order</li>
+    <li>a card selected as the explorer's file, and switched faster</li>
+    <li>in the IDE the conversation spans its pane, not centered in it</li>
+    <li>an image too big to show small is not read for its chip</li>
+    <li>an exclude glob's {a,b} kept as one pattern</li>
+    <li>files shown from a chat removed a week after last shown</li>
+    </ul>
+  </section>
+
   <section class="release" id="v1.5.1">
     <h2 class="plain"><a href="#v1.5.1">1.5.1</a></h2>
     <p>长会话不再变慢</p>
