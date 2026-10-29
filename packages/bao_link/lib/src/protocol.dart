@@ -40,9 +40,9 @@ abstract final class LinkMethods {
   static const close = 'close';
 
   /// `{"session"?, "project"?, "bot"?, "text", "images"?, "mentions"?,
-  /// "now"?}`: a message to the session; with no session, to a new one in
-  /// the project, or to the bot's conversation ([LinkBot.id]), started if
-  /// it has none.
+  /// "now"?}`: a message to the bot's conversation ([LinkBot.id]), started
+  /// if it has none; else to the session; with neither, to a new one in the
+  /// project.
   /// Images are `{"data" (base64), "type", "name"?}`; mentions, the
   /// project's files the text names (`@path`), from its root. With `now`,
   /// taken up at once, the turn running stopped for it, rather than queued

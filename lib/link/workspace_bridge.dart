@@ -277,10 +277,11 @@ class WorkspaceBridge {
         final text = (params['text'] as String? ?? '').trim();
         if (text.isEmpty && _images(params['images']).isEmpty) return null;
         final AgentThread thread;
-        if (params['session'] case final Object id) {
-          thread = _thread(id);
-        } else if (params['bot'] case final Object id) {
+        if (params['bot'] case final Object id) {
+          // Its conversation, whichever it is now.
           thread = _bots().threadFor(_bot(id));
+        } else if (params['session'] case final Object id) {
+          thread = _thread(id);
         } else if (params['project'] case final String path) {
           thread = workspace.startAgent(_project(path));
         } else {

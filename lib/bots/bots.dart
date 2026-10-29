@@ -89,6 +89,8 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
     workspace.agentSetup = _setup;
     ClaudeSdkTools.gate = this;
     BotTools.register(this);
+    // Each with its conversation, for the phones to open from the first.
+    _bots.forEach(threadFor);
     workspace.addListener(_watch);
     _watch();
     notifyListeners();
@@ -253,6 +255,7 @@ class Bots extends ChangeNotifier implements ClaudeSdkGate {
       final made = Bot.fromJson(bot.toJson(), root: root)!;
       folders.make(made.folder);
       _bots.add(made);
+      if (_started) threadFor(made);
       _save();
       notifyListeners();
       return made;
